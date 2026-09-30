@@ -140,8 +140,9 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 .bst b{display:block;font-family:var(--f-num);font-weight:500;font-size:20px;color:var(--gold-text)}
 .bst small{font-size:11.5px;color:var(--muted)}
 @media (max-width:760px){
-  .layout{grid-template-columns:minmax(0,1fr)}
-  .side{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:6px}
+  .layout{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr;align-content:start}
+  .side{flex-direction:row;align-items:center;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:6px;position:sticky;top:50px;z-index:10;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .side::-webkit-scrollbar{display:none}
   .side .grp{display:none}
   .nav{width:auto;white-space:nowrap}
   .main{padding:14px 16px 50px}
