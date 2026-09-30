@@ -100,7 +100,7 @@ const app = document.getElementById('app');
 function render(){
   const me = ME();
   const label = me.role==='admin' ? (me.level==='top' ? '教务 · 管理' : '教务') : {teacher:'任课老师', student:'学生', parent:'家长'}[me.role];
-  app.innerHTML = `<header class="top"><h1>一对一教务台</h1><span class="who">${esc(me.name)} · ${label}</span></header>` + (isAdmin() ? adminView() : phoneView());
+  app.innerHTML = `<header class="top"><h1>一对一教务台</h1><span class="who">${esc(me.name)}${me.role==='parent'?'':' · '+label}</span></header>` + (isAdmin() ? adminView() : phoneView());
 }
 
 /* ═════════════ 教务端 ═════════════ */
@@ -398,7 +398,7 @@ const sFeedback = s => fbOfS(s.id).slice().reverse().slice(0,20).map(f=>fbMini(f
 function pOverview(s){
   const ym = TODAY.slice(0,7), prev = ymShift(ym,-1);
   const block = (m) => { const st = monthStats(s.id, m), leaves = lsOfS(s.id).filter(l=>l.date.startsWith(m) && l.status==='leave' && l.date<TODAY);
-    return `<div class="dg">${ymLabel(m)}</div><div class="bst"><div><b>${st.actual}/${st.req}</b><small>出勤</small></div><div><b style="${st.leave?'color:var(--seal)':''}">${st.leave}</b><small>请假</small></div><div><b>${st.hwOk}%</b><small>作业完成</small></div></div>
+    return `<div class="dg">${ymLabel(m)}</div>${!st.req ? '<div class="card small muted">这个月还没有上完的课</div>' : `<div class="bst"><div><b>${st.actual}/${st.req}</b><small>出勤</small></div><div><b style="${st.leave?'color:var(--seal)':''}">${st.leave}</b><small>请假</small></div><div><b>${st.hwOk}%</b><small>作业完成</small></div></div>`}
     ${leaves.map(l=>`<div class="card small"><span class="tag seal">请假</span> ${fmtMD(l.date)} ${esc(course(l.course_id).subject)} · ${esc(l.note)}</div>`).join('')}`; };
   return `<h2 style="font-size:19px">${esc(s.name)} 的学习情况</h2>${block(ym)}
   <div class="dg">${+ym.slice(5)} 月学习计划</div><div class="card">${mpView(s.id, ym)}</div>
