@@ -24,7 +24,15 @@ async function rpc(fn, args = {}){
   });
   const text = await r.text();
   let j = null; try { j = text ? JSON.parse(text) : null; } catch(e) {}
-  if (!r.ok) throw new Error((j && j.message) || '网络出错了，请稍后再试');
+  if (!r.ok) {
+    let m = (j && j.message) || '网络出错了，请稍后再试';
+    // 数据库的英文报错翻成能看懂的话（我们自己写的中文提示原样显示）
+    if (/invalid input syntax|violates not-null|null value/i.test(m)) m = '有一项没选或格式不对，请检查后再试';
+    else if (/duplicate key/i.test(m)) m = '这条记录已经存在了';
+    else if (/violates foreign key/i.test(m)) m = '关联的老师或学生不存在，请刷新页面后再试';
+    else if (/^[\x00-\x7F]+$/.test(m)) m = '操作没成功，请刷新页面后再试（' + m + '）';
+    throw new Error(m);
+  }
   return j;
 }
 
@@ -528,6 +536,7 @@ function linkModal(){
   <div class="fields"><label class="field"><span>身份</span><select id="ln-role" data-change="ln-role"><option value="normal">教务 · 普通</option><option value="top">教务 · 管理</option><option value="parent">家长</option><option value="student">学生</option><option value="teacher">任课老师</option></select></label>
   <label class="field"><span>姓名</span><input type="text" id="ln-name" placeholder="例：甘老师"></label>
   <label class="field" id="ln-target-f" hidden><span>对应的人</span><select id="ln-target"></select></label></div>
+  <div class="note warn" id="ln-empty" hidden></div>
   <div id="ln-scope-f" class="field"><span>负责哪些学生（点选）</span><div class="chips">${DB.students.map(s=>`<button class="chip" data-act="ln-chip" data-v="${s.id}">${esc(s.name)}</button>`).join('')||'<span class="muted small">还没有学生</span>'}</div></div>
   <div class="row"><button class="btn pri" data-act="link-create">生成链接</button></div>`);
 }
@@ -636,8 +645,9 @@ document.addEventListener('click', async e => {
     case 'ln-chip': lnScope.has(v)?lnScope.delete(v):lnScope.add(v); a.classList.toggle('on'); break;
     case 'link-create': { const r=val('ln-role'), name=val('ln-name').trim(); if(!name){toast('请填写姓名',true);break;}
       const d = {name, role: (r==='normal'||r==='top')?'admin':r, level: (r==='normal'||r==='top')?r:null, scope:[...lnScope]};
-      if (r==='teacher') d.teacher_id=val('ln-target'); if (r==='student'||r==='parent') d.student_id=val('ln-target');
+      if (r==='teacher'||r==='student'||r==='parent'){ if(!val('ln-target')){toast('请先选择对应的人',true);break;} if (r==='teacher') d.teacher_id=val('ln-target'); else d.student_id=val('ln-target'); }
       const nk = await act('admin_link_create', {d}); closeModal(); copyText(linkOf(nk), `已生成 ${name} 的链接并复制`); break; }
+    case 'go-add': closeModal(); S.page = v==='teacher' ? 'teachers' : 'students'; render(); if (v==='teacher') teacherForm(); else studentForm(); break;
     case 'scope-edit': scopeModal(v); break;
     case 'scope-chip': scopeSel.has(v)?scopeSel.delete(v):scopeSel.add(v); a.classList.toggle('on'); break;
     case 'scope-save': await act('admin_link_update', {pid:v, d:{scope:[...scopeSel]}}, '范围已更新'); closeModal(); break;
@@ -651,9 +661,15 @@ document.addEventListener('change', e => {
   else if (k==='paym'){ S.payMonth=el.value; render(); }
   else if (k==='team'){ S.teaMonth=el.value; render(); }
   else if (k==='rq-type'){ document.getElementById('rq-wish-f').hidden = el.value!=='改期'; }
-  else if (k==='ln-role'){ const r=el.value, adm=r==='normal'||r==='top';
-    document.getElementById('ln-target-f').hidden=adm; document.getElementById('ln-scope-f').hidden=r!=='normal';
-    if(!adm) document.getElementById('ln-target').innerHTML=(r==='teacher'?DB.teachers:DB.students).map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join(''); }
+  else if (k==='ln-role'){ const r=el.value, adm=r==='normal'||r==='top', list = r==='teacher'?DB.teachers:DB.students;
+    const emptyBox=document.getElementById('ln-empty'), noOne = !adm && !list.length;
+    document.getElementById('ln-target-f').hidden=adm||noOne; document.getElementById('ln-scope-f').hidden=r!=='normal';
+    document.querySelector('[data-act="link-create"]').disabled = noOne;
+    emptyBox.hidden = !noOne;
+    if (noOne) emptyBox.innerHTML = r==='teacher'
+      ? `还没有老师。请先到「老师档案」新增老师，<b>保存后会自动生成他的链接</b>，不用在这里建。 <button class="btn sm" data-act="go-add" data-v="teacher">去新增老师</button>`
+      : `还没有学生。请先到「学生档案」新增学生，<b>保存后会自动生成学生和家长的链接</b>。 <button class="btn sm" data-act="go-add" data-v="student">去新增学生</button>`;
+    if(!adm && !noOne) document.getElementById('ln-target').innerHTML=list.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join(''); }
 });
 document.addEventListener('input', e => {
   if (e.target.dataset?.input==='stuq' && !e.isComposing){ S.stuQ=e.target.value; render(); const i=document.getElementById('stu-q'); i.focus(); i.setSelectionRange(i.value.length,i.value.length); }
