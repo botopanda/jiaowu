@@ -363,7 +363,9 @@ function phoneView(){
     tabs = [['a','概况'],['b','老师反馈'],['c','课表'],['d','档案'],['e','月度']];
     body = {a:pOverview,b:pFeedback,c:pSchedule,d:profilePage,e:pMonthly}[S.tab]?.(s) ?? pOverview(s);
   }
-  return `<div class="pw"><div class="phone"><div class="p-body">${body}</div></div></div>
+  // 电脑上菜单在左侧（和教务一样），手机上在底部（大拇指好点）
+  return `<div class="layout pl"><nav class="side pside" aria-label="菜单">${tabs.map(([k,t,n])=>`<button class="nav ${S.tab===k?'on':''}" data-act="tab" data-v="${k}"><span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')}</nav>
+    <div class="pw"><div class="phone"><div class="p-body">${body}</div></div></div></div>
     <nav class="tabbar" style="grid-template-columns:repeat(${tabs.length},1fr)">${tabs.map(([k,t,n])=>`<button class="${S.tab===k?'on':''}" data-act="tab" data-v="${k}">${t}${n?`<span class="dot">${n}</span>`:''}</button>`).join('')}</nav>`;
 }
 function reqLine(q){

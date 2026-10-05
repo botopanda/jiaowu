@@ -264,3 +264,9 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 .center{max-width:440px;margin:14vh auto;text-align:center;padding:0 16px;display:flex;flex-direction:column;gap:10px}
 .center h2{font-size:20px}
 .busy{opacity:.55;pointer-events:none}
+
+/* 老师 / 学生 / 家长：电脑上左侧菜单，手机上底部菜单 */
+.layout.pl{min-height:calc(100vh - 50px)}
+.layout.pl .pw{min-width:0}
+@media (min-width:761px){.tabbar{display:none}.layout.pl .p-body{padding-bottom:40px}.pside{position:sticky;top:50px;align-self:start;height:calc(100vh - 50px)}}
+@media (max-width:760px){.layout.pl{display:block}.pside{display:none}}
