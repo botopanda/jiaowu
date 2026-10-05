@@ -148,7 +148,23 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 .pc.lv{opacity:.5;border-left-color:var(--seal)} .pc.lv .pn{text-decoration:line-through}
 .pc .pn.long{font-size:9px;letter-spacing:-.03em}
 .ph-day .more{font-size:10px;color:var(--muted);text-align:center}
+/* 手机：每格最多 3 节、不显示科目；电脑/平板：页面变宽、格子变大、最多 5 节并显示科目 */
+.pc .ps,.ph-day .more.d{display:none}
+.ph-day .pc:nth-of-type(n+4){display:none}
 @media (min-width:600px){.ph-day{min-height:72px;padding:3px}.pc .pt{font-size:10.5px}.pc .pn{font-size:12.5px}.ph-grid{gap:4px}}
+@media (min-width:900px){
+  .phone{max-width:1100px}
+  .ph-cal{padding:14px}
+  .ph-grid{gap:6px}
+  .ph-hd{font-size:13px}
+  .ph-day{min-height:118px;padding:5px;gap:3px;border-radius:6px}
+  .ph-day .n{font-size:13px;align-self:flex-start}
+  .pc{padding:2px 5px;border-left-width:3px}
+  .pc .pt{font-size:11.5px} .pc .ps{display:inline}
+  .pc .pn{font-size:14px} .pc .pn.long{font-size:13px;letter-spacing:0}
+  .ph-day .pc:nth-of-type(n+4){display:flex}
+  .ph-day .more.m{display:none} .ph-day .more.d{display:block}
+}
 .les{display:flex;gap:10px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--hc);border-radius:var(--r);padding:8px 10px}
 .les .when{font-family:var(--f-num);font-size:13px;min-width:88px}
 .dg{font-size:12px;color:var(--muted);letter-spacing:.05em;margin-top:2px}
@@ -185,6 +201,6 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 <div id="app"><div class="center"><h2>一对一教务台</h2><p class="muted">加载中…</p></div></div>
 <div id="modal-root"></div>
 <div id="toast-root"></div>
-<script src="app.js?v=20261005c"></script>
+<script src="app.js?v=20261005d"></script>
 </body>
 </html>

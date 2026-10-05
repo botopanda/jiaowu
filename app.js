@@ -356,8 +356,8 @@ function schedule(ls, tz, whoFn, canReq=false, canEdit=false){
     const ds_ = `${ym}-${pad(d)}`, dl = mine.filter(l=>l.date===ds_);
     const st = l => tz==='CN' ? wrap(mins(l.start)-60) : l.start;
     cells += `<button class="ph-day ${ds_===TODAY?'today':''} ${ds_===sel?'sel':''} ${dl.length?'has':''}" data-act="pday" data-v="${ds_}" aria-label="${fmtMD(ds_)}，${dl.length} 节课"><span class="n">${d}</span>
-      ${dl.slice(0,3).map(l=>{ const c=course(l.course_id); return `<span class="pc ${l.status==='leave'?'lv':''}" style="--hc:${hue(c.subject)}"><span class="pt">${st(l)}</span><span class="pn ${whoFn(c).length>3?'long':''}">${esc(whoFn(c))}</span></span>`; }).join('')}
-      ${dl.length>3?`<span class="more">+${dl.length-3}</span>`:''}</button>`;
+      ${dl.slice(0,5).map(l=>{ const c=course(l.course_id); return `<span class="pc ${l.status==='leave'?'lv':''}" style="--hc:${hue(c.subject)}"><span class="pt">${st(l)}<span class="ps"> ${esc(c.subject)}</span></span><span class="pn ${whoFn(c).length>3?'long':''}">${esc(whoFn(c))}</span></span>`; }).join('')}
+      ${dl.length>3?`<span class="more m">+${dl.length-3}</span>`:''}${dl.length>5?`<span class="more d">+${dl.length-5}</span>`:''}</button>`;
   }
   const day = mine.filter(l=>l.date===sel);
   return `<div class="row" style="justify-content:space-between">${tzNote(tz)}${toggle}</div>
