@@ -275,10 +275,15 @@ function pgTeachers(){
   return `<div class="ph"><h2>老师档案</h2><button class="btn pri" data-act="teacher-form">＋ 新增老师</button></div>
   <div class="hint">履历可以你们填，也可以老师在自己的链接里填。</div>
   ${DB.teachers.length ? `<div class="grid2">${DB.teachers.map(t => { const cs = DB.courses.filter(c=>c.teacher_id===t.id), ym = TODAY.slice(0,7);
-    const h = lsOfT(t.id).filter(l=>l.date.startsWith(ym)).reduce((a,l)=>a+paidH(l),0), p = personOf('teacher','teacher_id',t.id);
-    return `<section class="card"><div class="row" style="margin-bottom:6px"><h3 style="margin-right:auto;font-size:16px">${esc(t.name)}</h3>${t.subject?subjTag(t.subject):''}<span class="tag mute">${esc(t.loc||'—')} · ${t.tz==='CN'?'北京时间':'日本时间'}</span></div>
+    const ms = lsOfT(t.id).filter(l=>l.date.startsWith(ym)), p = personOf('teacher','teacher_id',t.id);
+    const done = ms.filter(l=>paidH(l)>0), plan = ms.filter(l=>l.status!=='leave');
+    const hDone = +done.reduce((a,l)=>a+paidH(l),0).toFixed(1), hPlan = +plan.reduce((a,l)=>a+dur(l),0).toFixed(1);
+    const names = [...new Set(cs.map(c=>stu(c.student_id).name))];
+    return `<section class="card"><div class="row" style="margin-bottom:6px"><h3 style="margin-right:auto;font-size:16px">${esc(t.name)}</h3>${t.subject?subjTag(t.subject):''}<span class="tag mute">${t.loc?esc(t.loc)+' · ':''}${t.tz==='CN'?'北京时间':'日本时间'}</span></div>
     <dl class="kv small"><dt>学历</dt><dd>${esc(t.edu||'—')}</dd><dt>经历</dt><dd>${esc(t.exp||'—')}</dd><dt>擅长</dt><dd>${esc(t.good||'—')}</dd>
-    <dt>带的学生</dt><dd>${cs.map(c=>esc(stu(c.student_id).name)).join('、')||'—'}</dd><dt>本月课时</dt><dd class="num">${h} 小时</dd></dl>
+    <dt>带的学生</dt><dd>${names.map(esc).join('、')||'—'}</dd>
+    <dt>本月已上</dt><dd><b class="num">${hDone}</b> 小时 <span class="muted xs">（${done.length} 节）</span></dd>
+    <dt>本月应上</dt><dd><b class="num">${hPlan}</b> 小时 <span class="muted xs">（${plan.length} 节）</span></dd></dl>
     <div class="row" style="margin-top:8px"><button class="btn sm" data-act="teacher-form" data-v="${t.id}">编辑</button>${p?`<button class="btn sm" data-act="copy-link" data-v="${p.key}">复制老师链接</button>`:''}</div></section>`}).join('')}</div>` : '<div class="card empty">还没有老师。点右上角「新增老师」开始。</div>'}`;
 }
 
