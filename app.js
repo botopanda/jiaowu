@@ -122,13 +122,13 @@ function adminView(){
   const pend = DB.feedbacks.filter(f => f.status==='pending').length, reqN = DB.requests.filter(q => q.status==='pending').length;
   const items = isTop()
     ? [['日常',[['overview','总览'],['calendar','课表与排课'],['requests','改期 · 请假',reqN],['feedback','反馈审批',pend]]],
-       ['档案',[['students','学生档案'],['teachers','老师档案']]],
-       ['管理',[['payroll','课时与工资'],['links','链接与权限']]]]
-    : [['日常',[['overview','总览'],['calendar','课表']]],['档案',[['students','学生档案']]]];
+       ['学生',[['students','学生档案'],['apply','升学与出愿'],['reviews','月度回访'],['followups','跟进记录']]],
+       ['管理',[['teachers','老师档案'],['payroll','课时与工资'],['links','链接与权限']]]]
+    : [['日常',[['overview','总览'],['calendar','课表与排课']]],['学生',[['students','学生档案'],['apply','升学与出愿'],['reviews','月度回访'],['followups','跟进记录']]]];
   const nav = items.map(([g,list]) => `<div class="grp">${g}</div>` + list.map(([k,t,n]) =>
     `<button class="nav ${S.page===k?'on':''}" data-act="page" data-v="${k}"><span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')).join('');
-  const P = {overview:pgOverview, calendar:pgCalendar, requests:pgRequests, feedback:pgFeedback, students:pgStudents, teachers:pgTeachers, payroll:pgPayroll, links:pgLinks};
-  const page = (isTop() || ['overview','calendar','students'].includes(S.page)) ? (P[S.page]||pgOverview) : pgOverview;
+  const P = {overview:pgOverview, calendar:pgCalendar, requests:pgRequests, apply:pgApply2, reviews:pgReviews, followups:pgFollowups, feedback:pgFeedback, students:pgStudents, teachers:pgTeachers, payroll:pgPayroll, links:pgLinks};
+  const page = (isTop() || ['overview','calendar','students','apply','reviews','followups'].includes(S.page)) ? (P[S.page]||pgOverview) : pgOverview;
   return `<div class="layout"><nav class="side" aria-label="教务导航">${nav}</nav><main class="main">${page()}</main></div>`;
 }
 const scopeNote = () => !isTop() ? `<div class="scope">你负责 ${DB.students.length} 位学生，只显示他们的资料。</div>` : '';
@@ -156,7 +156,9 @@ function pgOverview(){
       ${isTop() && pend.length ? `<div class="li"><span class="tag seal">审批</span><div class="grow">${pend.length} 条反馈等待审批，审批后家长才能看到</div><button class="btn sm" data-act="page" data-v="feedback">去审批</button></div>` : ''}
       ${bad.map(f => { const l=L(f.lesson_id), c=course(l.course_id); return `<div class="li"><span class="tag seal">不满意</span><div class="grow">${esc(stu(c.student_id).name)} 对 ${sMD(l.date)} ${esc(tea(c.teacher_id).name)} 的课评价「不满意」</div></div>`}).join('')}
       ${miss.slice(0,8).map(l => { const c=course(l.course_id); return `<div class="li"><span class="tag warn">未写</span><div class="grow">${esc(tea(c.teacher_id).name)} · ${sMD(l.date)} ${esc(stu(c.student_id).name)} ${esc(c.subject)}</div><button class="btn sm" data-act="copy-remind" data-v="${l.id}">复制提醒</button></div>`}).join('')}
-      ${!reqs.length && !pend.length && !bad.length && !miss.length ? '<div class="empty">没有要处理的事</div>' : ''}
+      ${upcomingEvents(14).map(e=>`<div class="li"><span class="tag ${e.days<=7?'seal':'warn'}">${e.days===0?'今天':e.days+' 天'}</span><div class="grow">${esc(stu(e.t.student_id).name)} · ${esc(e.t.school)} ${e.label} ${sMD(e.date)}</div><button class="btn sm" data-act="page" data-v="apply">查看</button></div>`).join('')}
+      ${(DB.followups||[]).filter(f=>f.next_date && f.confirm!=='已确认' && f.next_date<=TODAY).map(f=>`<div class="li"><span class="tag gold">跟进</span><div class="grow">${esc(stu(f.student_id).name)} · ${esc(f.next_action||f.task||'')}（${sMD(f.next_date)}）</div><button class="btn sm" data-act="fu-edit" data-v="${f.id}">更新</button></div>`).join('')}
+      ${!reqs.length && !pend.length && !bad.length && !miss.length && !upcomingEvents(14).length ? '<div class="empty">没有要处理的事</div>' : ''}
     </div></section>
   </div>`;
 }
@@ -245,10 +247,10 @@ function pgStudents(){
   const ym = TODAY.slice(0,7);
   return `<div class="ph"><h2>学生档案</h2>${isTop()?`<button class="btn pri" data-act="student-form">＋ 新增学生</button>`:''}</div>${scopeNote()}
   <div class="row"><input type="text" id="stu-q" placeholder="搜索姓名或方向" value="${esc(S.stuQ)}" data-input="stuq" style="width:200px"></div>
-  ${list.length ? `<div class="tw"><table><thead><tr><th>姓名</th><th>方向</th><th>任课老师</th><th>负责教务</th><th>${+ym.slice(5)} 月出勤</th><th>作业</th><th>${+ym.slice(5)} 月计划</th></tr></thead><tbody>
+  ${list.length ? `<div class="tw"><table><thead><tr><th>编号</th><th>姓名</th><th>方向</th><th>任课老师</th><th>负责教务</th><th>${+ym.slice(5)} 月出勤</th><th>作业</th><th>${+ym.slice(5)} 月计划</th></tr></thead><tbody>
   ${list.map(s => { const cs = DB.courses.filter(c=>c.student_id===s.id), st = monthStats(s.id, ym), un = latestHw(s.id).filter(f=>!f.hw_sub).length;
     const pn = cs.filter(c => planText(c.id, ym)).length;
-    return `<tr class="click" data-act="student" data-v="${s.id}"><td><b>${esc(s.name)}</b>${s.active?'':' <span class="tag mute">停课</span>'}<br><span class="xs muted">${esc(s.loc)}</span></td><td>${esc(s.track)}</td>
+    return `<tr class="click" data-act="student" data-v="${s.id}"><td class="num">${esc(s.code||'')}</td><td><b>${esc(s.name)}</b>${s.active?'':' <span class="tag mute">停课</span>'}<br><span class="xs muted">${esc(s.loc||'')}</span></td><td>${esc(s.direction||s.track||'')}${s.target_ym?`<br><span class="xs muted">目标 ${esc(s.target_ym)}</span>`:''}</td>
     <td>${cs.map(c=>`${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}`).join('<br>') || '<span class="tag warn">还没有课程</span>'}</td><td>${esc(s.staff)}</td>
     <td class="num">${st.actual}/${st.req}${st.leave?` <span class="tag seal">请假 ${st.leave}</span>`:''}</td><td>${un?`<span class="tag warn">${un} 份未交</span>`:'<span class="tag ok">已交齐</span>'}</td>
     <td>${cs.length ? `<span class="tag ${pn===cs.length?'ok':'warn'}">${pn}/${cs.length}</span>` : ''}</td></tr>`}).join('')}
@@ -309,12 +311,13 @@ function phoneView(){
     body = {a:tSchedule,b:tStudents,c:tWrite,d:tMe}[S.tab](t);
   } else if (me.role==='student'){
     const s = stu(me.student_id);
-    tabs = [['a','首页'],['b','作业',latestHw(s.id).filter(f=>!f.hw_sub).length],['c','上课记录',fbOfS(s.id).filter(f=>!f.confirm).length]];
-    body = {a:sHome,b:sHomework,c:sFeedback}[S.tab]?.(s) ?? sHome(s);
+    const selfDue = !reviewOf(s.id, TODAY.slice(0,7))?.self_eval && +TODAY.slice(8,10) >= 20 ? 1 : 0;   // 每月 20 号以后提醒写自评
+    tabs = [['a','首页'],['b','作业',latestHw(s.id).filter(f=>!f.hw_sub).length],['c','上课记录',fbOfS(s.id).filter(f=>!f.confirm).length],['d','升学'],['e','月度',selfDue]];
+    body = {a:sHome,b:sHomework,c:sFeedback,d:sTrack,e:sMonthly}[S.tab]?.(s) ?? sHome(s);
   } else {
     const s = stu(me.student_id);
-    tabs = [['a','概况'],['b','老师反馈'],['c','课表']];
-    body = {a:pOverview,b:pFeedback,c:pSchedule}[S.tab]?.(s) ?? pOverview(s);
+    tabs = [['a','概况'],['b','老师反馈'],['c','课表'],['d','升学'],['e','月度']];
+    body = {a:pOverview,b:pFeedback,c:pSchedule,d:sTrack,e:pMonthly}[S.tab]?.(s) ?? pOverview(s);
   }
   return `<div class="pw"><div class="phone"><div class="p-body">${body}</div></div></div>
     <nav class="tabbar" style="grid-template-columns:repeat(${tabs.length},1fr)">${tabs.map(([k,t,n])=>`<button class="${S.tab===k?'on':''}" data-act="tab" data-v="${k}">${t}${n?`<span class="dot">${n}</span>`:''}</button>`).join('')}</nav>`;
@@ -383,7 +386,7 @@ function tStudents(t){
     return `<section class="card" style="display:flex;flex-direction:column;gap:6px"><div class="row"><h3 style="font-size:16px;margin-right:auto">${esc(s.name)}</h3>${subjTag(c.subject)}</div>
     <dl class="kv small"><dt>方向</dt><dd>${esc(s.track||'—')}</dd><dt>下节课</dt><dd>${next?`${fmtMD(next.date)} ${timeFor(next,t.tz)}`:'—'}</dd>
     <dt>本月计划</dt><dd>${esc(planText(c.id, TODAY.slice(0,7))||'还没写')}</dd><dt>上次作业</dt><dd>${lastF?`${esc(lastF.hw)} ${lastF.hw_sub?'<span class="tag ok">已交</span>':'<span class="tag warn">未交</span>'}`:'—'}</dd></dl>
-    <button class="btn sm" data-act="t-stu" data-v="${c.id}">写月计划 · 私下备注</button></section>`}).join('') : '<div class="empty">还没有分配学生</div>';
+    <button class="btn sm" data-act="t-stu" data-v="${c.id}">档案 · 月计划 · 私下备注</button></section>`}).join('') : '<div class="empty">还没有分配学生</div>';
 }
 function tWrite(t){
   const cand = DB.lessons.filter(l => l.date<=TODAY && l.status==='scheduled' && !fbOf(l)).reverse();
@@ -525,18 +528,20 @@ function teacherForm(id){
 function studentModal(id, tab){
   const s = stu(id), cs = DB.courses.filter(c=>c.student_id===id); tab = tab || 'info';
   const ym = TODAY.slice(0,7), nx = ymShift(ym,1), pv = ymShift(ym,-1);
-  const tabs = [['info','概况与课程'],['mp','月计划'],['fb','反馈'],['note','私下备注']];
+  const tabs = [['info','概况与课程'],['profile','档案资料'],['score','成绩'],['target','大学与出愿'],['review','月度回访'],['fu','跟进记录'],['mp','月计划'],['fb','反馈'],['note','私下备注']];
   let body = '';
-  if (tab==='info'){
+  if (['profile','score','target','review','fu'].includes(tab)) body = studentTrackTab(id, tab);
+  else if (tab==='info'){
     const ps = personOf('student','student_id',id), pp = personOf('parent','student_id',id);
-    body = `<div class="grid2"><dl class="kv"><dt>方向</dt><dd>${esc(s.track||'—')}（${s.grad?'大学院':'学部'}）</dd><dt>所在地</dt><dd>${esc(s.loc||'—')}（${s.tz==='CN'?'北京时间':'日本时间'}）</dd><dt>负责教务</dt><dd>${esc(s.staff||'—')}</dd>${s.memo?`<dt>教务备注</dt><dd>${esc(s.memo)}</dd>`:''}</dl>
+    body = `<div class="grid2"><dl class="kv">${s.code?`<dt>编号</dt><dd class="num">${esc(s.code)}</dd>`:''}<dt>方向</dt><dd>${esc(s.track||'—')}（${s.grad?'大学院':'学部'}）</dd><dt>所在地</dt><dd>${esc(s.loc||'—')}（${s.tz==='CN'?'北京时间':'日本时间'}）</dd><dt>负责教务</dt><dd>${esc(s.staff||'—')}</dd>${s.memo?`<dt>教务备注</dt><dd>${esc(s.memo)}</dd>`:''}</dl>
       <div class="row" style="align-content:flex-start">${isTop()?`<button class="btn sm" data-act="student-form" data-v="${id}">编辑资料</button>`:''}<button class="btn sm" data-act="stu-cal" data-v="${id}">看课表</button>
       ${ps?`<button class="btn sm" data-act="copy-link" data-v="${ps.key}">复制学生链接</button>`:''}${pp?`<button class="btn sm" data-act="copy-link" data-v="${pp.key}">复制家长链接</button>`:''}</div></div>
       <b>课程</b><div class="list">${cs.map(c=>`<div class="li small"><span class="grow">${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}${c.active?'':' <span class="tag mute">已停</span>'}</span>${isTop()?`<span class="num">${yen(c.rate)}/小时</span>`:''}${isAdmin()?`<button class="btn sm" data-act="course-edit" data-v="${c.id}">改</button>`:''}</div>`).join('')||'<div class="muted small">还没有课程</div>'}</div>
       ${isAdmin()?`<details class="card" ${cs.length?'':'open'}><summary><b>＋ 添加课程</b> <span class="muted xs">（这位学生跟哪位老师上什么课）</span></summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
         ${DB.teachers.length?`<div class="fields"><label class="field"><span>老师</span><select id="cf-t">${DB.teachers.filter(t=>t.active).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
         <label class="field"><span>科目</span><input type="text" id="cf-subj" placeholder="例：文综"></label>${isTop()?'<label class="field"><span>老师单价（日元/小时）</span><input type="number" id="cf-rate" step="500" min="0" value="0"></label>':''}</div>${isTop()?'':'<div class="muted xs">课时单价由教务·管理设置。</div>'}
-        <div class="row"><button class="btn pri sm" data-act="add-course" data-v="${id}">添加课程</button></div>`:'<div class="muted small">先到「老师档案」里添加老师。</div>'}</div></details>`:''}`;
+        <div class="row"><button class="btn pri sm" data-act="add-course" data-v="${id}">添加课程</button></div>`:'<div class="muted small">先到「老师档案」里添加老师。</div>'}</div></details>`:''}
+      ${isTop()?`<div class="row" id="stu-del-row" style="margin-top:6px"><button class="btn danger sm" data-act="stu-del-ask" data-v="${id}">删除这位学生</button></div>`:''}`;
   } else if (tab==='mp') {
     const editable = cs.filter(c=>c.active);
     const edit = m => `<section class="card" style="display:flex;flex-direction:column;gap:8px"><b>${ymLabel(m)}计划</b>${editable.map(c=>`<label class="field"><span>${esc(c.subject)} · ${esc(tea(c.teacher_id).name)}${DB.plans.find(p=>p.course_id===c.id&&p.ym===m)?.updated_by?` <span class="xs">（${esc(DB.plans.find(p=>p.course_id===c.id&&p.ym===m).updated_by)} 写）</span>`:''}</span><textarea id="mp-${m}-${c.id}" style="min-height:52px" placeholder="这个月这门课要完成什么">${esc(planText(c.id,m))}</textarea></label>`).join('')||'<div class="muted small">还没有课程</div>'}
@@ -558,6 +563,7 @@ function courseEdit(cid){
 function tStuModal(cid){
   const c = course(cid), s = stu(c.student_id), ym = TODAY.slice(0,7), nx = ymShift(ym,1);
   openModal(`${mHead(`${esc(s.name)} · ${esc(c.subject)}`)}
+  ${teacherTrackBlock(s.id)}
   <b class="small">月计划 <span class="muted xs" style="font-weight:400">学生和家长能看到</span></b>
   ${[ym,nx].map(m=>`<label class="field"><span>${ymLabel(m)}</span><textarea id="mp-${m}-${cid}" style="min-height:52px" placeholder="这个月要完成什么，例：日本史近代收尾，每周 1 篇记述">${esc(planText(cid,m))}</textarea></label>`).join('')}
   <div class="row"><button class="btn pri sm" data-act="t-mp-save" data-v="${cid}">保存计划</button></div>
@@ -726,7 +732,7 @@ document.addEventListener('compositionend', e => { if (e.target.id==='stu-q'){ S
 document.addEventListener('keydown', e => { if (e.key==='Escape' && mroot.innerHTML) closeModal(); });
 
 /* ───────── 启动 ───────── */
-(async function start(){
+window.addEventListener('DOMContentLoaded', async function start(){
   if (!KEY){ app.innerHTML = `<div class="center"><h2>一对一教务台</h2><p class="muted">请用教务老师发给你的专属链接打开。</p></div>`; return; }
   try { await load(); render(); }
   catch(e){
@@ -734,4 +740,4 @@ document.addEventListener('keydown', e => { if (e.key==='Escape' && mroot.innerH
     if (bad){ try{ localStorage.removeItem('jw_k'); }catch(_){} }
     app.innerHTML = `<div class="center"><h2>${bad?'这个链接已失效':'暂时打不开'}</h2><p class="muted">${bad?'链接可能已经停用或更换。请联系教务老师重新发一条链接。':'网络好像不太稳定，请稍后刷新再试。'}</p>${bad?'':'<p><button class="btn" onclick="location.reload()">刷新</button></p>'}</div>`;
   }
-})();
+});
