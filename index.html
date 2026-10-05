@@ -213,6 +213,17 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
   table{min-width:0!important}
   section{break-inside:avoid}
 }
+/* 补课小标签 */
+.mk{display:inline-block;font-size:9.5px;line-height:13px;padding:0 3px;margin-left:2px;border-radius:3px;background:var(--blue);color:#fff;font-family:var(--f-body);font-weight:700;vertical-align:1px}
+/* 文件 */
+.files{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px}
+.files>.muted{width:100%}
+.fitem{position:relative;display:inline-flex}
+.fitem a{display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--surface);color:var(--ink);text-decoration:none;max-width:200px}
+.fitem img{width:64px;height:64px;object-fit:cover;display:block}
+.fpdf{background:var(--seal);color:#fff;font-size:10.5px;font-weight:700;padding:2px 5px;margin-left:4px;border-radius:2px}
+.fname{font-size:12px;padding:4px 6px 4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fdel{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:9px;border:0;background:var(--ink);color:var(--bg);font-size:12px;line-height:18px;padding:0;cursor:pointer}
 .les{display:flex;gap:10px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--hc);border-radius:var(--r);padding:8px 10px}
 .les .when{font-family:var(--f-num);font-size:13px;min-width:88px}
 .dg{font-size:12px;color:var(--muted);letter-spacing:.05em;margin-top:2px}
@@ -249,8 +260,9 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 <div id="app"><div class="center"><h2>一对一教务台</h2><p class="muted">加载中…</p></div></div>
 <div id="modal-root"></div>
 <div id="toast-root"></div>
-<script src="app.js?v=20261006d"></script>
-<script src="track.js?v=20261006d"></script>
-<script src="profile.js?v=20261006d"></script>
+<script src="app.js?v=20261006e"></script>
+<script src="track.js?v=20261006e"></script>
+<script src="profile.js?v=20261006e"></script>
+<script src="extras.js?v=20261006e"></script>
 </body>
 </html>
