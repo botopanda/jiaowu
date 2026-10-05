@@ -104,14 +104,24 @@ function monthStats(sid, ym){
 }
 const latestHw = sid => DB.courses.filter(c => c.student_id===sid).map(c => DB.feedbacks.filter(f => L(f.lesson_id).course_id===c.id).slice(-1)[0]).filter(Boolean);
 
+let lastLoad = 0;
 async function load(){
-  DB = await rpc('app_load');
+  DB = await rpc('app_load'); lastLoad = Date.now();
   TODAY = DB.today;
   DB.lessons.sort((a,b) => (a.date+a.start).localeCompare(b.date+b.start));
   if (!S.month) S.month = TODAY.slice(0,7);
   if (!S.payMonth) S.payMonth = ymShift(TODAY.slice(0,7), -1);
   if (!S.teaMonth) S.teaMonth = TODAY.slice(0,7);
 }
+// 点菜单、切回这个网页时：先马上显示，再在后台取最新数据（别人刚写的反馈、刚排的课）再画一遍
+// 正在打字或开着弹窗时不重画，免得把填了一半的内容冲掉
+async function refresh(minGap = 3000){
+  if (Date.now() - lastLoad < minGap) return;
+  try { await load(); } catch(e) { return; }
+  const busy = document.querySelector('.modal') || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+  if (!busy) render();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && DB) refresh(30000); });
 // 做完一个操作：刷新数据、重画页面、提示结果
 async function act(fn, args, okMsg, after){
   document.body.classList.add('busy');
@@ -671,8 +681,8 @@ document.addEventListener('click', async e => {
   if (k==='close-bg' && e.target!==a) return;
   try {
   switch(k){
-    case 'page': if (v==='feedback-missing'){ S.page='feedback'; S.fbTab='missing'; } else { S.page=v; if (v==='feedback') S.fbTab='pending'; } render(); window.scrollTo(0,0); break;
-    case 'tab': S.tab=v; render(); window.scrollTo(0,0); break;
+    case 'page': if (v==='feedback-missing'){ S.page='feedback'; S.fbTab='missing'; } else { S.page=v; if (v==='feedback') S.fbTab='pending'; } render(); window.scrollTo(0,0); refresh(); break;
+    case 'tab': S.tab=v; render(); window.scrollTo(0,0); refresh(); break;
     case 'pview': PV=v; try{ localStorage.setItem('jw_view', v); }catch(_){} render(); break;
     case 'pday': S.pDay=v; render(); break;
     case 'pmonth': S.pMonth = v==='0' ? TODAY.slice(0,7) : ymShift(S.pMonth || TODAY.slice(0,7), Number(v)); S.pDay = S.pMonth===TODAY.slice(0,7) ? TODAY : S.pMonth+'-01'; render(); break;
