@@ -48,6 +48,12 @@ const mins = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
 const tstr = m => `${pad(Math.floor(m/60))}:${pad(m%60)}`;
 const dBetween = (a,b) => Math.round((pd(b)-pd(a))/86400000);
 const yen = n => '¥' + Math.round(n||0).toLocaleString('ja-JP');
+// 单价规则：3 位数以内是人民币，4 位数以上是日元
+const curOf = rate => (rate||0) >= 1000 ? 'JPY' : 'CNY';
+const money = (n, cur) => cur==='JPY' ? '¥' + Math.round(n||0).toLocaleString('ja-JP') : Math.round(n||0).toLocaleString('zh-CN') + ' 元';
+const rateTxt = rate => (rate ? money(rate, curOf(rate)) : '未设') + '/小时';
+// 多种币种分开合计，比如「3,400 元 + ¥12,000」
+const sumMoney = ls => { const t = {}; ls.forEach(([amt, cur]) => t[cur] = (t[cur]||0) + amt); return Object.keys(t).length ? Object.entries(t).sort().map(([c,v]) => money(v,c)).join(' + ') : money(0,'CNY'); };
 const ymLabel = ym => `${+ym.slice(0,4)}年${+ym.slice(5)}月`;
 const ymShift = (ym, n) => { const [y,m] = ym.split('-').map(Number); const d = new Date(y, m-1+n, 1); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; };
 const HUES = ['--h1','--h2','--h3','--h4','--h5','--h6'];
@@ -271,17 +277,18 @@ function pgTeachers(){
 function pgPayroll(){
   const ym = S.payMonth;
   const rows = DB.teachers.map(t => { const ls = lsOfT(t.id).filter(l => l.date.startsWith(ym) && paidH(l)>0);
-    return {t, ls, h: ls.reduce((a,l)=>a+paidH(l),0), amt: ls.reduce((a,l)=>a+paidH(l)*(course(l.course_id).rate||0),0)}; }).filter(r => r.ls.length);
-  const total = rows.reduce((a,r)=>a+r.amt,0);
+    const parts = ls.map(l => { const rt = course(l.course_id).rate||0; return [paidH(l)*rt, curOf(rt)]; });
+    return {t, ls, h: ls.reduce((a,l)=>a+paidH(l),0), parts, amt: sumMoney(parts)}; }).filter(r => r.ls.length);
+  const total = sumMoney(rows.flatMap(r => r.parts));
   const months = [...new Set(DB.lessons.map(l=>l.date.slice(0,7)).concat([TODAY.slice(0,7), ymShift(TODAY.slice(0,7),-1)]))].sort().reverse();
   return `<div class="ph"><h2>课时与工资</h2><select id="pay-m" data-change="paym">${months.map(v=>`<option value="${v}" ${v===ym?'selected':''}>${ymLabel(v)}</option>`).join('')}</select></div>
-  <div class="note">只有<b>教务 · 管理</b>能看到这一页。上完的课自动计入课时；当天请假扣学生的课时，照样计入老师工资。单价在学生档案 → 课程里设置。每位老师每月：<b>核对课时 → 审核通过 → 结算完成</b>。</div>
-  <div class="stats"><div class="stat"><small>计费课时</small><b>${rows.reduce((a,r)=>a+r.h,0)}</b></div><div class="stat"><small>工资合计</small><b>${yen(total)}</b></div>
+  <div class="note">只有<b>教务 · 管理</b>能看到这一页。上完的课自动计入课时；当天请假扣学生的课时，照样计入老师工资。单价在学生档案 → 课程里设置（3 位数以内按人民币算，4 位数以上按日元算）。每位老师每月：<b>核对课时 → 审核通过 → 结算完成</b>。</div>
+  <div class="stats"><div class="stat"><small>计费课时</small><b>${rows.reduce((a,r)=>a+r.h,0)}</b></div><div class="stat"><small>工资合计</small><b style="font-size:18px">${total}</b></div>
     <div class="stat"><small>已审核</small><b>${rows.filter(r=>payOf(r.t.id,ym).reviewed_at).length}/${rows.length}</b></div><div class="stat"><small>已结算</small><b>${rows.filter(r=>payOf(r.t.id,ym).settled_at).length}/${rows.length}</b></div></div>
   ${rows.length ? '' : '<div class="card empty">这个月还没有上完的课</div>'}
-  ${rows.map(r => `<details class="card"><summary class="row"><b style="margin-right:auto;font-family:var(--f-disp)">${esc(r.t.name)}</b><span class="num small">${r.ls.length} 节 · ${r.h} 小时</span><b class="num">${yen(r.amt)}</b>${payBadge(r.t.id, ym)}<span class="muted xs">展开明细</span></summary>
+  ${rows.map(r => `<details class="card"><summary class="row"><b style="margin-right:auto;font-family:var(--f-disp)">${esc(r.t.name)}</b><span class="num small">${r.ls.length} 节 · ${r.h} 小时</span><b class="num">${r.amt}</b>${payBadge(r.t.id, ym)}<span class="muted xs">展开明细</span></summary>
     <div class="tw" style="margin-top:8px"><table><thead><tr><th>日期</th><th>时间（日本）</th><th>学生</th><th>科目</th><th>计费</th><th>单价</th><th>金额</th><th>备注</th></tr></thead><tbody>
-    ${r.ls.map(l=>{const c=course(l.course_id);return `<tr><td class="num">${sMD(l.date)}</td><td class="num">${l.start}–${l.end}</td><td>${esc(stu(c.student_id).name)}</td><td>${subjTag(c.subject)}</td><td class="num">${paidH(l)}h</td><td class="num">${yen(c.rate)}</td><td class="num">${yen(paidH(l)*c.rate)}</td><td class="xs">${l.status==='leave'?'<span class="tag seal">当天请假</span> ':''}${esc(l.note)}</td></tr>`}).join('')}
+    ${r.ls.map(l=>{const c=course(l.course_id);return `<tr><td class="num">${sMD(l.date)}</td><td class="num">${l.start}–${l.end}</td><td>${esc(stu(c.student_id).name)}</td><td>${subjTag(c.subject)}</td><td class="num">${paidH(l)}h</td><td class="num">${rateTxt(c.rate)}</td><td class="num">${money(paidH(l)*(c.rate||0), curOf(c.rate))}</td><td class="xs">${l.status==='leave'?'<span class="tag seal">当天请假</span> ':''}${esc(l.note)}</td></tr>`}).join('')}
     </tbody></table></div><div class="row" style="margin-top:8px"><button class="btn sm" data-act="copy-pay" data-v="${r.t.id}">复制课时清单（发给老师核对）</button><span style="margin-left:auto" class="row">${payButtons(r.t.id, ym)}</span></div></details>`).join('')}`;
 }
 
@@ -544,10 +551,10 @@ function studentModal(id, tab){
     body = `<div class="grid2"><dl class="kv">${s.code?`<dt>编号</dt><dd class="num">${esc(s.code)}</dd>`:''}<dt>方向</dt><dd>${esc(s.track||'—')}（${s.grad?'大学院':'学部'}）</dd><dt>所在地</dt><dd>${esc(s.loc||'—')}（${s.tz==='CN'?'北京时间':'日本时间'}）</dd><dt>负责教务</dt><dd>${esc(s.staff||'—')}</dd>${s.memo?`<dt>教务备注</dt><dd>${esc(s.memo)}</dd>`:''}</dl>
       <div class="row" style="align-content:flex-start">${isTop()?`<button class="btn sm" data-act="student-form" data-v="${id}">编辑资料</button>`:''}<button class="btn sm" data-act="stu-cal" data-v="${id}">看课表</button>
       ${ps?`<button class="btn sm" data-act="copy-link" data-v="${ps.key}">复制学生链接</button>`:''}${pp?`<button class="btn sm" data-act="copy-link" data-v="${pp.key}">复制家长链接</button>`:''}</div></div>
-      <b>课程</b><div class="list">${cs.map(c=>`<div class="li small"><span class="grow">${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}${c.active?'':' <span class="tag mute">已停</span>'}</span>${isTop()?`<span class="num">${yen(c.rate)}/小时</span>`:''}${isAdmin()?`<button class="btn sm" data-act="course-edit" data-v="${c.id}">改</button>`:''}</div>`).join('')||'<div class="muted small">还没有课程</div>'}</div>
+      <b>课程</b><div class="list">${cs.map(c=>`<div class="li small"><span class="grow">${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}${c.active?'':' <span class="tag mute">已停</span>'}</span>${isTop()?`<span class="num">${rateTxt(c.rate)}</span>`:''}${isAdmin()?`<button class="btn sm" data-act="course-edit" data-v="${c.id}">改</button>`:''}</div>`).join('')||'<div class="muted small">还没有课程</div>'}</div>
       ${isAdmin()?`<details class="card" ${cs.length?'':'open'}><summary><b>＋ 添加课程</b> <span class="muted xs">（这位学生跟哪位老师上什么课）</span></summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
         ${DB.teachers.length?`<div class="fields"><label class="field"><span>老师</span><select id="cf-t">${DB.teachers.filter(t=>t.active).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
-        <label class="field"><span>科目</span><input type="text" id="cf-subj" placeholder="例：文综"></label>${isTop()?'<label class="field"><span>老师单价（日元/小时）</span><input type="number" id="cf-rate" step="500" min="0" value="0"></label>':''}</div>${isTop()?'':'<div class="muted xs">课时单价由教务·管理设置。</div>'}
+        <label class="field"><span>科目</span><input type="text" id="cf-subj" placeholder="例：文综"></label>${isTop()?'<label class="field"><span>老师单价（每小时；3 位数＝人民币，4 位数＝日元）</span><input type="number" id="cf-rate" step="500" min="0" value="0"></label>':''}</div>${isTop()?'':'<div class="muted xs">课时单价由教务·管理设置。</div>'}
         <div class="row"><button class="btn pri sm" data-act="add-course" data-v="${id}">添加课程</button></div>`:'<div class="muted small">先到「老师档案」里添加老师。</div>'}</div></details>`:''}
       ${isTop()?`<div class="row" id="stu-del-row" style="margin-top:6px"><button class="btn danger sm" data-act="stu-del-ask" data-v="${id}">删除这位学生</button></div>`:''}`;
   } else if (tab==='mp') {
@@ -564,7 +571,7 @@ function studentModal(id, tab){
 function courseEdit(cid){
   const c = course(cid);
   openModal(`${mHead(`${esc(stu(c.student_id).name)} · ${esc(tea(c.teacher_id).name)}`)}
-  <div class="fields"><label class="field"><span>科目</span><input type="text" id="ce-subj" value="${esc(c.subject)}"></label>${isTop()?`<label class="field"><span>老师单价（日元/小时）</span><input type="number" id="ce-rate" step="500" min="0" value="${c.rate||0}"></label>`:''}
+  <div class="fields"><label class="field"><span>科目</span><input type="text" id="ce-subj" value="${esc(c.subject)}"></label>${isTop()?`<label class="field"><span>老师单价（每小时；3 位数＝人民币，4 位数＝日元）</span><input type="number" id="ce-rate" step="500" min="0" value="${c.rate||0}"></label>`:''}
   <label class="field"><span>状态</span><select id="ce-active"><option value="true" ${c.active?'selected':''}>在上</option><option value="false" ${c.active?'':'selected'}>停了</option></select></label></div>
   <div class="row"><button class="btn pri" data-act="save-course" data-v="${cid}">保存</button></div>`);
 }
