@@ -135,6 +135,7 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 .pc{display:flex;flex-direction:column;border-left:2px solid var(--hc);background:color-mix(in srgb,var(--hc) 16%,var(--surface));border-radius:2px;padding:1px 2px;min-width:0;line-height:1.2}
 .pc .pt{font-family:var(--f-num);font-size:9.5px;color:var(--muted);white-space:nowrap;overflow:hidden}
 .pc .pn{font-size:11px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:clip}
+.lc.pend{border-style:dashed;opacity:.85} .mk.q{background:#c98a1a}
 .pc.lv{opacity:.5;border-left-color:var(--seal)} .pc.lv .pn{text-decoration:line-through}
 .pc .pn.long{font-size:9px;letter-spacing:-.03em}
 .ph-day .more{font-size:10px;color:var(--muted);text-align:center}

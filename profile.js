@@ -101,7 +101,7 @@ function boardView(sid){
   }).join('');
   return `<div class="row" style="justify-content:space-between"><b style="font-family:var(--f-disp);font-size:16px">${y} 年跟进看板</b>
     ${years.length > 1 ? `<select id="bd-year" data-change="bd-year" data-sid="${sid}">${years.map(v => `<option ${v === y ? 'selected' : ''}>${v}</option>`).join('')}</select>` : ''}</div>
-  <div class="stats"><div class="stat"><small>本年已上课次</small><b>${ls.length}</b></div><div class="stat"><small>本年已上课时</small><b>${+ls.reduce((a, l) => a + dur(l), 0).toFixed(1)}</b></div>
+  <div class="stats"><div class="stat"><small>本年已上课次</small><b>${ls.length}</b></div><div class="stat"><small>本年已上课时</small><b>${+ls.reduce((a, l) => a + realH(l), 0).toFixed(1)}</b></div>
     <div class="stat"><small>已记录月份</small><b>${rv.filter(r => r.content || r.teacher_eval).length}</b></div>${staff ? `<div class="stat ${pendFu ? 'al' : ''}"><small>待确认跟进</small><b>${pendFu}</b></div>` : ''}</div>
   <div class="tw"><table class="board"><thead><tr><th>月份</th><th>课次</th><th>课时</th><th>本月课程内容</th><th>学生自我评价</th><th>老师评价</th><th>任务 / 跟进结论</th><th>下月重点</th><th>状态</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
 }
