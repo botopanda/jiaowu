@@ -328,20 +328,52 @@ function agenda(ls, tz, whoFn, n=12, canReq=false, canEdit=false){
   const up = ls.filter(l=>l.date>=TODAY).slice(0,n);
   if (!up.length) return '<div class="empty">近期没有课</div>';
   let out='', last='';
-  up.forEach(l => { const c=course(l.course_id), q=reqOf(l), leave = l.status==='leave';
+  up.forEach(l => {
     if (l.date!==last){ out += `<div class="dg ${l.date===TODAY?'today':''}">${l.date===TODAY?'今天 · ':''}${fmtMD(l.date)}</div>`; last=l.date; }
-    out += `<div class="les" style="--hc:${hue(c.subject)}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}</div><div style="min-width:0;flex:1">${subjTag(c.subject)} · ${esc(whoFn(c))}${l.moved?' <span class="tag warn">调课</span>':''}${leave?' <span class="tag seal">请假</span>':''}
-      ${reqLine(q)}${canReq && !leave && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}</div></div>`;
+    out += lessonItem(l, tz, whoFn, canReq, canEdit);
   });
   return out;
 }
 const tzNote = tz => `<div class="muted xs">${tz==='CN'?'北京时间（日本时间减 1 小时）':'日本时间'}</div>`;
+
+/* 手机端课表：月历 / 列表 两种看法，每个人自己选，本机记住 */
+let PV = 'cal'; try { PV = localStorage.getItem('jw_view') || 'cal'; } catch(e) {}
+function lessonItem(l, tz, whoFn, canReq, canEdit){
+  const c = course(l.course_id), q = reqOf(l), leave = l.status==='leave';
+  return `<div class="les" style="--hc:${hue(c.subject)}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}</div><div style="min-width:0;flex:1">${subjTag(c.subject)} · ${esc(whoFn(c))}${l.moved?' <span class="tag warn">调课</span>':''}${leave?' <span class="tag seal">请假</span>':''}${isDone(l)?' <span class="tag ok">已上</span>':''}
+    ${reqLine(q)}${canReq && !leave && l.date>=TODAY && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave && !fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}</div></div>`;
+}
+function schedule(ls, tz, whoFn, canReq=false, canEdit=false){
+  const toggle = `<div class="seg" role="group" aria-label="课表看法">${[['cal','月历'],['list','列表']].map(([k,t])=>`<button class="${PV===k?'on':''}" data-act="pview" data-v="${k}">${t}</button>`).join('')}</div>`;
+  if (PV==='list') return `<div class="row" style="justify-content:space-between">${tzNote(tz)}${toggle}</div>${agenda(ls,tz,whoFn,30,canReq,canEdit)}`;
+  const ym = S.pMonth || (S.pMonth = TODAY.slice(0,7)), [y,m] = ym.split('-').map(Number);
+  const first = new Date(y,m-1,1), last = new Date(y,m,0).getDate(), lead = (first.getDay()+6)%7;
+  const sel = S.pDay && S.pDay.startsWith(ym) ? S.pDay : (TODAY.startsWith(ym) ? TODAY : `${ym}-01`);
+  const mine = ls.filter(l => l.date.startsWith(ym));
+  let cells = ['一','二','三','四','五','六','日'].map((d,i)=>`<div class="ph-hd ${i>=5?'we':''}">${d}</div>`).join('');
+  for (let i=0;i<lead;i++) cells += '<div></div>';
+  for (let d=1; d<=last; d++){
+    const ds_ = `${ym}-${pad(d)}`, dl = mine.filter(l=>l.date===ds_);
+    cells += `<button class="ph-day ${ds_===TODAY?'today':''} ${ds_===sel?'sel':''}" data-act="pday" data-v="${ds_}" aria-label="${fmtMD(ds_)}，${dl.length} 节课"><span class="n">${d}</span>
+      <span class="bars">${dl.slice(0,3).map(l=>`<i class="${l.status==='leave'?'lv':''}" style="--hc:${hue(course(l.course_id).subject)}"></i>`).join('')}</span></button>`;
+  }
+  const day = mine.filter(l=>l.date===sel);
+  return `<div class="row" style="justify-content:space-between">${tzNote(tz)}${toggle}</div>
+  <div class="card ph-cal">
+    <div class="row" style="justify-content:space-between;margin-bottom:6px"><button class="btn sm" data-act="pmonth" data-v="-1" aria-label="上个月">‹</button>
+      <b class="num" style="font-size:16px">${y}.${pad(m)}</b><span class="row"><button class="btn sm" data-act="pmonth" data-v="0">本月</button><button class="btn sm" data-act="pmonth" data-v="1" aria-label="下个月">›</button></span></div>
+    <div class="ph-grid">${cells}</div>
+    <div class="muted xs" style="margin-top:6px">这个月共 ${mine.filter(l=>l.status!=='leave').length} 节课 · 点日期看当天的课</div>
+  </div>
+  <div class="dg ${sel===TODAY?'today':''}">${sel===TODAY?'今天 · ':''}${fmtMD(sel)}</div>
+  ${day.length ? day.map(l=>lessonItem(l,tz,whoFn,canReq,canEdit)).join('') : '<div class="empty" style="padding:10px">这天没有课</div>'}`;
+}
 function tSchedule(t){
   const miss = needFb();
   return `<h2 style="font-size:19px">${esc(t.name)}</h2>
   ${miss.length?`<div class="note warn row" style="justify-content:space-between">有 ${miss.length} 节课还没写反馈 <button class="btn sm" data-act="tab" data-v="c">去写</button></div>`:''}
-  <div class="row" style="justify-content:space-between">${tzNote(t.tz)}<button class="btn pri sm" data-act="add-lesson">＋ 排课</button></div>
-  ${agenda(lsOfT(t.id),t.tz,c=>stu(c.student_id).name,30,false,true)}`;
+  <div class="row" style="justify-content:flex-end"><button class="btn pri sm" data-act="add-lesson">＋ 排课</button></div>
+  ${schedule(lsOfT(t.id),t.tz,c=>stu(c.student_id).name,false,true)}`;
 }
 function tStudents(t){
   const cs = DB.courses.filter(c=>c.teacher_id===t.id && c.active);
@@ -393,7 +425,7 @@ function sHome(s){
   return `<h2 style="font-size:19px">${esc(s.name)}</h2>
   ${r.length?`<div class="remind"><b>提醒</b>${r.map(([t,x])=>`<button data-act="tab" data-v="${t}">${esc(x)}</button>`).join('')}</div>`:''}
   <details class="card" ${DB.courses.some(c=>planText(c.id,TODAY.slice(0,7)))?'open':''}><summary class="row"><b style="font-family:var(--f-disp);margin-right:auto">${+TODAY.slice(5,7)} 月学习计划</b><span class="muted xs">展开 / 收起</span></summary><div style="margin-top:6px">${mpView(s.id,TODAY.slice(0,7))}</div></details>
-  ${tzNote(s.tz)}<div class="muted xs">有事可以直接申请改期或请假</div>${agenda(lsOfS(s.id),s.tz,c=>tea(c.teacher_id).name,12,true)}`;
+  <div class="muted xs">有事可以在当天的课下面直接申请改期或请假</div>${schedule(lsOfS(s.id),s.tz,c=>tea(c.teacher_id).name,true)}`;
 }
 function sHomework(s){
   const cur = latestHw(s.id), older = fbOfS(s.id).filter(f=>!cur.includes(f)).slice(-5).reverse();
@@ -420,7 +452,7 @@ function pOverview(s){
   ${block(prev)}<div class="dg">接下来的课</div>${agenda(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name,4)}`;
 }
 const pFeedback = s => `<div class="muted xs">老师的课后反馈经教务审核后显示在这里。</div>` + (fbOfS(s.id).slice().reverse().slice(0,20).map(f=>fbMini(f,false)).join('') || '<div class="empty">还没有反馈</div>');
-const pSchedule = s => `${tzNote('JP')}${agenda(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name,20)}`;
+const pSchedule = s => schedule(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name);
 
 /* ═════════════ 弹窗 ═════════════ */
 const mroot = document.getElementById('modal-root');
@@ -584,6 +616,9 @@ document.addEventListener('click', async e => {
   switch(k){
     case 'page': if (v==='feedback-missing'){ S.page='feedback'; S.fbTab='missing'; } else { S.page=v; if (v==='feedback') S.fbTab='pending'; } render(); window.scrollTo(0,0); break;
     case 'tab': S.tab=v; render(); window.scrollTo(0,0); break;
+    case 'pview': PV=v; try{ localStorage.setItem('jw_view', v); }catch(_){} render(); break;
+    case 'pday': S.pDay=v; render(); break;
+    case 'pmonth': S.pMonth = v==='0' ? TODAY.slice(0,7) : ymShift(S.pMonth || TODAY.slice(0,7), Number(v)); S.pDay = S.pMonth===TODAY.slice(0,7) ? TODAY : S.pMonth+'-01'; render(); break;
     case 'month': S.month = v==='0' ? TODAY.slice(0,7) : ymShift(S.month, Number(v)); render(); break;
     case 'caltype': S.calType=v; S.calId=''; render(); break;
     case 'lesson': lessonModal(v); break;
