@@ -77,6 +77,12 @@ const needFb = () => DB.lessons.filter(l => isDone(l) && !fbOf(l));
 const ME = () => DB.me;
 const isAdmin = () => ME().role==='admin';
 const isTop = () => isAdmin() && ME().level==='top';
+const canSched = () => isAdmin() || ME().role==='teacher';          // 排课、调课、删课（数据库里还会再按范围检查）
+const myTz = () => ME().role==='teacher' ? (tea(ME().teacher_id).tz || 'JP') : 'JP';
+const tzName = tz => tz==='CN' ? '北京时间' : '日本时间';
+const wrap = m => tstr(((m % 1440) + 1440) % 1440);
+const fromJST = t => myTz()==='CN' ? wrap(mins(t)-60) : t;          // 日本时间 → 自己的时间（显示用）
+const toJST = t => myTz()==='CN' ? (mins(t)+60 >= 1440 ? null : tstr(mins(t)+60)) : t;   // 自己填的时间 → 日本时间（存库用）
 const planText = (cid, ym) => DB.plans.find(p => p.course_id===cid && p.ym===ym)?.text || '';
 const reqOf = l => DB.requests.filter(q => q.lesson_id===l.id).slice(-1)[0];
 const personOf = (role, field, id) => (DB.people||[]).find(p => p.role===role && p[field]===id && p.active);
@@ -173,7 +179,7 @@ function pgCalendar(){
   const who = S.calType==='s' ? DB.students : S.calType==='t' ? DB.teachers : [];
   const title = S.calType==='s' && S.calId ? `${y}年${m}月｜${stu(S.calId).name}` : S.calType==='t' && S.calId ? `${y}年${m}月｜${tea(S.calId).name}` : `${y}年${m}月｜全部课程`;
   const hours = ls.filter(l=>l.status!=='leave').reduce((a,l)=>a+dur(l),0);
-  return `<div class="ph"><h2>${isTop()?'课表与排课':'课表'}</h2>${isTop()?`<button class="btn pri" data-act="add-lesson" ${DB.courses.length?'':'disabled title="先在学生档案里添加课程"'}>＋ 排课</button>`:'<span class="tag mute">只读</span>'}</div>${scopeNote()}
+  return `<div class="ph"><h2>课表与排课</h2>${isAdmin()?`<button class="btn pri" data-act="add-lesson" ${DB.courses.length?'':'disabled title="先在学生档案里添加课程"'}>＋ 排课</button>`:'<span class="tag mute">只读</span>'}</div>${scopeNote()}
   <div class="cal-bar">
     <button class="btn sm" data-act="month" data-v="-1" aria-label="上个月">‹</button><span class="mon">${S.month.replace('-','.')}</span><button class="btn sm" data-act="month" data-v="1" aria-label="下个月">›</button>
     <button class="btn sm" data-act="month" data-v="0">本月</button>
@@ -318,14 +324,14 @@ function reqLine(q){
   if (q.status==='pending') return `<div class="xs" style="color:var(--warn)">已申请${q.type}，等教务处理 · ${esc(q.reason)}${q.wish?` · 希望：${esc(q.wish)}`:''}</div>`;
   return `<div class="xs" style="color:${q.status==='accepted'?'var(--ok)':'var(--seal)'}">${q.type}申请${q.status==='accepted'?'已同意':'未同意'}（${esc(q.handled_by)}）：${esc(q.reply)}</div>`;
 }
-function agenda(ls, tz, whoFn, n=12, canReq=false){
+function agenda(ls, tz, whoFn, n=12, canReq=false, canEdit=false){
   const up = ls.filter(l=>l.date>=TODAY).slice(0,n);
   if (!up.length) return '<div class="empty">近期没有课</div>';
   let out='', last='';
   up.forEach(l => { const c=course(l.course_id), q=reqOf(l), leave = l.status==='leave';
     if (l.date!==last){ out += `<div class="dg ${l.date===TODAY?'today':''}">${l.date===TODAY?'今天 · ':''}${fmtMD(l.date)}</div>`; last=l.date; }
     out += `<div class="les" style="--hc:${hue(c.subject)}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}</div><div style="min-width:0;flex:1">${subjTag(c.subject)} · ${esc(whoFn(c))}${l.moved?' <span class="tag warn">调课</span>':''}${leave?' <span class="tag seal">请假</span>':''}
-      ${reqLine(q)}${canReq && !leave && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}</div></div>`;
+      ${reqLine(q)}${canReq && !leave && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}</div></div>`;
   });
   return out;
 }
@@ -334,7 +340,8 @@ function tSchedule(t){
   const miss = needFb();
   return `<h2 style="font-size:19px">${esc(t.name)}</h2>
   ${miss.length?`<div class="note warn row" style="justify-content:space-between">有 ${miss.length} 节课还没写反馈 <button class="btn sm" data-act="tab" data-v="c">去写</button></div>`:''}
-  ${tzNote(t.tz)}${agenda(lsOfT(t.id),t.tz,c=>stu(c.student_id).name)}`;
+  <div class="row" style="justify-content:space-between">${tzNote(t.tz)}<button class="btn pri sm" data-act="add-lesson">＋ 排课</button></div>
+  ${agenda(lsOfT(t.id),t.tz,c=>stu(c.student_id).name,30,false,true)}`;
 }
 function tStudents(t){
   const cs = DB.courses.filter(c=>c.teacher_id===t.id && c.active);
@@ -429,11 +436,13 @@ function lessonModal(id){
   <dt>状态</dt><dd>${st} ${l.moved?'<span class="tag warn">调过课</span>':''}</dd>${l.note?`<dt>备注</dt><dd>${esc(l.note)}</dd>`:''}
   ${l.status==='leave'?`<dt>扣学生课时</dt><dd class="num">${l.deduct} 小时（老师照发）</dd>`:''}${isDone(l)?`<dt>反馈</dt><dd>${f?(f.status==='approved'?'已审批':'待审批'):'<span class="tag warn">老师未写</span>'}</dd>`:''}
   ${q?`<dt>申请</dt><dd>${reqLine(q)}</dd>`:''}</dl>
-  ${isTop() && !f ? `<section class="card" style="display:flex;flex-direction:column;gap:8px"><b>调课</b>
-    <div class="fields"><label class="field"><span>日期</span><input type="date" id="mv-date" value="${l.date}"></label><label class="field"><span>开始（日本）</span><input type="time" id="mv-s" value="${l.start}"></label><label class="field"><span>结束</span><input type="time" id="mv-e" value="${l.end}"></label></div>
+  ${canSched() && !f && l.status!=='leave' ? `<section class="card" style="display:flex;flex-direction:column;gap:8px"><b>调课</b>
+    <div class="fields"><label class="field"><span>日期</span><input type="date" id="mv-date" value="${l.date}"></label><label class="field"><span>开始（${tzName(myTz())}）</span><input type="time" id="mv-s" value="${fromJST(l.start)}"></label><label class="field"><span>结束</span><input type="time" id="mv-e" value="${fromJST(l.end)}"></label></div>
     <label class="field"><span>原因</span><input type="text" id="mv-note" placeholder="例：老师发烧，改到周二"></label>
-    <div class="row"><button class="btn pri" data-act="move" data-v="${l.id}">保存调课</button><span class="muted xs">老师、学生、家长的课表同时更新</span></div></section>
-  <section class="card" style="display:flex;flex-direction:column;gap:8px"><b>${l.status==='leave'?'请假':'标记请假'}</b>
+    <div class="row"><button class="btn pri" data-act="move" data-v="${l.id}">保存调课</button><span class="muted xs">老师、学生、家长的课表同时更新</span></div></section>` : ''}
+  ${!isTop() && canSched() && !f ? `<div class="row" id="del-row"><button class="btn danger sm" data-act="del-ask" data-v="${l.id}">删除这节课</button><span class="muted xs">学生请假、扣课时请联系教务·管理处理</span></div>` : ''}
+  ${!isTop() && canSched() && f ? '<div class="muted xs">这节课已经写了反馈，不能再调课或删除。需要改的话请联系教务老师。</div>' : ''}
+  ${isTop() && !f ? `<section class="card" style="display:flex;flex-direction:column;gap:8px"><b>${l.status==='leave'?'请假':'标记请假'}</b>
     <div class="muted xs">当天请假原则上扣一半课时，也可以酌情不扣。</div>
     <div class="fields"><label class="field"><span>扣学生课时</span><select id="lv-d"><option value="0">不扣</option><option value="${dur(l)/2}" ${l.date===TODAY?'selected':''}>扣 ${dur(l)/2} 小时（一半）</option><option value="${dur(l)}">扣全部 ${dur(l)} 小时</option></select></label>
     <label class="field"><span>备注</span><input type="text" id="lv-note" placeholder="例：第一次，已口头提醒"></label></div>
@@ -441,10 +450,12 @@ function lessonModal(id){
   <div class="row" id="del-row"><button class="btn danger sm" data-act="del-ask" data-v="${l.id}">删除这节课</button></div>` : (isTop() && f ? '<div class="muted xs">这节课已经写了反馈，不能再调课或删除。</div>' : '')}`);
 }
 function addLessonModal(){
-  const act = DB.courses.filter(c=>c.active);
+  const act = DB.courses.filter(c=>c.active && (ME().role!=='teacher' || c.teacher_id===ME().teacher_id));
+  if (!act.length){ toast(ME().role==='teacher' ? '你还没有分配学生，请联系教务老师' : '先在学生档案里给学生添加课程', true); return; }
   openModal(`${mHead('排课')}
-  <label class="field"><span>学生 · 老师 · 科目</span><select id="al-c">${act.map(c=>`<option value="${c.id}">${esc(stu(c.student_id).name)} · ${esc(tea(c.teacher_id).name)} · ${esc(c.subject)}</option>`).join('')}</select></label>
-  <div class="fields"><label class="field"><span>第一节日期</span><input type="date" id="al-d" value="${TODAY}"></label><label class="field"><span>开始（日本时间）</span><input type="time" id="al-s" value="19:00"></label><label class="field"><span>结束</span><input type="time" id="al-e" value="21:00"></label></div>
+  <label class="field"><span>${ME().role==='teacher'?'学生 · 科目':'学生 · 老师 · 科目'}</span><select id="al-c">${act.map(c=>`<option value="${c.id}">${esc(stu(c.student_id).name)}${ME().role==='teacher'?'':' · '+esc(tea(c.teacher_id).name)} · ${esc(c.subject)}</option>`).join('')}</select></label>
+  <div class="fields"><label class="field"><span>第一节日期</span><input type="date" id="al-d" value="${TODAY}"></label><label class="field"><span>开始（${tzName(myTz())}）</span><input type="time" id="al-s" value="${myTz()==='CN'?'18:00':'19:00'}"></label><label class="field"><span>结束</span><input type="time" id="al-e" value="${myTz()==='CN'?'20:00':'21:00'}"></label></div>
+  ${myTz()==='CN'?'<div class="note">请按<b>北京时间</b>填写，系统会自动换算成日本时间（＋1 小时）给学生和教务看。</div>':''}
   <label class="field"><span>重复</span><select id="al-rep"><option value="month">每周同一时间，到这个月底</option><option value="1">只排这一节</option><option value="4">每周同一时间，共 4 周</option><option value="8">每周同一时间，共 8 周</option></select></label>
   <div class="muted xs">和这位老师已有的课时间重叠的，会自动跳过。</div>
   <div class="row"><button class="btn pri" data-act="save-lesson">排课</button></div>`);
@@ -487,10 +498,10 @@ function studentModal(id, tab){
     body = `<div class="grid2"><dl class="kv"><dt>方向</dt><dd>${esc(s.track||'—')}（${s.grad?'大学院':'学部'}）</dd><dt>所在地</dt><dd>${esc(s.loc||'—')}（${s.tz==='CN'?'北京时间':'日本时间'}）</dd><dt>负责教务</dt><dd>${esc(s.staff||'—')}</dd>${s.memo?`<dt>教务备注</dt><dd>${esc(s.memo)}</dd>`:''}</dl>
       <div class="row" style="align-content:flex-start">${isTop()?`<button class="btn sm" data-act="student-form" data-v="${id}">编辑资料</button>`:''}<button class="btn sm" data-act="stu-cal" data-v="${id}">看课表</button>
       ${ps?`<button class="btn sm" data-act="copy-link" data-v="${ps.key}">复制学生链接</button>`:''}${pp?`<button class="btn sm" data-act="copy-link" data-v="${pp.key}">复制家长链接</button>`:''}</div></div>
-      <b>课程</b><div class="list">${cs.map(c=>`<div class="li small"><span class="grow">${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}${c.active?'':' <span class="tag mute">已停</span>'}</span>${isTop()?`<span class="num">${yen(c.rate)}/小时</span><button class="btn sm" data-act="course-edit" data-v="${c.id}">改</button>`:''}</div>`).join('')||'<div class="muted small">还没有课程</div>'}</div>
-      ${isTop()?`<details class="card" ${cs.length?'':'open'}><summary><b>＋ 添加课程</b> <span class="muted xs">（这位学生跟哪位老师上什么课）</span></summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+      <b>课程</b><div class="list">${cs.map(c=>`<div class="li small"><span class="grow">${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}${c.active?'':' <span class="tag mute">已停</span>'}</span>${isTop()?`<span class="num">${yen(c.rate)}/小时</span>`:''}${isAdmin()?`<button class="btn sm" data-act="course-edit" data-v="${c.id}">改</button>`:''}</div>`).join('')||'<div class="muted small">还没有课程</div>'}</div>
+      ${isAdmin()?`<details class="card" ${cs.length?'':'open'}><summary><b>＋ 添加课程</b> <span class="muted xs">（这位学生跟哪位老师上什么课）</span></summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
         ${DB.teachers.length?`<div class="fields"><label class="field"><span>老师</span><select id="cf-t">${DB.teachers.filter(t=>t.active).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
-        <label class="field"><span>科目</span><input type="text" id="cf-subj" placeholder="例：文综"></label><label class="field"><span>老师单价（日元/小时）</span><input type="number" id="cf-rate" step="500" min="0" value="0"></label></div>
+        <label class="field"><span>科目</span><input type="text" id="cf-subj" placeholder="例：文综"></label>${isTop()?'<label class="field"><span>老师单价（日元/小时）</span><input type="number" id="cf-rate" step="500" min="0" value="0"></label>':''}</div>${isTop()?'':'<div class="muted xs">课时单价由教务·管理设置。</div>'}
         <div class="row"><button class="btn pri sm" data-act="add-course" data-v="${id}">添加课程</button></div>`:'<div class="muted small">先到「老师档案」里添加老师。</div>'}</div></details>`:''}`;
   } else if (tab==='mp') {
     const editable = cs.filter(c=>c.active);
@@ -506,7 +517,7 @@ function studentModal(id, tab){
 function courseEdit(cid){
   const c = course(cid);
   openModal(`${mHead(`${esc(stu(c.student_id).name)} · ${esc(tea(c.teacher_id).name)}`)}
-  <div class="fields"><label class="field"><span>科目</span><input type="text" id="ce-subj" value="${esc(c.subject)}"></label><label class="field"><span>老师单价（日元/小时）</span><input type="number" id="ce-rate" step="500" min="0" value="${c.rate||0}"></label>
+  <div class="fields"><label class="field"><span>科目</span><input type="text" id="ce-subj" value="${esc(c.subject)}"></label>${isTop()?`<label class="field"><span>老师单价（日元/小时）</span><input type="number" id="ce-rate" step="500" min="0" value="${c.rate||0}"></label>`:''}
   <label class="field"><span>状态</span><select id="ce-active"><option value="true" ${c.active?'selected':''}>在上</option><option value="false" ${c.active?'':'selected'}>停了</option></select></label></div>
   <div class="row"><button class="btn pri" data-act="save-course" data-v="${cid}">保存</button></div>`);
 }
@@ -604,14 +615,14 @@ document.addEventListener('click', async e => {
     case 'add-course': { if(!val('cf-subj').trim()){toast('请填写科目',true);break;}
       await act('admin_save_course', {d:{student_id:v, teacher_id:val('cf-t'), subject:val('cf-subj'), rate:Number(val('cf-rate'))||0}}, '课程已添加，可以去排课了'); studentModal(v,'info'); break; }
     case 'course-edit': courseEdit(v); break;
-    case 'save-course': { const c=course(v); await act('admin_save_course', {d:{id:v, subject:val('ce-subj'), rate:Number(val('ce-rate'))||0, active:val('ce-active')==='true'}}, '已保存'); studentModal(c.student_id,'info'); break; }
-    case 'move': { const d=val('mv-date'), s=val('mv-s'), en=val('mv-e'); if(!d||!s||!en||mins(en)<=mins(s)){toast('请检查日期和时间',true);break;}
+    case 'save-course': { const c=course(v); await act('admin_save_course', {d:{id:v, subject:val('ce-subj'), rate: isTop() ? (Number(val('ce-rate'))||0) : undefined, active:val('ce-active')==='true'}}, '已保存'); studentModal(c.student_id,'info'); break; }
+    case 'move': { const d=val('mv-date'), s=toJST(val('mv-s')), en=toJST(val('mv-e')); if(!d||!s||!en||mins(en)<=mins(s)){toast('请检查日期和时间（不能跨过半夜 12 点）',true);break;}
       await act('admin_update_lesson', {lid:v, d:{date:d, start:s, end:en, moved:true, note:val('mv-note')||'已调课'}}, '已调课，各方的课表已更新'); closeModal(); break; }
     case 'leave': { const dd=Number(val('lv-d')); await act('admin_update_lesson', {lid:v, d:{status:'leave', deduct:dd, note:val('lv-note')||(dd?`当天请假，扣 ${dd} 小时`:'请假，不扣课时')}}, '已标记请假'); closeModal(); break; }
     case 'unleave': await act('admin_update_lesson', {lid:v, d:{status:'scheduled', deduct:0, note:''}}, '已取消请假'); closeModal(); break;
     case 'del-ask': document.getElementById('del-row').innerHTML=`<span class="small">确定删除这节课？</span><button class="btn danger sm" data-act="del" data-v="${v}">删除</button><button class="btn sm" data-act="close">算了</button>`; break;
     case 'del': await act('admin_delete_lesson', {lid:v}, '已删除'); closeModal(); break;
-    case 'save-lesson': { const d=val('al-d'), s=val('al-s'), en=val('al-e'); if(!d||!s||!en||mins(en)<=mins(s)){toast('请检查日期和时间',true);break;}
+    case 'save-lesson': { const d=val('al-d'), s=toJST(val('al-s')), en=toJST(val('al-e')); if(!d||!s||!en||mins(en)<=mins(s)){toast('请检查日期和时间（不能跨过半夜 12 点）',true);break;}
       await act('admin_add_lessons', {course:val('al-c'), dates:lessonDates(d, val('al-rep')), st:s, et:en}, r=>`已排 ${r.added} 节课`+(r.skipped?`，${r.skipped} 节和老师已有的课冲突，已跳过`:'')); S.month=d.slice(0,7); closeModal(); render(); break; }
     case 'req-ok': { const q=DB.requests.find(x=>x.id===v);
       const args = q.type==='改期' ? {rid:v, accept:true, reply:'', nd:val('rq-d-'+v), ns:val('rq-s-'+v), ne:val('rq-e-'+v), deduct:0} : {rid:v, accept:true, reply:'', deduct:Number(val('rq-dd-'+v))};
