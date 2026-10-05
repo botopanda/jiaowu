@@ -249,6 +249,12 @@ function pgFeedback(){
   <div class="seg">${[['pending',`待审批 ${pend.length}`],['approved','已通过'],['missing',`老师未写 ${miss.length}`]].map(([k,t])=>`<button class="${S.fbTab===k?'on':''}" data-act="fbtab" data-v="${k}">${t}</button>`).join('')}</div>${body}`;
 }
 
+// 学生的任课老师排成一行：同一位老师的几门课合在一起，比如「刘天曦 数学·物理」
+function teacherChips(cs){
+  const by = {}; cs.filter(c => c.active !== false).forEach(c => (by[c.teacher_id] ??= []).push(c.subject));
+  return Object.entries(by).length ? `<span class="tchips">${Object.entries(by).map(([tid, subs]) =>
+    `<span class="tchip"><b>${esc(tea(tid).name)}</b>${subs.map(x => `<span class="subj" style="--hc:${hue(x)}">${esc(x)}</span>`).join('')}</span>`).join('')}</span>` : '';
+}
 function pgStudents(){
   const q = S.stuQ.trim();
   const list = DB.students.filter(s => !q || s.name.includes(q) || (s.track||'').includes(q));
@@ -259,7 +265,7 @@ function pgStudents(){
   ${list.map(s => { const cs = DB.courses.filter(c=>c.student_id===s.id), st = monthStats(s.id, ym), un = latestHw(s.id).filter(f=>!f.hw_sub).length;
     const pn = cs.filter(c => planText(c.id, ym)).length;
     return `<tr class="click" data-act="student" data-v="${s.id}"><td class="num">${esc(s.code||'')}</td><td><b>${esc(s.name)}</b>${s.active?'':' <span class="tag mute">停课</span>'}<br><span class="xs muted">${esc(s.loc||'')}</span></td><td>${esc(s.direction||s.track||'')}${s.target_ym?`<br><span class="xs muted">目标 ${esc(s.target_ym)}</span>`:''}</td>
-    <td>${cs.map(c=>`${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}`).join('<br>') || '<span class="tag warn">还没有课程</span>'}</td><td>${esc(s.staff)}</td>
+    <td>${teacherChips(cs) || '<span class="tag warn">还没有课程</span>'}</td><td>${esc(s.staff)}</td>
     <td class="num">${st.actual}/${st.req}${st.leave?` <span class="tag seal">请假 ${st.leave}</span>`:''}</td><td>${un?`<span class="tag warn">${un} 份未交</span>`:'<span class="tag ok">已交齐</span>'}</td>
     <td>${cs.length ? `<span class="tag ${pn===cs.length?'ok':'warn'}">${pn}/${cs.length}</span>` : ''}</td></tr>`}).join('')}
   </tbody></table></div>` : `<div class="card empty">${DB.students.length ? '没有符合的学生' : '还没有学生。点右上角「新增学生」开始。'}</div>`}`;
