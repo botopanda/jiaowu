@@ -762,7 +762,7 @@ document.addEventListener('compositionend', e => { if (e.target.id==='stu-q'){ S
 document.addEventListener('keydown', e => { if (e.key==='Escape' && mroot.innerHTML) closeModal(); });
 
 /* ───────── 启动 ───────── */
-window.addEventListener('DOMContentLoaded', async function start(){
+document.addEventListener('app-ready', async function start(){
   if (!KEY){ app.innerHTML = `<div class="center"><h2>一对一教务台</h2><p class="muted">请用教务老师发给你的专属链接打开。</p></div>`; return; }
   try { await load(); render(); }
   catch(e){
