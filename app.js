@@ -250,7 +250,7 @@ function pgStudents(){
   ${list.length ? `<div class="tw"><table><thead><tr><th>编号</th><th>姓名</th><th>方向</th><th>任课老师</th><th>负责教务</th><th>${+ym.slice(5)} 月出勤</th><th>作业</th><th>${+ym.slice(5)} 月计划</th></tr></thead><tbody>
   ${list.map(s => { const cs = DB.courses.filter(c=>c.student_id===s.id), st = monthStats(s.id, ym), un = latestHw(s.id).filter(f=>!f.hw_sub).length;
     const pn = cs.filter(c => planText(c.id, ym)).length;
-    return `<tr class="click" data-act="student" data-v="${s.id}"><td class="num">${esc(s.code||'')}</td><td><b>${esc(s.name)}</b>${s.owner_id?' <span class="tag seal">私密</span>':''}${s.active?'':' <span class="tag mute">停课</span>'}<br><span class="xs muted">${esc(s.loc||'')}</span></td><td>${esc(s.direction||s.track||'')}${s.target_ym?`<br><span class="xs muted">目标 ${esc(s.target_ym)}</span>`:''}</td>
+    return `<tr class="click" data-act="student" data-v="${s.id}"><td class="num">${esc(s.code||'')}</td><td><b>${esc(s.name)}</b>${s.active?'':' <span class="tag mute">停课</span>'}<br><span class="xs muted">${esc(s.loc||'')}</span></td><td>${esc(s.direction||s.track||'')}${s.target_ym?`<br><span class="xs muted">目标 ${esc(s.target_ym)}</span>`:''}</td>
     <td>${cs.map(c=>`${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}`).join('<br>') || '<span class="tag warn">还没有课程</span>'}</td><td>${esc(s.staff)}</td>
     <td class="num">${st.actual}/${st.req}${st.leave?` <span class="tag seal">请假 ${st.leave}</span>`:''}</td><td>${un?`<span class="tag warn">${un} 份未交</span>`:'<span class="tag ok">已交齐</span>'}</td>
     <td>${cs.length ? `<span class="tag ${pn===cs.length?'ok':'warn'}">${pn}/${cs.length}</span>` : ''}</td></tr>`}).join('')}
@@ -275,7 +275,7 @@ function pgPayroll(){
   const total = rows.reduce((a,r)=>a+r.amt,0);
   const months = [...new Set(DB.lessons.map(l=>l.date.slice(0,7)).concat([TODAY.slice(0,7), ymShift(TODAY.slice(0,7),-1)]))].sort().reverse();
   return `<div class="ph"><h2>课时与工资</h2><select id="pay-m" data-change="paym">${months.map(v=>`<option value="${v}" ${v===ym?'selected':''}>${ymLabel(v)}</option>`).join('')}</select></div>
-  <div class="note">只有<b>教务 · 管理</b>能看到这一页。上完的课自动计入课时；当天请假扣学生的课时，照样计入老师工资。单价在学生档案 → 课程里设置。设为私密的学生，他们的课时只有设置的人能看到。</div>
+  <div class="note">只有<b>教务 · 管理</b>能看到这一页。上完的课自动计入课时；当天请假扣学生的课时，照样计入老师工资。单价在学生档案 → 课程里设置。</div>
   <div class="stats"><div class="stat"><small>计费课时</small><b>${rows.reduce((a,r)=>a+r.h,0)}</b></div><div class="stat"><small>工资合计</small><b>${yen(total)}</b></div></div>
   ${rows.length ? '' : '<div class="card empty">这个月还没有上完的课</div>'}
   ${rows.map(r => `<details class="card"><summary class="row"><b style="margin-right:auto;font-family:var(--f-disp)">${esc(r.t.name)}</b><span class="num small">${r.ls.length} 节 · ${r.h} 小时</span><b class="num">${yen(r.amt)}</b><span class="muted xs">展开明细</span></summary>
@@ -507,7 +507,6 @@ function studentForm(id){
   <label class="field"><span>显示时间</span><select id="sf-tz"><option value="JP" ${s.tz==='JP'?'selected':''}>日本时间</option><option value="CN" ${s.tz==='CN'?'selected':''}>北京时间</option></select></label>
   <label class="field"><span>负责教务</span><input type="text" id="sf-staff" value="${esc(s.staff)}" placeholder="例：金老师"></label>
   ${id?`<label class="field"><span>状态</span><select id="sf-active"><option value="true" ${s.active?'selected':''}>在读</option><option value="false" ${s.active?'':'selected'}>停课 / 毕业</option></select></label>`:''}</div>
-  ${id?'':`<label class="field"><span>谁能看到这位学生</span><select id="sf-private"><option value="0">所有教务·管理（潘老师、金老师）</option><option value="1">只有我（私密）</option></select></label>`}
   <label class="field"><span>教务备注（只有教务能看到）</span><textarea id="sf-memo">${esc(s.memo||'')}</textarea></label>
   ${id?'':'<div class="muted xs">保存后会自动生成这位学生和家长的两条专属链接。</div>'}
   <div class="row"><button class="btn pri" data-act="save-student" data-v="${id||''}">保存</button></div>`);
@@ -544,9 +543,6 @@ function studentModal(id, tab){
         ${DB.teachers.length?`<div class="fields"><label class="field"><span>老师</span><select id="cf-t">${DB.teachers.filter(t=>t.active).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
         <label class="field"><span>科目</span><input type="text" id="cf-subj" placeholder="例：文综"></label>${isTop()?'<label class="field"><span>老师单价（日元/小时）</span><input type="number" id="cf-rate" step="500" min="0" value="0"></label>':''}</div>${isTop()?'':'<div class="muted xs">课时单价由教务·管理设置。</div>'}
         <div class="row"><button class="btn pri sm" data-act="add-course" data-v="${id}">添加课程</button></div>`:'<div class="muted small">先到「老师档案」里添加老师。</div>'}</div></details>`:''}
-      ${isTop()?`<div class="card small" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">${s.owner_id
-          ? `<span class="tag seal">私密</span><span class="grow">这位学生只有你能看到，其他教务·管理看不到。</span><button class="btn sm" data-act="set-private" data-v="${id}|0">取消私密</button>`
-          : `<span class="grow muted">所有教务·管理都能看到这位学生。</span><button class="btn sm" data-act="set-private" data-v="${id}|1">设为私密（只有我能看到）</button>`}</div>`:''}
       ${isTop()?`<div class="row" id="stu-del-row" style="margin-top:6px"><button class="btn danger sm" data-act="stu-del-ask" data-v="${id}">删除这位学生</button></div>`:''}`;
   } else if (tab==='mp') {
     const editable = cs.filter(c=>c.active);
@@ -649,12 +645,11 @@ document.addEventListener('click', async e => {
     case 'save-edit': { const args={fid:v, content:val(`ed-content-${v}`), perf:val(`ed-perf-${v}`), hw:val(`ed-hw-${v}`)}; S.editing=null; await act('admin_feedback_edit', args, '已保存修改，可以审批了'); break; }
     case 'copy-remind': { const l=L(v), c=course(l.course_id); copyText(`${tea(c.teacher_id).name}您好，${sMD(l.date)} ${stu(c.student_id).name}的${c.subject}课反馈还没写，麻烦抽空填一下，谢谢！`, '提醒文字已复制，发到老师微信就行'); break; }
     case 'student': studentModal(v); break;
-    case 'set-private': { const [sid,on]=v.split('|'); await act('admin_set_private', {sid, on_: on==='1'}, on==='1'?'已设为私密，其他教务·管理看不到了':'已取消私密'); studentModal(sid,'info'); break; }
     case 'stu-tab': { const [id,t]=v.split('|'); studentModal(id,t); break; }
     case 'stu-cal': closeModal(); S.page='calendar'; S.calType='s'; S.calId=v; render(); break;
     case 'student-form': studentForm(v); break;
     case 'save-student': { if(!val('sf-name').trim()){toast('请填写姓名',true);break;}
-      const d={name:val('sf-name'), track:val('sf-track'), grad:val('sf-grad')==='true', loc:val('sf-loc'), tz:val('sf-tz'), staff:val('sf-staff'), memo:val('sf-memo'), private: val('sf-private')==='1'};
+      const d={name:val('sf-name'), track:val('sf-track'), grad:val('sf-grad')==='true', loc:val('sf-loc'), tz:val('sf-tz'), staff:val('sf-staff'), memo:val('sf-memo')};
       if (v){ d.id=v; d.active = val('sf-active')!=='false'; }
       const sid = await act('admin_save_student', {d}, v?'已保存':'已添加。接下来在「概况与课程」里给他添加课程'); studentModal(sid,'info'); break; }
     case 'teacher-form': teacherForm(v); break;
