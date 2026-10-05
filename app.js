@@ -261,7 +261,7 @@ function pgStudents(){
   const ym = TODAY.slice(0,7);
   return `<div class="ph"><h2>学生档案</h2>${isTop()?`<button class="btn pri" data-act="student-form">＋ 新增学生</button>`:''}</div>${scopeNote()}
   <div class="row"><input type="text" id="stu-q" placeholder="搜索姓名或方向" value="${esc(S.stuQ)}" data-input="stuq" style="width:200px"></div>
-  ${list.length ? `<div class="tw"><table class="rt"><thead><tr><th>编号</th><th>姓名</th><th>方向</th><th>任课老师</th><th>负责教务</th><th>${+ym.slice(5)} 月出勤</th><th>作业</th><th>${+ym.slice(5)} 月计划</th></tr></thead><tbody>
+  ${list.length ? `<div class="tw"><table class="rt stu-tbl"><thead><tr><th>编号</th><th>姓名</th><th>方向</th><th>任课老师</th><th>负责教务</th><th>${+ym.slice(5)} 月出勤</th><th>作业</th><th>${+ym.slice(5)} 月计划</th></tr></thead><tbody>
   ${list.map(s => { const cs = DB.courses.filter(c=>c.student_id===s.id), st = monthStats(s.id, ym), un = latestHw(s.id).filter(f=>!f.hw_sub).length;
     const pn = cs.filter(c => planText(c.id, ym)).length;
     return `<tr class="click" data-act="student" data-v="${s.id}"><td class="num">${esc(s.code||'')}</td><td><b>${esc(s.name)}</b>${s.active?'':' <span class="tag mute">停课</span>'}<br><span class="xs muted">${esc(s.loc||'')}</span></td><td>${esc(s.direction||s.track||'')}${s.target_ym?`<br><span class="xs muted">目标 ${esc(s.target_ym)}</span>`:''}</td>
