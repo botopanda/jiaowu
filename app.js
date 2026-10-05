@@ -103,6 +103,7 @@ const latestHw = sid => DB.courses.filter(c => c.student_id===sid).map(c => DB.f
 async function load(){
   DB = await rpc('app_load');
   TODAY = DB.today;
+  DB.lessons.sort((a,b) => (a.date+a.start).localeCompare(b.date+b.start));
   if (!S.month) S.month = TODAY.slice(0,7);
   if (!S.payMonth) S.payMonth = ymShift(TODAY.slice(0,7), -1);
   if (!S.teaMonth) S.teaMonth = TODAY.slice(0,7);
@@ -120,6 +121,7 @@ const app = document.getElementById('app');
 function render(){
   const me = ME();
   const label = me.role==='admin' ? (me.level==='top' ? '教务 · 管理' : '教务') : {teacher:'任课老师', student:'学生', parent:'家长'}[me.role];
+  setTimeout(labelTables);
   app.innerHTML = `<header class="top"><h1>一对一教务台</h1><span class="who">${esc(me.name)}${me.role==='parent'?'':' · '+label}</span></header>` + (isAdmin() ? adminView() : phoneView());
 }
 
@@ -253,7 +255,7 @@ function pgStudents(){
   const ym = TODAY.slice(0,7);
   return `<div class="ph"><h2>学生档案</h2>${isTop()?`<button class="btn pri" data-act="student-form">＋ 新增学生</button>`:''}</div>${scopeNote()}
   <div class="row"><input type="text" id="stu-q" placeholder="搜索姓名或方向" value="${esc(S.stuQ)}" data-input="stuq" style="width:200px"></div>
-  ${list.length ? `<div class="tw"><table><thead><tr><th>编号</th><th>姓名</th><th>方向</th><th>任课老师</th><th>负责教务</th><th>${+ym.slice(5)} 月出勤</th><th>作业</th><th>${+ym.slice(5)} 月计划</th></tr></thead><tbody>
+  ${list.length ? `<div class="tw"><table class="rt"><thead><tr><th>编号</th><th>姓名</th><th>方向</th><th>任课老师</th><th>负责教务</th><th>${+ym.slice(5)} 月出勤</th><th>作业</th><th>${+ym.slice(5)} 月计划</th></tr></thead><tbody>
   ${list.map(s => { const cs = DB.courses.filter(c=>c.student_id===s.id), st = monthStats(s.id, ym), un = latestHw(s.id).filter(f=>!f.hw_sub).length;
     const pn = cs.filter(c => planText(c.id, ym)).length;
     return `<tr class="click" data-act="student" data-v="${s.id}"><td class="num">${esc(s.code||'')}</td><td><b>${esc(s.name)}</b>${s.active?'':' <span class="tag mute">停课</span>'}<br><span class="xs muted">${esc(s.loc||'')}</span></td><td>${esc(s.direction||s.track||'')}${s.target_ym?`<br><span class="xs muted">目标 ${esc(s.target_ym)}</span>`:''}</td>
@@ -300,7 +302,7 @@ function pgLinks(){
   const grp = [['教务','admin'],['任课老师','teacher'],['学生','student'],['家长','parent']];
   return `<div class="ph"><h2>链接与权限</h2><button class="btn pri" data-act="link-new">＋ 新建链接</button></div>
   <div class="note">每个人一条专属链接，打开就能用。点「复制链接」发到对方微信。<b>链接被转发、老师离职、学生毕业</b>时，点「重新生成」或「停用」，旧链接马上失效。新增老师、学生时会自动生成链接。</div>
-  ${grp.map(([g,r]) => { const ps = P.filter(p=>p.role===r); return ps.length ? `<section><h3 style="font-size:15px;margin:6px 0">${g}</h3><div class="tw"><table><thead><tr><th>姓名</th><th>身份</th><th>能看到</th><th>状态</th><th></th></tr></thead><tbody>
+  ${grp.map(([g,r]) => { const ps = P.filter(p=>p.role===r); return ps.length ? `<section><h3 style="font-size:15px;margin:6px 0">${g}</h3><div class="tw"><table class="rt"><thead><tr><th>姓名</th><th>身份</th><th>能看到</th><th>状态</th><th></th></tr></thead><tbody>
     ${ps.map(p => `<tr><td><b>${esc(p.name)}</b>${p.id===ME().id?' <span class="tag gold">我</span>':''}</td><td><span class="tag ${p.level==='top'?'seal':p.role==='admin'?'gold':'mute'}">${p.role==='admin'?(p.level==='top'?'教务 · 管理':'教务 · 普通'):g}</span></td>
       <td class="small">${esc(scopeTxt(p))}${p.role==='admin'&&p.level!=='top'?` <button class="btn sm" data-act="scope-edit" data-v="${p.id}">改范围</button>`:''}</td>
       <td>${p.active?'<span class="tag ok">启用</span>':'<span class="tag seal">已停用</span>'}</td>
@@ -471,7 +473,9 @@ const pSchedule = s => schedule(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name);
 
 /* ═════════════ 弹窗 ═════════════ */
 const mroot = document.getElementById('modal-root');
-function openModal(html, wide){ mroot.innerHTML = `<div class="mb" data-act="close-bg"><div class="modal ${wide?'wide':''}" role="dialog" aria-modal="true">${html}</div></div>`; }
+function openModal(html, wide){ mroot.innerHTML = `<div class="mb" data-act="close-bg"><div class="modal ${wide?'wide':''}" role="dialog" aria-modal="true">${html}</div></div>`; labelTables(); }
+// 手机上把宽表格变成卡片：每个格子前面显示它的列名
+function labelTables(){ document.querySelectorAll('table.rt').forEach(t => { const hs = [...t.querySelectorAll('thead th')].map(th => th.textContent.trim()); t.querySelectorAll('tbody tr').forEach(tr => [...tr.children].forEach((td, i) => td.setAttribute('data-label', hs[i] || ''))); }); }
 function closeModal(){ mroot.innerHTML=''; lastModal = null; }
 const mHead = t => `<div class="mh"><h3>${t}</h3><button class="btn sm" data-act="close" aria-label="关闭">✕</button></div>`;
 

@@ -154,7 +154,7 @@ function pgApply2(){
   return `<div class="ph"><h2>升学与出愿</h2></div>${scopeNote()}
   <div class="hint">所有学生的大学目标和出愿日程。在学生档案 → 点学生 →「大学与出愿」里添加和修改。</div>
   <section class="card"><h3>接下来 60 天的日程</h3>${ev.length ? `<div class="list">${ev.map(e=>`<div class="li"><span class="tag ${e.days<=7?'seal':e.days<=21?'warn':'mute'}">${e.days===0?'今天':e.days+' 天'}</span><div class="grow"><b>${esc(stu(e.t.student_id).name)}</b> · ${esc(e.t.school)} <span class="tag ${TIER_CLS[e.t.tier]}">${e.t.tier}</span><br><span class="small">${e.label} ${fmtMD(e.date)}</span></div><button class="btn sm" data-act="student-tab" data-v="${e.t.student_id}|target">查看</button></div>`).join('')}</div>` : '<div class="empty">60 天内没有出愿日程</div>'}</section>
-  ${all.length ? `<div class="tw"><table><thead><tr><th>学生</th><th>级别</th><th>大学 / 专业</th><th>入试方式</th><th>下一个日期</th><th>出愿截止</th><th>状态</th><th>资料</th></tr></thead><tbody>
+  ${all.length ? `<div class="tw"><table class="rt"><thead><tr><th>学生</th><th>级别</th><th>大学 / 专业</th><th>入试方式</th><th>下一个日期</th><th>出愿截止</th><th>状态</th><th>资料</th></tr></thead><tbody>
     ${all.map(t => { const nx = nextEventOf(t); return `<tr class="click" data-act="student-tab" data-v="${t.student_id}|target"><td><b>${esc(stu(t.student_id).name)}</b></td><td><span class="tag ${TIER_CLS[t.tier]}">${t.tier} ${t.seq}</span></td><td>${esc(t.school)}</td><td class="small">${esc(t.exam_way||'')}</td>
       <td class="small">${nx?`${nx.label} <span class="num">${fmtYMD(nx.date)}</span> <span class="tag ${nx.days<=14?'seal':'mute'}">${nx.days} 天</span>`:'—'}</td><td class="num">${t.apply_end||'—'}</td><td>${esc(t.status||'')}</td><td class="small">${esc(t.doc_status||'')}</td></tr>`; }).join('')}
   </tbody></table></div>` : '<div class="card empty">还没有大学目标</div>'}`;
@@ -163,7 +163,7 @@ function pgReviews(){
   const ym = S.rvMonth || (S.rvMonth = TODAY.slice(0,7));
   return `<div class="ph"><h2>月度回访</h2><select id="rv-month" data-change="rv-month">${[1,0,-1,-2,-3,-4,-5].map(n=>ymShift(TODAY.slice(0,7),n)).map(m=>`<option value="${m}" ${m===ym?'selected':''}>${ymLabel(m)}</option>`).join('')}</select></div>${scopeNote()}
   <div class="hint">每个学生每月一条。学生自评由学生在自己的链接里写；状态改成「已完成」后家长能看到。</div>
-  <div class="tw"><table><thead><tr><th>编号</th><th>学生</th><th>课次</th><th>学生自评</th><th>老师评价</th><th>下月重点</th><th>状态</th><th></th></tr></thead><tbody>
+  <div class="tw"><table class="rt"><thead><tr><th>编号</th><th>学生</th><th>课次</th><th>学生自评</th><th>老师评价</th><th>下月重点</th><th>状态</th><th></th></tr></thead><tbody>
   ${DB.students.filter(s=>s.active!==false).map(s => { const r = reviewOf(s.id, ym), st = monthStats(s.id, ym);
     return `<tr><td class="num">${esc(s.code||'')}</td><td><b>${esc(s.name)}</b></td><td class="num">${st.actual}</td>
     <td>${r?.self_eval?'<span class="tag ok">已写</span>':'<span class="tag mute">未写</span>'}</td><td>${r?.teacher_eval?'<span class="tag ok">已写</span>':'<span class="tag warn">未写</span>'}</td>
