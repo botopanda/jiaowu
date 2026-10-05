@@ -176,6 +176,42 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 .dchip small{font-family:var(--f-body);font-size:10.5px;color:var(--muted)}
 .dchip.next{border-color:var(--gold);background:var(--gold-soft);font-weight:700}
 .dchip.past{opacity:.5}
+/* 个人档案页（照 Excel 第一页） */
+.pf-page{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+.pf-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:8px;border-bottom:2px solid var(--gold);padding-bottom:10px}
+.pf-head small{font-size:11.5px;letter-spacing:.18em;color:var(--gold-text)}
+.pf-head h2{font-size:24px;letter-spacing:.04em}
+.pf-tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pf-h{font-size:15px;color:var(--gold-text);margin-bottom:8px;padding-left:8px;border-left:3px solid var(--gold)}
+.pf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px}
+.pf-grid.two{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.pf-kv{background:var(--sunk);border-radius:4px;padding:6px 10px;display:flex;flex-direction:column;min-width:0}
+.pf-kv span{font-size:11.5px;color:var(--muted)}
+.pf-kv b{font-weight:600;font-size:13.5px;overflow-wrap:anywhere}
+.pf-note{margin-top:6px;font-size:13px;background:var(--gold-soft);border-radius:4px;padding:6px 10px}
+.pf-table{min-width:560px}
+.pf-chart-box{margin-top:10px;border:1px solid var(--line-2);border-radius:var(--r);padding:8px 10px}
+.pf-chart{width:100%;height:auto;display:block}
+.pf-foot{font-size:11.5px;color:var(--muted);text-align:center;border-top:1px solid var(--line-2);padding-top:8px}
+.printonly{display:none}
+/* 跟进看板 */
+.board{min-width:900px;font-size:12.5px}
+.board td{max-width:180px}
+.board tr.fut td{color:var(--muted);background:var(--sunk)}
+.board tr.cur td{background:var(--gold-soft)}
+/* 打印：只打印档案页 */
+#print-root{display:none}
+@media print{
+  body.printing > *:not(#print-root){display:none!important}
+  body.printing #print-root{display:block}
+  body{background:#fff;color:#1a1814}
+  .pf-page{border:0;padding:0}
+  .noprint{display:none!important}
+  .printonly{display:inline}
+  .tw{overflow:visible;border:0}
+  table{min-width:0!important}
+  section{break-inside:avoid}
+}
 .les{display:flex;gap:10px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--hc);border-radius:var(--r);padding:8px 10px}
 .les .when{font-family:var(--f-num);font-size:13px;min-width:88px}
 .dg{font-size:12px;color:var(--muted);letter-spacing:.05em;margin-top:2px}
@@ -212,7 +248,8 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 <div id="app"><div class="center"><h2>一对一教务台</h2><p class="muted">加载中…</p></div></div>
 <div id="modal-root"></div>
 <div id="toast-root"></div>
-<script src="app.js?v=20261005f"></script>
-<script src="track.js?v=20261005f"></script>
+<script src="app.js?v=20261006a"></script>
+<script src="track.js?v=20261006a"></script>
+<script src="profile.js?v=20261006a"></script>
 </body>
 </html>

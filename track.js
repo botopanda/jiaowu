@@ -253,18 +253,19 @@ function sMonthly(s){
     <textarea id="self-eval" placeholder="例：词汇有进步，但有机反应链容易混淆">${esc(r.self_eval||'')}</textarea>
     <div class="row"><button class="btn pri sm" data-act="self-save" data-v="${ym}">${r.self_eval?'更新':'提交'}</button>${r.self_eval?'<span class="tag ok">已写</span>':''}</div></section>
   ${r.teacher_eval || r.next_focus ? reviewCard({...r, ym, student_id:s.id}) : ''}
+  <div class="card">${boardView(s.id)}</div>
   ${past.map(x=>reviewCard(x)).join('')}`;
 }
 function pMonthly(s){
   const rs = reviewsOf(s.id).slice().reverse();
-  return `<h2 style="font-size:19px">月度回访</h2><div class="muted xs">教务老师整理完成后显示在这里，包括孩子的自我评价和老师评价。</div>${rs.map(r=>reviewCard(r)).join('') || '<div class="empty">还没有月度回访</div>'}`;
+  return `<h2 style="font-size:19px">月度回访</h2><div class="muted xs">教务老师整理完成后显示在这里，包括孩子的自我评价和老师评价。</div><div class="card">${boardView(s.id)}</div>${rs.map(r=>reviewCard(r)).join('') || '<div class="empty">还没有月度回访</div>'}`;
 }
 
 /* ═════════════ 老师：学生详情里的升学信息（只读） ═════════════ */
 function teacherTrackBlock(sid){
   const s = stu(sid), r = reviewOf(sid, TODAY.slice(0,7)), fus = fusOf(sid).slice(-3).reverse();
   return `<details class="card"><summary><b>学生档案与升学</b> <span class="muted xs">（成绩、大学目标、跟进记录）</span></summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-    ${profileView(s)}<b class="small">成绩变化</b>${scoreTrend(sid)}<b class="small">大学目标</b>${targetsView(sid,false)}
+    ${profileView(s)}${boardView(sid)}<b class="small">成绩变化</b>${scoreTrend(sid)}<b class="small">大学目标</b>${targetsView(sid,false)}
     ${r ? `<b class="small">本月回访</b>${reviewCard(r)}` : ''}
     ${fus.length ? `<b class="small">最近跟进</b><div class="list">${fus.map(f=>fuCard(f,false)).join('')}</div>` : ''}</div></details>`;
 }

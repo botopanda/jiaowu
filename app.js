@@ -312,12 +312,12 @@ function phoneView(){
   } else if (me.role==='student'){
     const s = stu(me.student_id);
     const selfDue = !reviewOf(s.id, TODAY.slice(0,7))?.self_eval && +TODAY.slice(8,10) >= 20 ? 1 : 0;   // 每月 20 号以后提醒写自评
-    tabs = [['a','首页'],['b','作业',latestHw(s.id).filter(f=>!f.hw_sub).length],['c','上课记录',fbOfS(s.id).filter(f=>!f.confirm).length],['d','升学'],['e','月度',selfDue]];
-    body = {a:sHome,b:sHomework,c:sFeedback,d:sTrack,e:sMonthly}[S.tab]?.(s) ?? sHome(s);
+    tabs = [['a','首页'],['b','作业',latestHw(s.id).filter(f=>!f.hw_sub).length],['c','上课记录',fbOfS(s.id).filter(f=>!f.confirm).length],['d','档案'],['e','月度',selfDue]];
+    body = {a:sHome,b:sHomework,c:sFeedback,d:profilePage,e:sMonthly}[S.tab]?.(s) ?? sHome(s);
   } else {
     const s = stu(me.student_id);
-    tabs = [['a','概况'],['b','老师反馈'],['c','课表'],['d','升学'],['e','月度']];
-    body = {a:pOverview,b:pFeedback,c:pSchedule,d:sTrack,e:pMonthly}[S.tab]?.(s) ?? pOverview(s);
+    tabs = [['a','概况'],['b','老师反馈'],['c','课表'],['d','档案'],['e','月度']];
+    body = {a:pOverview,b:pFeedback,c:pSchedule,d:profilePage,e:pMonthly}[S.tab]?.(s) ?? pOverview(s);
   }
   return `<div class="pw"><div class="phone"><div class="p-body">${body}</div></div></div>
     <nav class="tabbar" style="grid-template-columns:repeat(${tabs.length},1fr)">${tabs.map(([k,t,n])=>`<button class="${S.tab===k?'on':''}" data-act="tab" data-v="${k}">${t}${n?`<span class="dot">${n}</span>`:''}</button>`).join('')}</nav>`;
@@ -528,9 +528,11 @@ function teacherForm(id){
 function studentModal(id, tab){
   const s = stu(id), cs = DB.courses.filter(c=>c.student_id===id); tab = tab || 'info';
   const ym = TODAY.slice(0,7), nx = ymShift(ym,1), pv = ymShift(ym,-1);
-  const tabs = [['info','概况与课程'],['profile','档案资料'],['score','成绩'],['target','大学与出愿'],['review','月度回访'],['fu','跟进记录'],['mp','月计划'],['fb','反馈'],['note','私下备注']];
+  const tabs = [['info','概况与课程'],['pfview','家长看到的档案'],['board','跟进看板'],['profile','档案资料'],['score','成绩'],['target','大学与出愿'],['review','月度回访'],['fu','跟进记录'],['mp','月计划'],['fb','反馈'],['note','私下备注']];
   let body = '';
-  if (['profile','score','target','review','fu'].includes(tab)) body = studentTrackTab(id, tab);
+  if (tab==='pfview') body = `<div class="hint" style="margin:0">这就是学生和家长在自己链接「档案」里看到的页面，照 Excel 第一页的顺序。</div>${profilePage(s)}`;
+  else if (tab==='board') body = boardView(id);
+  else if (['profile','score','target','review','fu'].includes(tab)) body = studentTrackTab(id, tab);
   else if (tab==='info'){
     const ps = personOf('student','student_id',id), pp = personOf('parent','student_id',id);
     body = `<div class="grid2"><dl class="kv">${s.code?`<dt>编号</dt><dd class="num">${esc(s.code)}</dd>`:''}<dt>方向</dt><dd>${esc(s.track||'—')}（${s.grad?'大学院':'学部'}）</dd><dt>所在地</dt><dd>${esc(s.loc||'—')}（${s.tz==='CN'?'北京时间':'日本时间'}）</dd><dt>负责教务</dt><dd>${esc(s.staff||'—')}</dd>${s.memo?`<dt>教务备注</dt><dd>${esc(s.memo)}</dd>`:''}</dl>
