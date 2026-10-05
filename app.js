@@ -84,6 +84,9 @@ const lsOfS = sid => DB.lessons.filter(l => course(l.course_id)?.student_id===si
 const lsOfT = tid => DB.lessons.filter(l => course(l.course_id)?.teacher_id===tid);
 const fbOfS = sid => DB.feedbacks.filter(f => cOfF(f)?.student_id===sid);
 const needFb = () => DB.lessons.filter(isPend);
+const hasFb = l => !!(l.has_fb || fbOf(l));
+// 课表格子里的小标记：✓ = 已写反馈，待 = 上完了还没写反馈
+const fbMark = l => l.status!=='scheduled' ? '' : hasFb(l) ? '<b class="mk ok" title="已写反馈">✓</b>' : isPend(l) ? '<b class="mk q" title="还没写反馈">待</b>' : '';
 const ME = () => DB.me;
 const isAdmin = () => ME().role==='admin';
 const isTop = () => isAdmin() && ME().level==='top';
@@ -199,7 +202,7 @@ function pgCalendar(){
   if (S.calType==='t' && S.calId) ls = ls.filter(l => course(l.course_id).teacher_id===S.calId);
   const chip = l => { const c = course(l.course_id);
     const who = S.calType==='s' ? tea(c.teacher_id).name : S.calType==='t' ? stu(c.student_id).name : `${stu(c.student_id).name}·${tea(c.teacher_id).name.replace('老师','')}`;
-    return `<button class="lc ${l.status!=='scheduled'?'leave':''} ${isPend(l)?'pend':''} ${l.moved?'moved':''}" style="--hc:${hue(c.subject)}" data-act="lesson" data-v="${l.id}"><span class="t">${l.start}</span>${l.makeup?'<b class="mk">补</b>':''}${isPend(l)?'<b class="mk q">待</b>':''} ${esc(who)}<br>${esc(c.subject)}${l.status==='leave'?' 请假':l.status==='cancelled'?' 取消':''}</button>`; };
+    return `<button class="lc ${l.status!=='scheduled'?'leave':''} ${isPend(l)?'pend':''} ${l.moved?'moved':''}" style="--hc:${hue(c.subject)}" data-act="lesson" data-v="${l.id}"><span class="t">${l.start}</span>${l.makeup?'<b class="mk">补</b>':''}${fbMark(l)} ${esc(who)}<br>${esc(c.subject)}${l.status==='leave'?' 请假':l.status==='cancelled'?' 取消':''}</button>`; };
   let cells = ['一','二','三','四','五','六','日'].map((d,i) => `<div class="hd ${i>=5?'we':''}">${d}</div>`).join('');
   for (let i=0;i<lead;i++) cells += `<div class="day off"></div>`;
   for (let d=1; d<=last; d++){ const dd=`${S.month}-${pad(d)}`; cells += `<div class="day ${dd===TODAY?'today':''}"><span class="dn">${d}</span>${ls.filter(l=>l.date===dd).map(chip).join('')}</div>`; }
@@ -384,7 +387,7 @@ const tzNote = tz => `<div class="muted xs">${tz==='CN'?'北京时间（日本�
 let PV = 'cal'; try { PV = localStorage.getItem('jw_view') || 'cal'; } catch(e) {}
 function lessonItem(l, tz, whoFn, canReq, canEdit){
   const c = course(l.course_id), q = reqOf(l), leave = l.status!=='scheduled';
-  return `<div class="les" style="--hc:${hue(c.subject)}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}</div><div style="min-width:0;flex:1">${subjTag(c.subject)} · ${esc(whoFn(c))}${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调课</span>':''}${l.status==='leave'?' <span class="tag seal">请假</span>':''}${l.status==='cancelled'?' <span class="tag mute">已取消</span>':''}${isDone(l)?' <span class="tag ok">已上</span>':''}${isPend(l)?' <span class="tag warn">待确认</span>':''}${hrsTag(l)}
+  return `<div class="les" style="--hc:${hue(c.subject)}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}</div><div style="min-width:0;flex:1">${subjTag(c.subject)} · ${esc(whoFn(c))}${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调课</span>':''}${l.status==='leave'?' <span class="tag seal">请假</span>':''}${l.status==='cancelled'?' <span class="tag mute">已取消</span>':''}${isDone(l)?(hasFb(l)?' <span class="tag ok">已反馈</span>':' <span class="tag ok">已上</span>'):''}${isPend(l)?` <span class="tag warn">${ME().role==='teacher'?'待写反馈':'待确认'}</span>`:''}${hrsTag(l)}
     ${reqLine(q)}${canReq && !leave && l.date>=TODAY && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave && !fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}</div></div>`;
 }
 function schedule(ls, tz, whoFn, canReq=false, canEdit=false){
@@ -400,7 +403,7 @@ function schedule(ls, tz, whoFn, canReq=false, canEdit=false){
     const ds_ = `${ym}-${pad(d)}`, dl = mine.filter(l=>l.date===ds_);
     const st = l => tz==='CN' ? wrap(mins(l.start)-60) : l.start;
     cells += `<button class="ph-day ${ds_===TODAY?'today':''} ${ds_===sel?'sel':''} ${dl.length?'has':''}" data-act="pday" data-v="${ds_}" aria-label="${fmtMD(ds_)}，${dl.length} 节课"><span class="n">${d}</span>
-      ${dl.slice(0,5).map(l=>{ const c=course(l.course_id); return `<span class="pc ${l.status!=='scheduled'?'lv':''}" style="--hc:${hue(c.subject)}"><span class="pt">${st(l)}${l.makeup?'<b class="mk">补</b>':''}<span class="ps"> ${esc(c.subject)}</span></span><span class="pn ${whoFn(c).length>3?'long':''}">${esc(whoFn(c))}</span></span>`; }).join('')}
+      ${dl.slice(0,5).map(l=>{ const c=course(l.course_id); return `<span class="pc ${l.status!=='scheduled'?'lv':''}" style="--hc:${hue(c.subject)}"><span class="pt">${st(l)}${l.makeup?'<b class="mk">补</b>':''}${fbMark(l)}<span class="ps"> ${esc(c.subject)}</span></span><span class="pn ${whoFn(c).length>3?'long':''}">${esc(whoFn(c))}</span></span>`; }).join('')}
       ${dl.length>3?`<span class="more m">+${dl.length-3}</span>`:''}${dl.length>5?`<span class="more d">+${dl.length-5}</span>`:''}</button>`;
   }
   const day = mine.filter(l=>l.date===sel);
