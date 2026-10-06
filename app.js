@@ -13,8 +13,22 @@ function readKey(){
   if (q) return q;
   try { return localStorage.getItem('jw_k') || ''; } catch(e) { return ''; }
 }
-const KEY = readKey();
-const linkOf = key => `${location.origin}${location.pathname}?k=${key}`;
+let KEY = readKey();
+// 短链接：?s=10 位短代号（教务·管理复制时用）；还没有短代号的就给长链接
+let SHORT = {};
+const linkOf = key => SHORT[key] ? `${location.origin}${location.pathname}?s=${SHORT[key]}` : `${location.origin}${location.pathname}?k=${key}`;
+// 打开短链接：先用短代号换出钥匙，本机记住
+async function readShort(){
+  const sq = new URLSearchParams(location.search).get('s');
+  if (!sq) return true;
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/rpc/short_key`, {method:'POST', headers:{apikey: SB_KEY, 'Content-Type':'application/json'}, body: JSON.stringify({s: sq})});
+    const k = r.ok ? await r.json() : null;
+    if (!k) return false;
+    KEY = k; try { localStorage.setItem('jw_k', k); } catch(e) {}
+    return true;
+  } catch(e) { return true; }
+}
 
 async function rpc(fn, args = {}){
   const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
@@ -110,6 +124,7 @@ const latestHw = sid => DB.courses.filter(c => c.student_id===sid).map(c => DB.f
 let lastLoad = 0;
 async function load(){
   DB = await rpc('app_load'); lastLoad = Date.now();
+  if (DB.me.role==='admin' && DB.me.level==='top'){ try { SHORT = Object.fromEntries((await rpc('admin_short_links')).map(x => [x.key, x.skey])); } catch(e) {} }
   TODAY = DB.today;
   DB.lessons.sort((a,b) => (a.date+a.start).localeCompare(b.date+b.start));
   if (!S.month) S.month = TODAY.slice(0,7);
@@ -808,6 +823,7 @@ document.addEventListener('keydown', e => { if (e.key==='Escape' && mroot.innerH
 
 /* ───────── 启动 ───────── */
 document.addEventListener('app-ready', async function start(){
+  if (!(await readShort())){ try{ localStorage.removeItem('jw_k'); }catch(_){} app.innerHTML = `<div class="center"><h2>这个链接已失效</h2><p class="muted">链接可能已经停用或更换。请联系教务老师重新发一条链接。</p></div>`; return; }
   if (!KEY){ app.innerHTML = `<div class="center"><h2>一对一教务台</h2><p class="muted">请用教务老师发给你的专属链接打开。</p></div>`; return; }
   try { await load(); render(); }
   catch(e){
