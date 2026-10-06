@@ -524,7 +524,7 @@ function lessonModal(id){
   const st = isDone(l)?`<span class="tag ok">已上课</span>${!f&&!l.has_fb?' <span class="tag mute">教务确认</span>':''}${hrsTag(l)}`:l.status==='leave'?'<span class="tag seal">请假</span>':l.status==='cancelled'?'<span class="tag mute">已取消</span>':isPend(l)?'<span class="tag warn">待确认</span> <span class="muted xs">老师还没写反馈，暂不计课时</span>':'<span class="tag blue">待上课</span>';
   openModal(`${mHead(`${esc(s.name)} · ${esc(c.subject)}`)}
   <dl class="kv"><dt>老师</dt><dd>${esc(t.name)}${t.loc?`（${esc(t.loc)}）`:''}</dd><dt>时间</dt><dd>${fmtMD(l.date)} ${l.start}–${l.end} 日本${t.tz==='CN'||s.tz==='CN'?` <span class="muted">／北京 ${timeFor(l,'CN')}</span>`:''}</dd>
-  <dt>状态</dt><dd>${st} ${l.makeup?'<span class="tag blue">补课</span>':''} ${l.moved?'<span class="tag warn">调过课</span>':''}${canSched() && !f ? ` <button class="btn sm" data-act="makeup" data-v="${l.id}|${l.makeup?0:1}">${l.makeup?'取消补课标记':'标为补课'}</button>` : ''}</dd>${l.note?`<dt>备注</dt><dd>${esc(l.note)}</dd>`:''}
+  <dt>状态</dt><dd>${st} ${l.makeup?'<span class="tag blue">补课</span>':''} ${l.moved?'<span class="tag warn">调过课</span>':''}${canSched() && (!f || isTop()) ? ` <button class="btn sm" data-act="makeup" data-v="${l.id}|${l.makeup?0:1}">${l.makeup?'取消补课标记':'标为补课'}</button>` : ''}</dd>${l.note?`<dt>备注</dt><dd>${esc(l.note)}</dd>`:''}
   ${l.status==='leave'?`<dt>扣学生课时</dt><dd class="num">${l.deduct} 小时（老师照发）</dd>`:''}${l.actual_note?`<dt>时长说明</dt><dd>${esc(l.actual_note)}</dd>`:''}${isDone(l)||isPend(l)?`<dt>反馈</dt><dd>${f?(f.status==='approved'?'已审批':'待审批'):l.has_fb?'已写':'<span class="tag warn">老师未写</span>'}</dd>`:''}
   ${q?`<dt>申请</dt><dd>${reqLine(q)}</dd>`:''}</dl>
   ${isAdmin() && l.date<=TODAY && l.status!=='leave' ? `<section class="card" style="display:flex;flex-direction:column;gap:8px"><b>上课确认</b>
@@ -533,7 +533,7 @@ function lessonModal(id){
     <label class="field"><span>原因（时长和排课不一样时填）</span><input type="text" id="ls-why" value="${esc(l.actual_note||'')}" placeholder="例：学生有事，提前结束"></label></div>
     <div class="row"><button class="btn pri" data-act="lstate" data-v="${l.id}|done">${isDone(l)?'保存时长':'标为已上课'}</button>${!f&&!l.has_fb?`<button class="btn" data-act="lstate" data-v="${l.id}|cancelled">这节课没上（取消）</button>`:''}${l.done_manual&&!f&&!l.has_fb?`<button class="btn sm" data-act="lstate" data-v="${l.id}|reset">撤销确认</button>`:''}</div>
     <div class="muted xs">工资和课时按实际时长算。老师写反馈时也可以自己填实际时长。</div>`}</section>` : ''}
-  ${canSched() && !f && l.status==='scheduled' ? `<section class="card" style="display:flex;flex-direction:column;gap:8px"><b>调课</b>
+  ${canSched() && (!f || isTop()) && l.status==='scheduled' ? `<section class="card" style="display:flex;flex-direction:column;gap:8px"><b>调课</b>
     <div class="fields"><label class="field"><span>日期</span><input type="date" id="mv-date" value="${l.date}"></label><label class="field"><span>开始（${tzName(myTz())}）</span><input type="time" id="mv-s" value="${fromJST(l.start)}"></label><label class="field"><span>结束</span><input type="time" id="mv-e" value="${fromJST(l.end)}"></label></div>
     <label class="field"><span>原因</span><input type="text" id="mv-note" placeholder="例：老师发烧，改到周二"></label>
     <div class="row"><button class="btn pri" data-act="move" data-v="${l.id}">保存调课</button><span class="muted xs">老师、学生、家长的课表同时更新</span></div></section>` : ''}
@@ -544,7 +544,7 @@ function lessonModal(id){
     <div class="fields"><label class="field"><span>扣学生课时</span><select id="lv-d"><option value="0">不扣</option><option value="${dur(l)/2}" ${l.date===TODAY?'selected':''}>扣 ${dur(l)/2} 小时（一半）</option><option value="${dur(l)}">扣全部 ${dur(l)} 小时</option></select></label>
     <label class="field"><span>备注</span><input type="text" id="lv-note" placeholder="例：第一次，已口头提醒"></label></div>
     <div class="row"><button class="btn seal" data-act="leave" data-v="${l.id}">${l.status==='leave'?'更新请假':'确认请假'}</button>${l.status==='leave'?`<button class="btn" data-act="unleave" data-v="${l.id}">取消请假</button>`:''}</div></section>
-  <div class="row" id="del-row"><button class="btn danger sm" data-act="del-ask" data-v="${l.id}">删除这节课</button></div>` : (isTop() && f ? '<div class="muted xs">这节课已经写了反馈，不能再调课或删除。</div>' : '')}`);
+  <div class="row" id="del-row"><button class="btn danger sm" data-act="del-ask" data-v="${l.id}">删除这节课</button></div>` : (isTop() && f ? `<div class="row" id="del-row"><button class="btn danger sm" data-act="del-ask" data-v="${l.id}">删除这节课</button><span class="muted xs">这节课已经写了反馈，删除时反馈会一起删掉</span></div>` : '')}`);
 }
 function addLessonModal(){
   const act = DB.courses.filter(c=>c.active && (ME().role!=='teacher' || c.teacher_id===ME().teacher_id));
@@ -727,7 +727,7 @@ document.addEventListener('click', async e => {
       await act('admin_update_lesson', {lid:v, d:{date:d, start:s, end:en, moved:true, note:val('mv-note')||'已调课'}}, '已调课，各方的课表已更新'); closeModal(); break; }
     case 'leave': { const dd=Number(val('lv-d')); await act('admin_update_lesson', {lid:v, d:{status:'leave', deduct:dd, note:val('lv-note')||(dd?`当天请假，扣 ${dd} 小时`:'请假，不扣课时')}}, '已标记请假'); closeModal(); break; }
     case 'unleave': await act('admin_update_lesson', {lid:v, d:{status:'scheduled', deduct:0, note:''}}, '已取消请假'); closeModal(); break;
-    case 'del-ask': document.getElementById('del-row').innerHTML=`<span class="small">确定删除这节课？</span><button class="btn danger sm" data-act="del" data-v="${v}">删除</button><button class="btn sm" data-act="close">算了</button>`; break;
+    case 'del-ask': document.getElementById('del-row').innerHTML=`<span class="small">${L(v) && fbOf(L(v)) ? '确定删除？<b>老师写的反馈也会一起删掉，不能恢复。</b>' : '确定删除这节课？'}</span><button class="btn danger sm" data-act="del" data-v="${v}">删除</button><button class="btn sm" data-act="close">算了</button>`; break;
     case 'del': await act('admin_delete_lesson', {lid:v}, '已删除'); closeModal(); break;
     case 'save-lesson': { const d=val('al-d'), s=toJST(val('al-s')), en=toJST(val('al-e')); if(!d||!s||!en||mins(en)<=mins(s)){toast('请检查日期和时间（不能跨过半夜 12 点）',true);break;}
       await act('admin_add_lessons', {course:val('al-c'), dates:lessonDates(d, val('al-rep')), st:s, et:en, ...(val('al-mk')==='1'?{makeup:true}:{})}, r=>`已排 ${r.added} 节课`+(r.skipped?`，${r.skipped} 节和老师已有的课冲突，已跳过`:'')); S.month=d.slice(0,7); closeModal(); render(); break; }
