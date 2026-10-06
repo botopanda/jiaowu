@@ -156,7 +156,7 @@ function render(){
   const me = ME();
   const label = me.role==='admin' ? (me.level==='top' ? '教务 · 管理' : '教务') : {teacher:'任课老师', student:'学生', parent:'家长'}[me.role];
   setTimeout(labelTables);
-  app.innerHTML = `<header class="top"><h1>一对一教务台</h1><span class="who">${esc(me.name)}${me.role==='parent'?'':' · '+label}</span></header>` + (isAdmin() ? adminView() : phoneView());
+  app.innerHTML = `<header class="top"><h1>一对一教务台</h1><span class="who">${esc(me.name)}${me.role==='parent'?'':' · '+label}</span><button class="btn sm" data-act="logout" title="让这台设备忘掉你的链接">退出</button></header>` + (isAdmin() ? adminView() : phoneView());
 }
 
 /* ═════════════ 教务端 ═════════════ */
@@ -792,6 +792,9 @@ document.addEventListener('click', async e => {
     case 'ch-ok': await act('change_handle', {cid:v, accept:true, why:''}, r=>r.added!=null && (r.added||r.skipped) ? `已批准，排了 ${r.added} 节`+(r.skipped?`，${r.skipped} 节时间冲突跳过`:'') : '已批准，课表已更新'); break;
     case 'ch-no': { const why = prompt('不批准的原因（老师能看到，可以不写）', ''); if (why===null) break;
       await act('change_handle', {cid:v, accept:false, why}, '已回复老师'); break; }
+    case 'logout': if (!confirm('退出后，这台设备要重新点专属链接才能进来。确定退出吗？')) break;
+      try { localStorage.removeItem('jw_k'); } catch(e) {}
+      location.href = location.origin + location.pathname; break;
     case 'ch-seen': { const ids = chSeen().concat(v).slice(-200); try { localStorage.setItem('jw_chseen', JSON.stringify(ids)); } catch(e) {} render(); break; }
     case 'ch-withdraw': if (!confirm('撤回这条申请？')) break; await act('change_withdraw', {cid:v}, '已撤回'); break;
     case 'save-lesson': { const d=val('al-d'), s=toJST(val('al-s')), en=toJST(val('al-e')); if(!d||!s||!en||mins(en)<=mins(s)){toast('请检查日期和时间（不能跨过半夜 12 点）',true);break;}
