@@ -451,7 +451,16 @@ function tStudents(t){
 }
 function tWrite(t){
   const cand = DB.lessons.filter(l => l.date<=TODAY && l.status==='scheduled' && !fbOf(l)).reverse();
-  const mine = DB.feedbacks.slice(-6).reverse();
+  // 我写过的反馈：按上课日期从新到旧，可以按月份、按学生筛选
+  const sidOf = f => course(L(f.lesson_id).course_id).student_id, dOf = f => L(f.lesson_id).date;
+  const allF = DB.feedbacks.filter(f => L(f.lesson_id) && course(L(f.lesson_id).course_id)).sort((a,b) => dOf(b).localeCompare(dOf(a)));
+  const fMonths = [...new Set(allF.map(f => dOf(f).slice(0,7)))];
+  const fm = S.tfbM && (S.tfbM==='all' || fMonths.includes(S.tfbM)) ? S.tfbM : (fMonths[0] || 'all');
+  const fSids = [...new Set(allF.map(sidOf))];
+  const mine = allF.filter(f => (fm==='all' || dOf(f).startsWith(fm)) && (!S.tfbS || sidOf(f)===S.tfbS));
+  const fbBar = `<div class="row" style="justify-content:space-between;margin-top:6px"><span class="dg" style="margin:0">我写过的反馈 · ${mine.length} 条</span><span class="row">
+    <select data-change="tfb-m" aria-label="月份">${fMonths.map(m=>`<option value="${m}" ${m===fm?'selected':''}>${ymLabel(m)}</option>`).join('')}<option value="all" ${fm==='all'?'selected':''}>全部月份</option></select>
+    ${fSids.length>1?`<select data-change="tfb-s" aria-label="学生"><option value="">全部学生</option>${fSids.map(id=>`<option value="${id}" ${id===S.tfbS?'selected':''}>${esc(stu(id).name)}</option>`).join('')}</select>`:''}</span></div>`;
   const toGrade = DB.feedbacks.filter(f => f.hw_sub && !f.hw_fb);
   const grade = toGrade.length ? `<div class="dg">学生交上来的作业 · 待批改 ${toGrade.length}</div>` + toGrade.map(f=>{const l=L(f.lesson_id);return `<section class="card small" style="display:flex;flex-direction:column;gap:6px">
     <div class="row"><b>${esc(stu(course(l.course_id).student_id).name)}</b><span class="muted">${sMD(l.date)} 布置</span></div><div>${esc(f.hw)}</div>${f.hw_note?`<div class="note">学生说：${esc(f.hw_note)}</div>`:''}${fileList(f.id,'hw','学生交的作业')}${fileList(f.id,'grade','我的批改文件')}
@@ -469,7 +478,7 @@ function tWrite(t){
     <div class="muted xs">提前结束或者上超了，在这里改；工资按实际时长算。</div>
     <label class="field"><span>上次作业完成情况</span><select id="w-last"><option>已完成</option><option>部分完成</option><option>未完成</option><option>没有布置</option></select></label>
     <button class="btn pri" data-act="submit-fb">提交反馈</button></section>` : `<div class="card empty">上完的课都写好反馈了</div>`;
-  return grade + form + (mine.length ? `<div class="dg">我最近写的反馈</div>` + mine.map(f=>{const l=L(f.lesson_id);return `<div class="card small"><div class="row"><b>${sMD(l.date)} ${esc(stu(course(l.course_id).student_id).name)}</b><span style="margin-left:auto">${confirmTag(f)}</span><span class="tag ${f.status==='approved'?'ok':'warn'}">${f.status==='approved'?'已审核·家长可见':'待教务审核'}</span></div><div class="muted">${esc(f.content)}</div>${fileList(f.id,'note','上课笔记')}<div class="row" style="margin-top:4px">${uploadBtn('note', f.id, '上传上课笔记')}</div></div>`}).join('') : '');
+  return grade + form + (allF.length ? fbBar + (mine.length ? '' : '<div class="card empty">这个月没有反馈</div>') + mine.map(f=>{const l=L(f.lesson_id);return `<div class="card small"><div class="row"><b>${sMD(l.date)} ${esc(stu(course(l.course_id).student_id).name)}</b>${hrsTag(l)}<span style="margin-left:auto">${confirmTag(f)}</span><span class="tag ${f.status==='approved'?'ok':'warn'}">${f.status==='approved'?'已审核·家长可见':'待教务审核'}</span></div><div class="muted">${esc(f.content)}</div>${fileList(f.id,'note','上课笔记')}<div class="row" style="margin-top:4px">${uploadBtn('note', f.id, '上传上课笔记')}</div></div>`}).join('') : '');
 }
 function tMe(t){
   const ls = lsOfT(t.id).filter(l=>l.date.startsWith(S.teaMonth) && paidH(l)>0), h = ls.reduce((a,l)=>a+paidH(l),0);
@@ -803,6 +812,8 @@ document.addEventListener('change', e => {
   const k = el.dataset.change;
   if (k==='calwho'){ S.calId=el.value; render(); }
   else if (k==='paym'){ S.payMonth=el.value; render(); }
+  else if (k==='tfb-m'){ S.tfbM=el.value; render(); }
+  else if (k==='tfb-s'){ S.tfbS=el.value; render(); }
   else if (k==='team'){ S.teaMonth=el.value; render(); }
   else if (k==='rq-type'){ document.getElementById('rq-wish-f').hidden = el.value!=='改期'; }
   else if (k==='ln-role'){ const r=el.value, adm=r==='normal'||r==='top', list = r==='teacher'?DB.teachers:DB.students;
