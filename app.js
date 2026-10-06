@@ -191,12 +191,14 @@ function chText(x){
   if (x.d.makeup!=null) parts.push(x.d.makeup ? `${o} 标为补课` : `${o} 取消补课标记`);
   return parts.join('；') + (x.d.note && x.d.note!=='已调课' ? ` · 原因：${esc(x.d.note)}` : '');
 }
+// 老师看过的处理结果，点「知道了」就不再显示（记在这台设备上；7 天后也会自动消失）
+const chSeen = () => { try { return JSON.parse(localStorage.getItem('jw_chseen') || '[]'); } catch(e) { return []; } };
 const chStatus = x => x.status==='pending' ? '<span class="tag warn">等教务审批</span>' : x.status==='approved' ? `<span class="tag ok">已批准</span>` : x.status==='rejected' ? '<span class="tag seal">未批准</span>' : '<span class="tag mute">已撤回</span>';
 function chCard(x, forAdmin){
   const c = course(x.course_id) || {}, who = forAdmin ? `<b>${esc(x.by_name)}</b> · ${esc(stu(c.student_id).name)} ${c.subject?subjTag(c.subject):''}` : `<b>${esc(stu(c.student_id).name)}</b> ${c.subject?subjTag(c.subject):''}`;
   return `<div class="li"><span class="tag ${x.kind==='delete'?'seal':x.kind==='add'?'blue':'warn'}">${chKind[x.kind]}</span><div class="grow">${who}<br><span class="small">${chText(x)}</span>
     ${x.status!=='pending' && x.status!=='withdrawn' ? `<div class="xs" style="color:${x.status==='approved'?'var(--ok)':'var(--seal)'}">${x.status==='approved'?'已批准':'未批准'}（${esc(x.handled_by||'')}）${x.result?'：'+esc(x.result):''}${x.reply?'：'+esc(x.reply):''}</div>`:''}</div>
-    ${x.status==='pending' ? (forAdmin ? `<span class="row"><button class="btn sm" data-act="ch-no" data-v="${x.id}">不批准</button><button class="btn pri sm" data-act="ch-ok" data-v="${x.id}">批准</button></span>` : `<span class="row">${chStatus(x)}<button class="btn sm" data-act="ch-withdraw" data-v="${x.id}">撤回</button></span>`) : (forAdmin ? '' : chStatus(x))}</div>`;
+    ${x.status==='pending' ? (forAdmin ? `<span class="row"><button class="btn sm" data-act="ch-no" data-v="${x.id}">不批准</button><button class="btn pri sm" data-act="ch-ok" data-v="${x.id}">批准</button></span>` : `<span class="row">${chStatus(x)}<button class="btn sm" data-act="ch-withdraw" data-v="${x.id}">撤回</button></span>`) : (forAdmin ? '' : `<span class="row">${chStatus(x)}<button class="btn sm" data-act="ch-seen" data-v="${x.id}">知道了</button></span>`)}</div>`;
 }
 // 待确认：按老师数一下「X 老师 3 节」
 const pendByT = ls => { const n = {}; ls.forEach(l => { const t = tea(course(l.course_id).teacher_id).name; n[t] = (n[t]||0) + 1; });
@@ -470,7 +472,7 @@ function tSchedule(t){
   const miss = needFb();
   return `<h2 style="font-size:19px">${esc(t.name)}</h2>
   ${miss.length?`<div class="note warn row" style="justify-content:space-between">有 ${miss.length} 节课还没写反馈 <button class="btn sm" data-act="tab" data-v="c">去写</button></div>`:''}
-  ${(() => { const mine = (DB.changes||[]).filter(x => x.status==='pending' || (x.status!=='withdrawn' && x.handled_at && dBetween(x.handled_at.slice(0,10), TODAY) <= 7));
+  ${(() => { const mine = (DB.changes||[]).filter(x => x.status==='pending' || (x.status!=='withdrawn' && x.handled_at && dBetween(x.handled_at.slice(0,10), TODAY) <= 7 && !chSeen().includes(x.id)));
     return mine.length ? `<section class="card"><h3 style="font-size:15px">我的排课 / 调课申请</h3><div class="muted xs">教务批准后才会改到课表上。</div><div class="list">${mine.map(x => chCard(x, false)).join('')}</div></section>` : ''; })()}
   <div class="row" style="justify-content:flex-end"><span class="muted xs" style="margin-right:auto">排课、调课提交后要教务批准</span><button class="btn pri sm" data-act="add-lesson">＋ 申请排课</button></div>
   ${schedule(lsOfT(t.id),t.tz,c=>stu(c.student_id).name,false,true)}`;
@@ -790,6 +792,7 @@ document.addEventListener('click', async e => {
     case 'ch-ok': await act('change_handle', {cid:v, accept:true, why:''}, r=>r.added!=null && (r.added||r.skipped) ? `已批准，排了 ${r.added} 节`+(r.skipped?`，${r.skipped} 节时间冲突跳过`:'') : '已批准，课表已更新'); break;
     case 'ch-no': { const why = prompt('不批准的原因（老师能看到，可以不写）', ''); if (why===null) break;
       await act('change_handle', {cid:v, accept:false, why}, '已回复老师'); break; }
+    case 'ch-seen': { const ids = chSeen().concat(v).slice(-200); try { localStorage.setItem('jw_chseen', JSON.stringify(ids)); } catch(e) {} render(); break; }
     case 'ch-withdraw': if (!confirm('撤回这条申请？')) break; await act('change_withdraw', {cid:v}, '已撤回'); break;
     case 'save-lesson': { const d=val('al-d'), s=toJST(val('al-s')), en=toJST(val('al-e')); if(!d||!s||!en||mins(en)<=mins(s)){toast('请检查日期和时间（不能跨过半夜 12 点）',true);break;}
       await act('admin_add_lessons', {course:val('al-c'), dates:lessonDates(d, val('al-rep')), st:s, et:en, ...(val('al-mk')==='1'?{makeup:true}:{})}, r=>r.pending?'已提交排课申请，教务批准后会出现在课表上':`已排 ${r.added} 节课`+(r.skipped?`，${r.skipped} 节和老师已有的课冲突，已跳过`:'')); S.month=d.slice(0,7); closeModal(); render(); break; }
