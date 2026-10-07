@@ -390,7 +390,7 @@ function pgLinks(){
       <td class="small">${esc(scopeTxt(p))}${p.role==='admin'&&p.level!=='top'?` <button class="btn sm" data-act="scope-edit" data-v="${p.id}">改范围</button>`:''}</td>
       <td>${p.active?'<span class="tag ok">启用</span>':'<span class="tag seal">已停用</span>'}</td>
       <td><div class="row"><button class="btn sm" data-act="copy-link" data-v="${p.key}" ${p.active?'':'disabled'}>复制链接</button><button class="btn sm" data-act="link-regen" data-v="${p.id}">重新生成</button>
-        ${p.id===ME().id?'':`<button class="btn sm ${p.active?'danger':''}" data-act="link-toggle" data-v="${p.id}">${p.active?'停用':'恢复'}</button>`}</div></td></tr>`).join('')}
+        ${p.id===ME().id?'':`<button class="btn sm ${p.active?'danger':''}" data-act="link-toggle" data-v="${p.id}">${p.active?'停用':'恢复'}</button><button class="btn sm danger" data-act="link-del" data-v="${p.id}">删除</button>`}</div></td></tr>`).join('')}
   </tbody></table></div></section>` : ''; }).join('')}`;
 }
 
@@ -644,7 +644,7 @@ function teacherForm(id){
   <label class="field"><span>教学经历</span><textarea id="tf-exp">${esc(t.exp)}</textarea></label>
   <label class="field"><span>擅长领域</span><input type="text" id="tf-good" value="${esc(t.good)}"></label>
   ${id?'<div class="muted xs">老师离职后，记得到「链接与权限」里停用他的链接。</div>':'<div class="muted xs">保存后会自动生成这位老师的专属链接。</div>'}
-  <div class="row"><button class="btn pri" data-act="save-teacher" data-v="${id||''}">保存</button></div>`);
+  <div class="row"><button class="btn pri" data-act="save-teacher" data-v="${id||''}">保存</button>${id && isTop()?`<button class="btn danger sm" style="margin-left:auto" data-act="teacher-del" data-v="${id}">删除这位老师</button>`:''}</div>`);
 }
 function studentModal(id, tab){
   lastModal = () => studentModal(id, tab);
@@ -676,7 +676,7 @@ function studentModal(id, tab){
       ${editable.length?`<div class="row"><button class="btn pri sm" data-act="mp-save" data-v="${id}|${m}">保存${+m.slice(5)}月计划</button></div>`:''}</section>`;
     body = `<div class="hint" style="margin:0">每门课每月写一句，学生和家长能看到。任课老师也可以在自己的链接里写。进度快了慢了，下个月重新写就行。</div>${edit(ym)}${edit(nx)}<section class="card"><b>${ymLabel(pv)}计划</b>${mpView(id,pv)}</section>`;
   } else if (tab==='fb') body = fbOfS(id).slice().reverse().slice(0,6).map(f=>fbCard(f)).join('') || '<div class="empty">还没有反馈</div>';
-  else body = `<div class="note">私下备注只有老师和教务能看到，学生和家长看不到。</div>${DB.notes.filter(n=>n.student_id===id).slice().reverse().map(n=>`<div class="card small"><b>${esc(n.author)}</b> <span class="muted">${sMD(n.created_at.slice(0,10))}</span><p style="margin:4px 0 0;white-space:pre-wrap">${esc(n.text)}</p></div>`).join('')||'<div class="empty">暂无备注</div>'}
+  else body = `<div class="note">私下备注只有老师和教务能看到，学生和家长看不到。</div>${DB.notes.filter(n=>n.student_id===id).slice().reverse().map(n=>`<div class="card small"><div class="row"><b>${esc(n.author)}</b> <span class="muted">${sMD(n.created_at.slice(0,10))}</span><button class="btn sm" style="margin-left:auto" data-act="note-del" data-v="${n.id}">删除</button></div><p style="margin:4px 0 0;white-space:pre-wrap">${esc(n.text)}</p></div>`).join('')||'<div class="empty">暂无备注</div>'}
     <textarea id="note-new" placeholder="写一条备注"></textarea><div class="row"><button class="btn sm" data-act="note-add" data-v="${id}">添加备注</button></div>`;
   openModal(`${mHead(`${esc(s.name)} <span class="muted small" style="font-family:var(--f-body)">${esc(s.track||'')}</span>`)}
   <div class="sm-wrap"><nav class="sm-nav" aria-label="学生档案菜单">${groups.map(([g,items])=>`<div class="sm-grp">${g}</div>${items.map(([k,t])=>`<button class="nav ${tab===k?'on':''}" data-act="stu-tab" data-v="${id}|${k}">${t}</button>`).join('')}`).join('')}</nav>
@@ -687,9 +687,11 @@ function courseEdit(cid){
   openModal(`${mHead(`${esc(stu(c.student_id).name)} · ${esc(tea(c.teacher_id).name)}`)}
   <div class="fields"><label class="field"><span>科目</span><input type="text" id="ce-subj" value="${esc(c.subject)}"></label>${isTop()?`<label class="field"><span>老师单价（每小时；3 位数＝人民币，4 位数＝日元）</span><input type="number" id="ce-rate" step="500" min="0" value="${c.rate||0}"></label>`:''}
   <label class="field"><span>状态</span><select id="ce-active"><option value="true" ${c.active?'selected':''}>在上</option><option value="false" ${c.active?'':'selected'}>停了</option></select></label></div>
-  <div class="row"><button class="btn pri" data-act="save-course" data-v="${cid}">保存</button></div>`);
+  <div class="row"><button class="btn pri" data-act="save-course" data-v="${cid}">保存</button><button class="btn danger sm" style="margin-left:auto" data-act="course-del" data-v="${cid}">删除这门课</button></div>
+  <div class="muted xs">填错了可以直接删除；已经上过、写过反馈的课不能删，不上了就把状态改成「停了」。</div>`);
 }
 function tStuModal(cid){
+  lastModal = () => tStuModal(cid);
   const c = course(cid), s = stu(c.student_id), ym = TODAY.slice(0,7), nx = ymShift(ym,1);
   openModal(`${mHead(`${esc(s.name)} · ${esc(c.subject)}`)}
   ${teacherTrackBlock(s.id)}
@@ -697,7 +699,7 @@ function tStuModal(cid){
   ${[ym,nx].map(m=>`<label class="field"><span>${ymLabel(m)}</span><textarea id="mp-${m}-${cid}" style="min-height:52px" placeholder="这个月要完成什么，例：日本史近代收尾，每周 1 篇记述">${esc(planText(cid,m))}</textarea></label>`).join('')}
   <div class="row"><button class="btn pri sm" data-act="t-mp-save" data-v="${cid}">保存计划</button></div>
   <b class="small">私下备注 <span class="muted xs" style="font-weight:400">只有你和教务能看到</span></b>
-  ${DB.notes.filter(n=>n.student_id===s.id).map(n=>`<div class="card small"><span class="muted">${sMD(n.created_at.slice(0,10))}</span> ${esc(n.text)}</div>`).join('')}
+  ${DB.notes.filter(n=>n.student_id===s.id).map(n=>`<div class="card small row"><span class="muted">${sMD(n.created_at.slice(0,10))}</span><span class="grow">${esc(n.text)}</span>${n.teacher_id===ME().teacher_id?`<button class="btn sm" data-act="note-del" data-v="${n.id}">删除</button>`:''}</div>`).join('')}
   <textarea id="t-note" placeholder="例：学生最近状态不好，家长比较焦虑"></textarea><div class="row"><button class="btn sm" data-act="t-note-save" data-v="${s.id}">添加备注</button></div>`);
 }
 function reqModal(lid){

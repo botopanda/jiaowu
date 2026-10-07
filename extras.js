@@ -86,3 +86,35 @@ document.addEventListener('click', async e => {
     if (a.dataset.act === 'makeup') { const [lid, on] = v.split('|'); await act('admin_update_lesson', {lid, d: {makeup: on === '1'}}, ME().role==='teacher' ? '已提交申请，教务批准后生效' : on === '1' ? '已标为补课' : '已取消补课标记'); lessonModal(lid); }
   } catch(err) { /* act() 已经提示过 */ }
 });
+
+/* ───────── 删除：课程、老师、私下备注、月度回访、链接 ───────── */
+document.addEventListener('click', async e => {
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  const v = a.dataset.v, k = a.dataset.act;
+  if (!['course-del','teacher-del','note-del','rv-del','link-del'].includes(k)) return;
+  try {
+    if (k === 'course-del') {
+      const c = course(v), n = DB.lessons.filter(l => l.course_id === v).length;
+      if (!confirm(`删除「${stu(c.student_id).name} · ${tea(c.teacher_id).name} · ${c.subject}」这门课？` + (n ? `\n已经排好的 ${n} 节课也会一起删掉。` : ''))) return;
+      await act('admin_delete_course', {cid: v}, '已删除这门课'); studentModal(c.student_id);
+    }
+    if (k === 'teacher-del') {
+      if (!confirm(`删除老师「${tea(v).name}」？\n他的专属链接会一起失效。`)) return;
+      await act('admin_delete_teacher', {tid: v}, '已删除'); closeModal();
+    }
+    if (k === 'note-del') {
+      if (!confirm('删除这条备注？')) return;
+      await act('note_delete', {nid: v}, '已删除'); reopenModal();
+    }
+    if (k === 'rv-del') {
+      const [sid, ym] = v.split('|');
+      if (!confirm(`删除 ${ymLabel(ym)} 的月度回访？学生的自我评价也会一起删掉。`)) return;
+      await act('review_delete', {sid, month: ym}, '已删除'); if (document.querySelector('.modal')) reopenModal();
+    }
+    if (k === 'link-del') {
+      const p = (DB.people || []).find(x => x.id === v);
+      if (!confirm(`删除「${p ? p.name : ''}」的专属链接？删掉后这条链接马上打不开。\n（只是想暂时不让用，点「停用」就行，以后还能恢复。）`)) return;
+      await act('admin_link_delete', {pid: v}, '已删除');
+    }
+  } catch(err) { /* act() 已经提示过 */ }
+});

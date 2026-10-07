@@ -109,7 +109,7 @@ function targetsView(sid, edit){
 function reviewCard(r, opt={}){
   const sec = (l, v) => v ? `<div class="sec"><b>${l}</b><p>${esc(v)}</p></div>` : '';
   return `<article class="card fb small"><div class="row"><b style="font-family:var(--f-disp);font-size:15px;margin-right:auto">${ymLabel(r.ym)}</b>
-    <span class="tag ${r.status==='已完成'?'ok':r.status==='需调整'?'seal':'mute'}">${esc(r.status||'待跟进')}</span>${opt.edit?`<button class="btn sm" data-act="rv-open" data-v="${r.student_id}|${r.ym}">编辑</button>`:''}</div>
+    <span class="tag ${r.status==='已完成'?'ok':r.status==='需调整'?'seal':'mute'}">${esc(r.status||'待跟进')}</span>${opt.edit?`<button class="btn sm" data-act="rv-open" data-v="${r.student_id}|${r.ym}">编辑</button><button class="btn sm danger" data-act="rv-del" data-v="${r.student_id}|${r.ym}">删除</button>`:''}</div>
     ${sec('本月课程内容', r.content)}${sec('学生自我评价', r.self_eval)}${sec('老师评价', r.teacher_eval)}${sec('任务 / 跟进结论', r.conclusion)}${sec('下月重点', r.next_focus)}
     ${!r.content && !r.self_eval && !r.teacher_eval ? '<div class="muted">还没有内容</div>' : ''}</article>`;
 }
