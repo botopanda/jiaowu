@@ -286,3 +286,10 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
   .sm-grp{display:none}
   .sm-nav .nav{width:auto;white-space:nowrap;flex:none}
 }
+
+/* 院校库 */
+.pg-card summary{cursor:pointer;list-style:none}
+.pg-card summary::-webkit-details-marker{display:none}
+.pg-card summary .row{align-items:center}
+.pg-school{font-family:var(--f-disp);font-size:16px}
+.pg-card tr.muted td{opacity:.55}

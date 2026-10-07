@@ -164,13 +164,13 @@ function adminView(){
   const pend = DB.feedbacks.filter(f => f.status==='pending').length, reqN = DB.requests.filter(q => q.status==='pending').length + chPend().length;
   const items = isTop()
     ? [['日常',[['overview','总览'],['calendar','课表与排课'],['requests','改期 · 请假',reqN],['feedback','反馈审批',pend]]],
-       ['学生',[['students','学生档案'],['apply','升学与出愿'],['reviews','月度回访'],['followups','跟进记录']]],
+       ['学生',[['students','学生档案'],['apply','升学与出愿'],['schools','院校库'],['reviews','月度回访'],['followups','跟进记录']]],
        ['管理',[['teachers','老师档案'],['payroll','课时与工资'],['links','链接与权限']]]]
-    : [['日常',[['overview','总览'],['calendar','课表与排课']]],['学生',[['students','学生档案'],['apply','升学与出愿'],['reviews','月度回访'],['followups','跟进记录']]]];
+    : [['日常',[['overview','总览'],['calendar','课表与排课']]],['学生',[['students','学生档案'],['apply','升学与出愿'],['schools','院校库'],['reviews','月度回访'],['followups','跟进记录']]]];
   const nav = items.map(([g,list]) => `<div class="grp">${g}</div>` + list.map(([k,t,n]) =>
     `<button class="nav ${S.page===k?'on':''}" data-act="page" data-v="${k}"><span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')).join('');
-  const P = {overview:pgOverview, calendar:pgCalendar, requests:pgRequests, apply:pgApply2, reviews:pgReviews, followups:pgFollowups, feedback:pgFeedback, students:pgStudents, teachers:pgTeachers, payroll:pgPayroll, links:pgLinks};
-  const page = (isTop() || ['overview','calendar','students','apply','reviews','followups'].includes(S.page)) ? (P[S.page]||pgOverview) : pgOverview;
+  const P = {overview:pgOverview, calendar:pgCalendar, requests:pgRequests, apply:pgApply2, reviews:pgReviews, followups:pgFollowups, feedback:pgFeedback, students:pgStudents, teachers:pgTeachers, payroll:pgPayroll, links:pgLinks, schools:pgSchools};
+  const page = (isTop() || ['overview','calendar','students','apply','schools','reviews','followups'].includes(S.page)) ? (P[S.page]||pgOverview) : pgOverview;
   return `<div class="layout"><nav class="side" aria-label="教务导航">${nav}</nav><main class="main">${page()}</main></div>`;
 }
 const scopeNote = () => !isTop() ? `<div class="scope">你负责 ${DB.students.length} 位学生，只显示他们的资料。</div>` : '';
