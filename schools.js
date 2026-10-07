@@ -59,7 +59,7 @@ function progList(){
   if (!list.length) return '<div class="card empty">没有符合条件的专业</div>';
   return `<div class="muted xs" style="margin:2px 0 6px">共 ${list.length} 个专业</div>` + list.map(progCard).join('');
 }
-const SHOWN_IN_HEAD = ['year','level','field','school','region','faculty','dept','school_type','intake','url','url2'];
+const SHOWN_IN_HEAD = ['year','level','field','school','region','faculty','dept','school_type','intake','campus','url','url2'];
 function progCard(p){
   const used = (DB.targets||[]).filter(t => t.program_id===p.id).length, rs = p.rounds || [];
   const rExtra = SF_R.filter(f => !f.core);
