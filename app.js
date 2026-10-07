@@ -572,7 +572,7 @@ const pSchedule = s => schedule(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name);
 
 /* ═════════════ 弹窗 ═════════════ */
 const mroot = document.getElementById('modal-root');
-function openModal(html, wide){ mroot.innerHTML = `<div class="mb" data-act="close-bg"><div class="modal ${wide?'wide':''}" role="dialog" aria-modal="true">${html}</div></div>`; labelTables(); }
+function openModal(html, wide){ mroot.innerHTML = `<div class="mb" data-act="close-bg"><div class="modal ${wide==='xl'?'wide xl':wide?'wide':''}" role="dialog" aria-modal="true">${html}</div></div>`; labelTables(); }
 // 手机上把宽表格变成卡片：每个格子前面显示它的列名
 function labelTables(){ document.querySelectorAll('table.rt').forEach(t => { const hs = [...t.querySelectorAll('thead th')].map(th => th.textContent.trim()); t.querySelectorAll('tbody tr').forEach(tr => [...tr.children].forEach((td, i) => td.setAttribute('data-label', hs[i] || ''))); }); }
 function closeModal(){ mroot.innerHTML=''; lastModal = null; }
@@ -650,7 +650,11 @@ function studentModal(id, tab){
   lastModal = () => studentModal(id, tab);
   const s = stu(id), cs = DB.courses.filter(c=>c.student_id===id); tab = tab || 'info';
   const ym = TODAY.slice(0,7), nx = ymShift(ym,1), pv = ymShift(ym,-1);
-  const tabs = [['info','概况与课程'],['pfview','家长看到的档案'],['board','跟进看板'],['profile','档案资料'],['score','成绩'],['target','大学与出愿'],['review','月度回访'],['fu','跟进记录'],['mp','月计划'],['fb','反馈'],['note','私下备注']];
+  // 左侧菜单按用途分组
+  const groups = [['基本',[['info','概况与课程'],['profile','档案资料'],['note','私下备注']]],
+    ['学习',[['mp','月计划'],['fb','反馈'],['score','成绩']]],
+    ['升学',[['target','大学与出愿'],['fu','跟进记录'],['review','月度回访']]],
+    ['给家长看',[['pfview','家长看到的档案'],['board','跟进看板']]]];
   let body = '';
   if (tab==='pfview') body = `<div class="hint" style="margin:0">这就是学生和家长在自己链接「档案」里看到的页面，照 Excel 第一页的顺序。</div>${profilePage(s)}`;
   else if (tab==='board') body = boardView(id);
@@ -675,7 +679,8 @@ function studentModal(id, tab){
   else body = `<div class="note">私下备注只有老师和教务能看到，学生和家长看不到。</div>${DB.notes.filter(n=>n.student_id===id).slice().reverse().map(n=>`<div class="card small"><b>${esc(n.author)}</b> <span class="muted">${sMD(n.created_at.slice(0,10))}</span><p style="margin:4px 0 0;white-space:pre-wrap">${esc(n.text)}</p></div>`).join('')||'<div class="empty">暂无备注</div>'}
     <textarea id="note-new" placeholder="写一条备注"></textarea><div class="row"><button class="btn sm" data-act="note-add" data-v="${id}">添加备注</button></div>`;
   openModal(`${mHead(`${esc(s.name)} <span class="muted small" style="font-family:var(--f-body)">${esc(s.track||'')}</span>`)}
-  <div class="seg">${tabs.map(([k,t])=>`<button class="${tab===k?'on':''}" data-act="stu-tab" data-v="${id}|${k}">${t}</button>`).join('')}</div>${body}`, true);
+  <div class="sm-wrap"><nav class="sm-nav" aria-label="学生档案菜单">${groups.map(([g,items])=>`<div class="sm-grp">${g}</div>${items.map(([k,t])=>`<button class="nav ${tab===k?'on':''}" data-act="stu-tab" data-v="${id}|${k}">${t}</button>`).join('')}`).join('')}</nav>
+  <div class="sm-body">${body}</div></div>`, 'xl');
 }
 function courseEdit(cid){
   const c = course(cid);

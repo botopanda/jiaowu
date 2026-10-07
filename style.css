@@ -270,3 +270,19 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 .layout.pl .pw{min-width:0}
 @media (min-width:761px){.tabbar{display:none}.layout.pl .p-body{padding-bottom:40px}.pside{position:sticky;top:50px;align-self:start;height:calc(100vh - 50px)}}
 @media (max-width:760px){.layout.pl{display:block}.pside{display:none}}
+
+/* 学生档案弹窗：左侧分组菜单 */
+.modal.xl{max-width:1120px}
+.sm-wrap{display:grid;grid-template-columns:168px minmax(0,1fr);gap:18px;align-items:start}
+.sm-nav{display:flex;flex-direction:column;gap:1px;position:sticky;top:0;border-right:1px solid var(--line);padding-right:10px}
+.sm-grp{font-size:11px;letter-spacing:.12em;color:var(--muted);padding:10px 10px 3px}
+.sm-grp:first-child{padding-top:0}
+.sm-nav .nav{font-size:14px;padding:8px 10px}
+.sm-body{min-width:0;display:flex;flex-direction:column;gap:12px}
+@media (max-width:760px){
+  .sm-wrap{grid-template-columns:minmax(0,1fr);gap:10px}
+  .sm-nav{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:0 0 6px;position:static;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .sm-nav::-webkit-scrollbar{display:none}
+  .sm-grp{display:none}
+  .sm-nav .nav{width:auto;white-space:nowrap;flex:none}
+}
