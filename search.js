@@ -120,7 +120,24 @@ function fzAliases(school){
   return FZ_ALIAS_N.filter(a => n.includes(a.key)).flatMap(a => a.all).join(' ');
 }
 // 搜索词按空格分开，每个词都要搜得到
-function fzHit(query, hay){
+var fzHit = function(query, hay){
   const words = String(query || '').trim().split(/[\s　]+/).map(fz).filter(Boolean);
   return !words.length || words.every(w => hay.includes(w));
 }
+
+// 专业词中日对照：搜其中任何一个，等于搜这一组
+const FZ_TERMS = [
+ '动画|アニメ|animation', '漫画|マンガ|まんが|comic|manga', '电影|映画|film|cinema', '影像|映像|video|media', '摄影|写真|photo',
+ '设计|デザイン|design', '美术|美術|fine art', '艺术|芸術|藝術|art', '表演|演剧|演劇|舞台|theatre|theater|drama', '舞蹈|舞踊|dance',
+ '游戏|ゲーム|game', '插画|イラスト|illustration', '角色|キャラクター|character', '服装|ファッション|服飾|fashion', '建筑|建築|architecture',
+ '媒体|メディア|media', '音乐|音楽|music', '视觉|ビジュアル|visual', '情报|情報|信息|information', '数字|デジタル|digital',
+ '工艺|工芸|craft', '雕塑|彫刻|sculpture', '油画|油画|油絵|oil painting', '日本画|日本画', '版画|版画', '陶艺|陶芸|ceramic',
+ '纺织|テキスタイル|textile', '产品|プロダクト|product', '空间|空間|space', '环境|環境|environment', '传播|コミュニケーション|communication',
+ '经营|経営|商学|business|management', '经济|経済|economics', '文学|文学|literature', '社会|社会|sociology', '国际|国際|international',
+ '研究生|研究生|research student', '大学院|研究科|graduate', '学部|undergraduate', '留学生|外国人|international student',
+].map(s => s.split('|').map(fz));
+function fzWord(w){ const g = FZ_TERMS.find(t => t.some(x => x && (x === w || (w.length >= 2 && x.startsWith(w))))); return g ? g.filter(Boolean) : [w]; }
+fzHit = function(query, hay){
+  const words = String(query || '').trim().split(/[\s　]+/).map(fz).filter(Boolean);
+  return !words.length || words.every(w => hay.includes(w) || fzWord(w).some(x => hay.includes(x)));
+};
