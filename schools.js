@@ -44,14 +44,14 @@ function pgSchools(){
   }
   const uniq = k => [...new Set(PROG.map(p => String(pv(p, k))).filter(Boolean))].sort();
   const sel = (k, label) => `<select id="pf-${k}" aria-label="${label}"><option value="">${label}：全部</option>${uniq(k).map(x => `<option ${x===PF[k]?'selected':''}>${esc(x)}</option>`).join('')}</select>`;
-  return head + `<div class="row"><input type="search" id="pf-q" placeholder="搜学校、学部、学科、关键词" value="${esc(PF.q)}" style="flex:1;min-width:200px">
+  return head + `<div class="row"><input type="search" id="pf-q" placeholder="搜学校、学部、学科、关键词；中文、日文、英文都行，例：早稻田 / waseda" value="${esc(PF.q)}" style="flex:1;min-width:200px">
     ${sel('year','年度')}${sel('level','类别')}${sel('field','方向')}${sel('school_type','学校类型')}</div>
   <div id="pg-list">${progList()}</div>`;
 }
+// 搜索用的内容（简繁日汉字统一、带上学校的中文名 / 英文名 / 简称），算一次记住
+const progHay = p => p._hay || (p._hay = fz([p.school, p.faculty, p.dept, p.field, p.region, ...Object.values(p.info || {})].join(' ')) + ' ' + fzAliases(p.school + p.faculty));
 function progFiltered(){
-  const q = PF.q.trim().toLowerCase();
-  return PROG.filter(p => ['year','level','field','school_type'].every(k => !PF[k] || String(pv(p, k)) === PF[k])
-    && (!q || [p.school, p.faculty, p.dept, p.field, p.region, ...Object.values(p.info || {})].join(' ').toLowerCase().includes(q)));
+  return PROG.filter(p => ['year','level','field','school_type'].every(k => !PF[k] || String(pv(p, k)) === PF[k]) && fzHit(PF.q, progHay(p)));
 }
 function progList(){
   if (!PROG.length) return `<div class="card empty">院校库还是空的。点右上角「下载 Excel 模板」，填好后「导入 Excel」；也可以「添加专业」一个个录。</div>`;
@@ -59,7 +59,7 @@ function progList(){
   if (!list.length) return '<div class="card empty">没有符合条件的专业</div>';
   return `<div class="muted xs" style="margin:2px 0 6px">共 ${list.length} 个专业</div>` + list.map(progCard).join('');
 }
-const SHOWN_IN_HEAD = ['year','level','field','school','region','faculty','dept','school_type','intake','campus','url','url2'];
+const SHOWN_IN_HEAD = ['year','level','field','school','school_cn','school_en','region','faculty','dept','school_type','intake','campus','url','url2'];
 function progCard(p){
   const used = (DB.targets||[]).filter(t => t.program_id===p.id).length, rs = p.rounds || [];
   const rExtra = SF_R.filter(f => !f.core);
@@ -67,7 +67,7 @@ function progCard(p){
     const items = SF_P.filter(f => f.g === g && !SHOWN_IN_HEAD.includes(f.k) && pv(p, f.k));
     return items.length ? `<div class="pg-grp"><div class="pg-gt">${g}</div><dl class="kv small">${items.map(f => `<dt>${f.l}</dt><dd style="white-space:pre-wrap">${esc(String(pv(p, f.k)))}</dd>`).join('')}</dl></div>` : '';
   }).join('');
-  return `<details class="card pg-card"><summary><div class="row"><b class="pg-school">${esc(p.school)}</b><span>${esc(progName(p))}</span>
+  return `<details class="card pg-card"><summary><div class="row"><b class="pg-school" title="${esc([pv(p,'school_cn'), pv(p,'school_en')].filter(Boolean).join(' / '))}">${esc(p.school)}</b><span>${esc(progName(p))}</span>
       <span class="tag mute">${p.year}${pv(p,'intake')&&pv(p,'intake')!=='4月'?' · '+esc(pv(p,'intake'))+'入学':''}</span><span class="tag blue">${esc(p.level)}</span>${p.field?`<span class="tag gold">${esc(p.field)}</span>`:''}
       ${pv(p,'school_type')?`<span class="tag mute">${esc(pv(p,'school_type'))}</span>`:''}${p.region?`<span class="tag mute">${esc(p.region)}</span>`:''}
       ${used?`<span class="tag ok">${used} 位学生在报</span>`:''}${staleTag(p)}<span style="margin-left:auto">${nextRound(p)}</span></div></summary>
@@ -125,9 +125,9 @@ async function progPicker(sid, tid){
   TG_DRAFT = {sid, tid, d: tgCollect()};
   try { await progLoad(); } catch(e) { toast(e.message, true); return; }
   openModal(`${mHead('从院校库选')}
-  <input type="search" id="pk-q" placeholder="搜学校、学部、学科">
+  <input type="search" id="pk-q" placeholder="搜学校、学部、学科（中文、日文、英文都行）">
   <div class="muted xs">点某一轮，就把这一轮的日期和要求带进出愿目标；带进去以后还可以改。</div>
-  <div id="pk-list" style="display:flex;flex-direction:column;gap:6px">${PROG.length ? PROG.map(p => `<div class="card small pk-item" data-s="${esc([p.school,p.faculty,p.dept,p.field].join(' ').toLowerCase())}">
+  <div id="pk-list" style="display:flex;flex-direction:column;gap:6px">${PROG.length ? PROG.map(p => `<div class="card small pk-item" data-s="${esc(progHay(p))}">
     <div class="row"><b>${esc(p.school)}</b><span>${esc(progName(p))}</span><span class="tag mute">${p.year}</span>${p.field?`<span class="tag gold">${esc(p.field)}</span>`:''}</div>
     <div class="row" style="margin-top:4px">${(p.rounds||[]).length ? p.rounds.map(r => `<button class="btn sm" data-act="pk-pick" data-v="${p.id}|${r.id}">${esc(r.name||'（未命名）')}${r.apply_end?` · ${dS(r.apply_end)} 截止`:''}</button>`).join('') : `<button class="btn sm" data-act="pk-pick" data-v="${p.id}|">带入（还没有轮次）</button>`}</div></div>`).join('') : '<div class="empty">院校库还是空的，先到左侧「院校库」导入</div>'}</div>
   <div class="row"><button class="btn sm" data-act="pk-back">返回</button></div>`, true);
@@ -330,7 +330,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('input', e => {
   const el = e.target;
   if (el.id === 'pf-q') { PF.q = el.value; const box = document.getElementById('pg-list'); if (box) { box.innerHTML = progList(); labelTables(); } }
-  if (el.id === 'pk-q') { const q = el.value.trim().toLowerCase(); document.querySelectorAll('.pk-item').forEach(x => x.style.display = !q || x.dataset.s.includes(q) ? '' : 'none'); }
+  if (el.id === 'pk-q') document.querySelectorAll('.pk-item').forEach(x => x.style.display = fzHit(el.value, x.dataset.s) ? '' : 'none');
 });
 document.addEventListener('change', e => {
   const el = e.target;

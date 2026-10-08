@@ -16,7 +16,7 @@
 <script>
 // 每次打开先读「当前版本号」（不走缓存），再按这个版本加载样式和脚本——网站更新后马上生效
 (function(){
-  var files = ['app.js','track.js','profile.js','extras.js','school_fields.js','schools.js'];
+  var files = ['app.js','track.js','profile.js','extras.js','school_fields.js','search.js','schools.js'];
   function boot(v){
     var css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'style.css?v=' + v; document.head.appendChild(css);
     (function next(i){ if (i >= files.length) { document.dispatchEvent(new Event('app-ready')); return; }
