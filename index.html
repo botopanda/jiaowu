@@ -24,8 +24,11 @@
       sc.onerror = function(){ document.getElementById('app').innerHTML = '<div class="center"><h2>暂时打不开</h2><p>网络不太稳定，请稍后刷新再试。</p></div>'; };
       document.body.appendChild(sc); })(0);
   }
+  // version.txt 第一行是版本号，第二行（可选）是要加载的脚本清单——以后加新文件也不怕首页被缓存
   fetch('version.txt?t=' + Date.now(), {cache: 'no-store'}).then(function(r){ return r.ok ? r.text() : 'x'; })
-    .then(function(v){ boot(v.trim() || 'x'); }).catch(function(){ boot(String(Date.now())); });
+    .then(function(t){ var ls = t.split(/?
+/); if (ls[1] && /\.js/.test(ls[1])) files = ls[1].split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+      boot(ls[0].trim() || 'x'); }).catch(function(){ boot(String(Date.now())); });
 })();
 </script>
 </body>
