@@ -330,3 +330,36 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 .fbx[open] .fbx-s{display:none}.fbx .fb{margin-top:8px}
 .fbp{display:flex;flex-direction:column;gap:8px;border-left:4px solid var(--hc)}.fbp summary{cursor:pointer}
 .self-card{display:flex;flex-direction:column;gap:8px}.self-card textarea{min-height:110px}
+/* 学生端减法版：大留白、少框、少颜色 */
+.sx{display:flex;flex-direction:column;gap:22px;max-width:640px}
+.sx-cap{font-size:12.5px;color:var(--muted);letter-spacing:.08em;margin-bottom:6px}
+.sx-next{padding:4px 0}
+.sx-when{font-size:30px;font-weight:700;line-height:1.25;font-family:var(--f-disp)}
+.sx-when .num{font-family:var(--f-num)}
+.sx-what{font-size:17px;margin-top:2px}
+.sx-link{margin-top:10px;border:0;background:none;padding:0;color:var(--gold-text);font-size:14px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.sx-note{margin-top:8px;font-size:13px;color:var(--warn)}
+.sx-list{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.sx-list>*+*{border-top:1px solid var(--line)}
+.sx-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:none;padding:14px;font-size:15.5px;color:var(--ink);cursor:pointer}
+.sx-row:hover{background:var(--sunk)}
+.sx-arr{color:var(--muted);font-size:18px}
+.sx-hot{color:var(--seal);font-weight:600}
+.sx-empty{padding:6px 0}
+.sx-item{padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.sx-meta{font-size:12.5px;color:var(--muted)}
+.sx-main{font-size:15.5px}
+.sx-dates{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px}
+.sx-fb{font-size:14px;background:var(--sunk);border-radius:var(--r);padding:8px 10px}
+.ok-t{color:var(--ok)}
+.sx-fold>summary{cursor:pointer;color:var(--muted);font-size:14px;padding:4px 0}
+.sx-fold[open]>summary{margin-bottom:8px}
+.sx-fbr{display:flex;align-items:flex-start;gap:8px;padding:0 10px 0 0}
+.sx-fbr details{flex:1;min-width:0}
+.sx-fbr summary{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;list-style:none;font-size:15px}
+.sx-fbr summary::-webkit-details-marker{display:none}
+.sx-d{min-width:40px;color:var(--muted)}
+.sx-btns{display:flex;gap:6px;padding-top:9px}
+.sx-body{padding:0 14px 12px;font-size:14px;display:flex;flex-direction:column;gap:6px}
+.sx-body p{margin:0}.sx-body b{color:var(--muted);font-weight:400;margin-right:8px}
+.sx-ta{min-height:110px}
