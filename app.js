@@ -100,7 +100,7 @@ const fbOfS = sid => DB.feedbacks.filter(f => cOfF(f)?.student_id===sid);
 const needFb = () => DB.lessons.filter(isPend);
 const hasFb = l => !!(l.has_fb || fbOf(l));
 // 课表格子里的小标记：✓ = 已写反馈，待 = 上完了还没写反馈
-const fbMark = l => l.status!=='scheduled' ? '' : hasFb(l) ? '<b class="mk ok" title="已写反馈">✓</b>' : isPend(l) ? '<b class="mk q" title="还没写反馈">待</b>' : '';
+const fbMark = l => l.status!=='scheduled' || ['student','parent'].includes(ME().role) ? '' : hasFb(l) ? '<b class="mk ok" title="已写反馈">✓</b>' : isPend(l) ? '<b class="mk q" title="还没写反馈">待</b>' : '';
 const ME = () => DB.me;
 const isAdmin = () => ME().role==='admin';
 const isTop = () => isAdmin() && ME().level==='top';
@@ -404,9 +404,7 @@ function phoneView(){
     body = {a:tSchedule,b:tStudents,c:tWrite,d:tMe}[S.tab](t);
   } else if (me.role==='student'){
     const s = stu(me.student_id);
-    const selfDue = !reviewOf(s.id, TODAY.slice(0,7))?.self_eval && +TODAY.slice(8,10) >= 20 ? 1 : 0;   // 每月 20 号以后提醒写自评
-    tabs = [['a','首页'],['b','作业',latestHw(s.id).filter(f=>!f.hw_sub).length],['c','上课记录',fbOfS(s.id).filter(f=>!f.confirm).length],['d','档案'],['e','月度',selfDue]];
-    body = {a:sHome,b:sHomework,c:sFeedback,d:profilePage,e:sMonthly}[S.tab]?.(s) ?? sHome(s);
+    tabs = sTabs(s); body = sView(s);   // 学生端在 student.js
   } else {
     const s = stu(me.student_id);
     tabs = [['a','概况'],['b','老师反馈'],['c','课表'],['d','档案'],['e','月度']];
@@ -438,7 +436,7 @@ const tzNote = tz => `<div class="muted xs">${tz==='CN'?'北京时间（日本�
 let PV = 'cal'; try { PV = localStorage.getItem('jw_view') || 'cal'; } catch(e) {}
 function lessonItem(l, tz, whoFn, canReq, canEdit){
   const c = course(l.course_id), q = reqOf(l), leave = l.status!=='scheduled';
-  return `<div class="les" style="--hc:${hue(c.subject)}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}</div><div style="min-width:0;flex:1">${subjTag(c.subject)} · ${esc(whoFn(c))}${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调课</span>':''}${l.status==='leave'?' <span class="tag seal">请假</span>':''}${l.status==='cancelled'?' <span class="tag mute">已取消</span>':''}${isDone(l)?(hasFb(l)?' <span class="tag ok">已反馈</span>':' <span class="tag ok">已上</span>'):''}${isPend(l)?` <span class="tag warn">${ME().role==='teacher'?'待写反馈':'待确认'}</span>`:''}${hrsTag(l)}
+  return `<div class="les" style="--hc:${hue(c.subject)}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}</div><div style="min-width:0;flex:1">${subjTag(c.subject)} · ${esc(whoFn(c))}${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调课</span>':''}${l.status==='leave'?' <span class="tag seal">请假</span>':''}${l.status==='cancelled'?' <span class="tag mute">已取消</span>':''}${['student','parent'].includes(ME().role) ? (l.status==='scheduled' && l.date<TODAY ? ' <span class="tag mute">已上</span>' : '') : `${isDone(l)?(hasFb(l)?' <span class="tag ok">已反馈</span>':' <span class="tag ok">已上</span>'):''}${isPend(l)?` <span class="tag warn">${ME().role==='teacher'?'待写反馈':'待确认'}</span>`:''}`}${hrsTag(l)}
     ${reqLine(q)}${canReq && !leave && l.date>=TODAY && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave && !fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}</div></div>`;
 }
 function schedule(ls, tz, whoFn, canReq=false, canEdit=false){
@@ -454,7 +452,7 @@ function schedule(ls, tz, whoFn, canReq=false, canEdit=false){
     const ds_ = `${ym}-${pad(d)}`, dl = mine.filter(l=>l.date===ds_);
     const st = l => tz==='CN' ? wrap(mins(l.start)-60) : l.start;
     cells += `<button class="ph-day ${ds_===TODAY?'today':''} ${ds_===sel?'sel':''} ${dl.length?'has':''}" data-act="pday" data-v="${ds_}" aria-label="${fmtMD(ds_)}，${dl.length} 节课"><span class="n">${d}</span>
-      ${dl.slice(0,5).map(l=>{ const c=course(l.course_id); return `<span class="pc ${l.status!=='scheduled'?'lv':''}" style="--hc:${hue(c.subject)}"><span class="pt">${st(l)}${l.makeup?'<b class="mk">补</b>':''}${fbMark(l)}<span class="ps"> ${esc(c.subject)}</span></span><span class="pn ${whoFn(c).length>3?'long':''}">${esc(whoFn(c))}</span></span>`; }).join('')}
+      ${dl.slice(0,5).map(l=>{ const c=course(l.course_id); return `<span class="pc ${l.status!=='scheduled'?'lv':''} ${l.date<TODAY?'past':''}" style="--hc:${hue(c.subject)}"><span class="pt">${st(l)}${l.makeup?'<b class="mk">补</b>':''}${fbMark(l)}<span class="ps"> ${esc(c.subject)}</span></span><span class="pn ${whoFn(c).length>3?'long':''}">${esc(whoFn(c))}</span></span>`; }).join('')}
       ${dl.length>3?`<span class="more m">+${dl.length-3}</span>`:''}${dl.length>5?`<span class="more d">+${dl.length-5}</span>`:''}</button>`;
   }
   const day = mine.filter(l=>l.date===sel);

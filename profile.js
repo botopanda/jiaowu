@@ -36,8 +36,8 @@ function scoreChart(ls){
   return `<svg viewBox="0 0 ${W} ${H}" class="pf-chart" role="img" aria-label="成绩变化折线图">${grid}<path d="${path}" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linejoin="round"/>${dots}</svg>`;
 }
 
-function profilePage(s){
-  const kv = (l, v) => `<div class="pf-kv"><span>${l}</span><b>${v ? esc(v) : '<span class="muted">—</span>'}</b></div>`;
+function profilePage(s, opt = {}){
+  const kv = (l, v) => !v && opt.hideEmpty ? '' : `<div class="pf-kv"><span>${l}</span><b>${v ? esc(v) : '<span class="muted">—</span>'}</b></div>`;   // 学生自己看时，空着的项不显示
   const rows = scoreRows(s.id), metric = (rows.find(r => r.m === S.pfMetric) || rows[0] || {}).m;
   const ts = targetsOf(s.id);
   const birth = s.birth ? `${+s.birth.slice(0,4)}年${+s.birth.slice(5,7)}月${+s.birth.slice(8,10)}日` : '';
