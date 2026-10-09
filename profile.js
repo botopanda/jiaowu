@@ -43,7 +43,7 @@ function profilePage(s, opt = {}){
   const birth = s.birth ? `${+s.birth.slice(0,4)}年${+s.birth.slice(5,7)}月${+s.birth.slice(8,10)}日` : '';
   const bunri = [s.lv_bun, s.lv_ri].filter(x => x && x !== '不适用').join('；');
 
-  const scoreTable = rows.length ? `<div class="tw"><table class="pf-table"><thead><tr><th>成绩指标</th><th>首次日期</th><th>首次分数</th><th>最新日期</th><th>最新分数</th><th>提升</th></tr></thead><tbody>
+  const scoreTable = rows.length ? `<div class="tw"><table class="pf-table ${opt.hideEmpty ? 'rt' : ''}"><thead><tr><th>成绩指标</th><th>首次日期</th><th>首次分数</th><th>最新日期</th><th>最新分数</th><th>提升</th></tr></thead><tbody>
     ${rows.map(r => {
       const d = Number(r.l.score) - Number(r.f.score), many = r.ls.length > 1;
       return `<tr><td><b>${esc(r.m)}</b></td><td class="num">${r.f.date}</td><td class="num">${r.f.score}</td>
@@ -55,7 +55,7 @@ function profilePage(s, opt = {}){
       <b class="printonly">${esc(metric)}</b></div>${scoreChart(rows.find(r => r.m === metric).ls)}</div>`
     : '<div class="muted small">还没有成绩记录</div>';
 
-  const tierTable = ts.length ? `<div class="tw"><table class="pf-table"><thead><tr><th>类别</th><th>序号</th><th>大学 / 专业</th><th>入试要求</th><th>分数要求</th><th>资料状态</th><th>下一个日期</th></tr></thead><tbody>
+  const tierTable = ts.length ? `<div class="tw"><table class="pf-table ${opt.hideEmpty ? 'rt' : ''}"><thead><tr><th>类别</th><th>序号</th><th>大学 / 专业</th><th>入试要求</th><th>分数要求</th><th>资料状态</th><th>下一个日期</th></tr></thead><tbody>
     ${ts.map(t => {
       const nx = nextEventOf(t);
       const next = nx ? `${nx.label} <b class="num">${fmtYMD(nx.date)}</b><br><span class="${nx.days <= 14 ? 'tag seal' : 'muted xs'}">还有 ${nx.days} 天</span>`
