@@ -69,9 +69,7 @@ function sHomework2(s){
     return `<div class="les hw-i" style="--hc:${hue(c.subject)}"><div style="min-width:0;flex:1">
       <div class="row xs">${subjTag(c.subject)}<span class="muted">${esc(tea(c.teacher_id).name)} · ${sMD(l.date)} 布置</span><span style="margin-left:auto" class="tag ${f.hw_fb?'ok':f.hw_sub?'blue':'warn'}">${f.hw_fb?'已批改':f.hw_sub?'已交':'未交'}</span></div>
       <div class="hw-t">${esc(f.hw)}</div>
-      ${now && !f.hw_sub ? `<div class="row"><button class="btn pri sm" data-act="hw-open" data-v="${f.id}">我完成了</button></div>
-        <div id="hwp-${f.id}" class="hw-panel" hidden><textarea id="hw-${f.id}" placeholder="写一句完成情况（可以不写）"></textarea>
-        <div class="row"><button class="btn pri sm" data-act="hw-done" data-v="${f.id}">提交</button>${uploadBtn('hw', f.id, '上传作业照片 / PDF')}</div></div>` : ''}
+      ${now && !f.hw_sub ? `<div class="row">${uploadBtn('hw', f.id, '上传作业照片 / PDF')}<button class="btn pri sm" data-act="hw-done" data-v="${f.id}">我完成了</button></div>` : ''}
       ${now && f.hw_sub && !f.hw_fb ? `<div class="row">${uploadBtn('hw', f.id, '再传几张')}</div>` : ''}
       ${fileList(f.id,'hw','我交的作业')}${fileList(f.id,'grade','老师的批改')}
       ${f.hw_note?`<div class="muted xs">我说：${esc(f.hw_note)}</div>`:''}${f.hw_fb?`<div class="note"><b>老师批改：</b>${esc(f.hw_fb)}</div>`:''}</div></div>`; };
