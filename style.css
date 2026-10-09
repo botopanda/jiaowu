@@ -363,3 +363,5 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 .sx-body{padding:0 14px 12px;font-size:14px;display:flex;flex-direction:column;gap:6px}
 .sx-body p{margin:0}.sx-body b{color:var(--muted);font-weight:400;margin-right:8px}
 .sx-ta{min-height:110px}
+.sx .sx-list>*+*{border-top:1px solid var(--line)}
+.sx .grow{flex:1;min-width:0}
