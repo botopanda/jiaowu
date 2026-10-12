@@ -399,3 +399,4 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 .cal .lc.pend{outline:1px dashed color-mix(in srgb,var(--warn) 60%,transparent);outline-offset:-1px}
 .cal .lc{flex:none}            /* 课多的时候不挤扁，格子自己长高 */
 .cal .day{height:auto}
+.cal .day{min-height:auto}     /* 正方形打底；课放不下时按内容长高 */
