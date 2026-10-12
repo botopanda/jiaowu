@@ -5,7 +5,7 @@
    · 上课记录、作业：平时收起，点开看全文
    · 我的：目标大学与出愿日程、成绩变化、月度自评、个人档案
    ══════════════════════════════════════════════════════════════ */
-const nowJST = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(11, 16);
+const nowJST = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16);   // 现在几点（北京时间）
 const dayWord = d => { const n = dBetween(TODAY, d); return n === 0 ? '今天' : n === 1 ? '明天' : n === 2 ? '后天' : fmtMD(d); };
 const sUnHw = s => latestHw(s.id).filter(f => !f.hw_sub);
 const sUnConfirm = s => fbOfS(s.id).filter(f => !f.confirm);
@@ -36,7 +36,7 @@ function sNextCard(s){
     <div class="nx-when"><b>${dayWord(l.date)}</b> <span class="num">${t}</span></div>
     <div class="nx-what">${subjTag(c.subject)} <span>${esc(tea(c.teacher_id).name)} 老师</span>${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调过课</span>':''}</div>
     ${q ? reqLine(q) : ''}
-    ${!(q && q.status==='pending') ? `<div class="row"><button class="btn sm" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button><span class="muted xs">${s.tz==='CN'?'北京时间':'日本时间'}</span></div>` : ''}
+    ${!(q && q.status==='pending') ? `<div class="row"><button class="btn sm" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button><span class="muted xs">北京时间</span></div>` : ''}
     ${later.length ? `<div class="nx-later">${later.map(x => { const cc = course(x.course_id); return `<div class="row xs"><span class="muted">之后</span><b>${dayWord(x.date)}</b><span class="num">${timeFor(x, s.tz)}</span>${subjTag(cc.subject)}<span class="muted">${esc(tea(cc.teacher_id).name)}</span></div>`; }).join('')}</div>` : ''}
   </section>`;
 }

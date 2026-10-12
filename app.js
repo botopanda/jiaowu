@@ -106,7 +106,7 @@ const isPend = l => l.status==='scheduled' && l.date < TODAY && !isDone(l);
 const realH = l => l.actual_hours!=null ? Number(l.actual_hours) : dur(l);   // 实际上课时长（没改过就是排课时长）
 const paidH = l => isDone(l) ? realH(l) : l.status==='leave' ? Number(l.deduct) : 0;
 const hrsTag = l => l.actual_hours!=null && isDone(l) ? ` <span class="tag warn">实际 ${realH(l)}h（排 ${dur(l)}h）</span>` : '';
-const timeFor = (l, tz) => tz==='CN' ? `${tstr(mins(l.start)-60)}–${tstr(mins(l.end)-60)}` : `${l.start}–${l.end}`;
+const timeFor = (l, tz) => `${l.start}–${l.end}`;   // 2026-10-13 起所有时间都是北京时间，不再换算
 const lsOfS = sid => DB.lessons.filter(l => course(l.course_id)?.student_id===sid);
 const lsOfT = tid => DB.lessons.filter(l => course(l.course_id)?.teacher_id===tid);
 const fbOfS = sid => DB.feedbacks.filter(f => cOfF(f)?.student_id===sid);
@@ -118,11 +118,11 @@ const ME = () => DB.me;
 const isAdmin = () => ME().role==='admin';
 const isTop = () => isAdmin() && ME().level==='top';
 const canSched = () => isAdmin() || ME().role==='teacher';          // 排课、调课、删课（数据库里还会再按范围检查）
-const myTz = () => ME().role==='teacher' ? (tea(ME().teacher_id).tz || 'JP') : 'JP';
-const tzName = tz => tz==='CN' ? '北京时间' : '日本时间';
+const myTz = () => 'CN';
+const tzName = tz => '北京时间';
 const wrap = m => tstr(((m % 1440) + 1440) % 1440);
-const fromJST = t => myTz()==='CN' ? wrap(mins(t)-60) : t;          // 日本时间 → 自己的时间（显示用）
-const toJST = t => myTz()==='CN' ? (mins(t)+60 >= 1440 ? null : tstr(mins(t)+60)) : t;   // 自己填的时间 → 日本时间（存库用）
+const fromJST = t => t;   // 以前用来换算日本时间，现在全是北京时间，原样返回
+const toJST = t => t;
 const planText = (cid, ym) => DB.plans.find(p => p.course_id===cid && p.ym===ym)?.text || '';
 const reqOf = l => DB.requests.filter(q => q.lesson_id===l.id).slice(-1)[0];
 const personOf = (role, field, id) => (DB.people||[]).find(p => p.role===role && p[field]===id && p.active);
@@ -194,7 +194,7 @@ const isT = () => ME().role==='teacher';
 const chPend = () => (DB.changes||[]).filter(x => x.status==='pending');
 const chPendOf = lid => chPend().find(x => x.lesson_id===lid);
 const chKind = {add:'排课', move:'调课', delete:'删课'};
-const tShow = t => isT() ? fromJST(t) : t;   // 老师看自己的时区，教务看日本时间
+const tShow = t => t;
 function chText(x){
   if (x.kind==='add'){ const ds = x.d.dates || []; return `${ds.length} 节：${ds.slice(0,8).map(sMD).join('、')}${ds.length>8?' 等':''} · ${tShow(x.d.st)}–${tShow(x.d.et)}${x.d.makeup?' · 补课':''}`; }
   const o = x.old ? `${sMD(x.old.date)} ${tShow(x.old.start)}–${tShow(x.old.end)}` : '（这节课已不在）';
@@ -278,7 +278,7 @@ function pgCalendar(){
     <div class="seg">${[['all','全部'],['s','按学生'],['t','按老师']].map(([k,t])=>`<button class="${S.calType===k?'on':''}" data-act="caltype" data-v="${k}">${t}</button>`).join('')}</div>
     ${who.length ? `<select id="cal-who" data-change="calwho"><option value="">选择${S.calType==='s'?'学生':'老师'}…</option>${who.map(x=>`<option value="${x.id}" ${S.calId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`:''}
   </div>
-  <div class="row"><h3 style="font-size:16px">${esc(title)}</h3><span class="muted xs">共 ${ls.length} 节 · ${hours} 小时 · 日本时间 · 划线＝请假 · 「调」＝调过课 · ${slotLegend()}</span></div>
+  <div class="row"><h3 style="font-size:16px">${esc(title)}</h3><span class="muted xs">共 ${ls.length} 节 · ${hours} 小时 · 北京时间 · 划线＝请假 · 「调」＝调过课 · ${slotLegend()}</span></div>
   <div class="cal">${cells}</div><div class="agenda">${agenda}</div>`;
 }
 
@@ -289,7 +289,7 @@ function pgRequests(){
       <div class="row"><span class="tag ${q.type==='请假'?'seal':'warn'}">${q.type}</span><b>${esc(stu(c.student_id).name)}</b>${subjTag(c.subject)}<span class="muted small">${esc(tea(c.teacher_id).name)} · ${q.status==='pending'?'原定':'课程'} ${fmtMD(l.date)} ${l.start}–${l.end}</span></div>
       <dl class="kv small"><dt>原因</dt><dd>${esc(q.reason)}</dd>${q.wish?`<dt>希望时间</dt><dd>${esc(q.wish)}</dd>`:''}</dl>
       ${q.status==='pending' ? `${q.type==='改期'
-        ? `<div class="fields"><label class="field"><span>新日期</span><input type="date" id="rq-d-${q.id}" value="${l.date}"></label><label class="field"><span>开始（日本时间）</span><input type="time" id="rq-s-${q.id}" value="${l.start}"></label><label class="field"><span>结束</span><input type="time" id="rq-e-${q.id}" value="${l.end}"></label></div>
+        ? `<div class="fields"><label class="field"><span>新日期</span><input type="date" id="rq-d-${q.id}" value="${l.date}"></label><label class="field"><span>开始（北京时间）</span><input type="time" id="rq-s-${q.id}" value="${l.start}"></label><label class="field"><span>结束</span><input type="time" id="rq-e-${q.id}" value="${l.end}"></label></div>
            <div class="row"><button class="btn pri sm" data-act="req-ok" data-v="${q.id}">同意，改到这个时间</button></div>`
         : `<div class="row" style="align-items:flex-end"><label class="field"><span>扣学生课时${same?'（当天请假）':'（提前请假）'}</span><select id="rq-dd-${q.id}"><option value="0" ${same?'':'selected'}>不扣</option><option value="${dur(l)/2}" ${same?'selected':''}>扣 ${dur(l)/2} 小时（一半）</option><option value="${dur(l)}">扣全部 ${dur(l)} 小时</option></select></label><button class="btn seal sm" data-act="req-ok" data-v="${q.id}">同意请假</button></div>`}
         <div class="row"><input type="text" id="rq-r-${q.id}" placeholder="不同意的话，写一句原因回复学生" style="flex:1;min-width:180px"><button class="btn sm" data-act="req-no" data-v="${q.id}">不同意</button></div>`
@@ -366,7 +366,7 @@ function pgTeachers(){
     const done = ms.filter(l=>paidH(l)>0), plan = ms.filter(l=>l.status==='scheduled'), pn = ms.filter(isPend).length;
     const hDone = +done.reduce((a,l)=>a+paidH(l),0).toFixed(1), hPlan = +plan.reduce((a,l)=>a+dur(l),0).toFixed(1);
     const names = [...new Set(cs.map(c=>stu(c.student_id).name))];
-    return `<section class="card"><div class="row" style="margin-bottom:6px"><h3 style="margin-right:auto;font-size:16px">${esc(t.name)} ${tBookTag(t)}</h3>${t.subject?subjTag(t.subject):''}<span class="tag mute">${t.loc?esc(t.loc)+' · ':''}${t.tz==='CN'?'北京时间':'日本时间'}</span></div>
+    return `<section class="card"><div class="row" style="margin-bottom:6px"><h3 style="margin-right:auto;font-size:16px">${esc(t.name)} ${tBookTag(t)}</h3>${t.subject?subjTag(t.subject):''}${t.loc?`<span class="tag mute">${esc(t.loc)}</span>`:''}</div>
     <dl class="kv small"><dt>学历</dt><dd>${esc(t.edu||'—')}</dd><dt>经历</dt><dd>${esc(t.exp||'—')}</dd><dt>擅长</dt><dd>${esc(t.good||'—')}</dd>
     <dt>带的学生</dt><dd>${names.map(esc).join('、')||'—'}</dd>
     <dt>本月已上</dt><dd><b class="num">${hDone}</b> 小时 <span class="muted xs">（${done.length} 节）</span>${pn?` <span class="tag warn">${pn} 节待确认</span>`:''}</dd>
@@ -387,7 +387,7 @@ function pgPayroll(){
     <div class="stat"><small>已审核</small><b>${rows.filter(r=>payOf(r.t.id,ym).reviewed_at).length}/${rows.length}</b></div><div class="stat"><small>已结算</small><b>${rows.filter(r=>payOf(r.t.id,ym).settled_at).length}/${rows.length}</b></div></div>
   ${rows.length ? '' : '<div class="card empty">这个月还没有上完的课</div>'}
   ${rows.map(r => `<details class="card"><summary class="row"><b style="margin-right:auto;font-family:var(--f-disp)">${esc(r.t.name)}</b><span class="num small">${r.ls.length} 节 · ${r.h} 小时</span>${r.pn?`<span class="tag warn">${r.pn} 节待确认未计入</span>`:''}<b class="num">${r.amt}</b>${payBadge(r.t.id, ym)}<span class="muted xs">展开明细</span></summary>
-    <div class="tw" style="margin-top:8px"><table><thead><tr><th>日期</th><th>时间（日本）</th><th>学生</th><th>科目</th><th>计费</th><th>单价</th><th>金额</th><th>备注</th></tr></thead><tbody>
+    <div class="tw" style="margin-top:8px"><table><thead><tr><th>日期</th><th>时间（北京）</th><th>学生</th><th>科目</th><th>计费</th><th>单价</th><th>金额</th><th>备注</th></tr></thead><tbody>
     ${r.ls.map(l=>{const c=course(l.course_id);return `<tr><td class="num">${sMD(l.date)}</td><td class="num">${l.start}–${l.end}</td><td>${esc(stu(c.student_id).name)}</td><td>${subjTag(c.subject)}</td><td class="num">${paidH(l)}h</td><td class="num">${rateTxt(c.rate)}</td><td class="num">${money(paidH(l)*(c.rate||0), curOf(c.rate))}</td><td class="xs">${l.status==='leave'?'<span class="tag seal">当天请假</span> ':''}${l.done_manual&&!l.has_fb&&!fbOf(l)?'<span class="tag mute">教务确认</span> ':''}${hrsTag(l)} ${esc(l.actual_note||'')} ${esc(l.note)}</td></tr>`}).join('')}
     </tbody></table></div><div class="row" style="margin-top:8px"><button class="btn sm" data-act="copy-pay" data-v="${r.t.id}">复制课时清单（发给老师核对）</button><span style="margin-left:auto" class="row">${payButtons(r.t.id, ym)}</span></div></details>`).join('')}`;
 }
@@ -445,7 +445,7 @@ function agenda(ls, tz, whoFn, n=12, canReq=false, canEdit=false){
   });
   return out;
 }
-const tzNote = tz => `<div class="muted xs">${tz==='CN'?'北京时间（日本时间减 1 小时）':'日本时间'}</div>`;
+const tzNote = tz => '<div class="muted xs">北京时间</div>';
 
 /* 手机端课表：月历 / 列表 两种看法，每个人自己选，本机记住 */
 let PV = 'cal'; try { PV = localStorage.getItem('jw_view') || 'cal'; } catch(e) {}
@@ -465,7 +465,7 @@ function schedule(ls, tz, whoFn, canReq=false, canEdit=false){
   for (let i=0;i<lead;i++) cells += '<div></div>';
   for (let d=1; d<=last; d++){
     const ds_ = `${ym}-${pad(d)}`, dl = mine.filter(l=>l.date===ds_);
-    const st = l => tz==='CN' ? wrap(mins(l.start)-60) : l.start;
+    const st = l => l.start;
     cells += `<button class="ph-day ${ds_===TODAY?'today':''} ${ds_===sel?'sel':''} ${dl.length?'has':''}" data-act="pday" data-v="${ds_}" aria-label="${fmtMD(ds_)}，${dl.length} 节课"><span class="n">${d}</span>
       ${dl.slice(0,5).map(l=>{ const c=course(l.course_id); return `<span class="pc ${l.status!=='scheduled'?'lv':''} ${l.date<TODAY?'past':''}" style="--hc:${slotHue(st(l))}"><span class="pt">${st(l)}${l.makeup?'<b class="mk">补</b>':''}${fbMark(l)}<span class="ps"> ${esc(c.subject)}</span></span><span class="pn ${whoFn(c).length>3?'long':''}">${esc(whoFn(c))}</span></span>`; }).join('')}
       ${dl.length>3?`<span class="more m">+${dl.length-3}</span>`:''}${dl.length>5?`<span class="more d">+${dl.length-5}</span>`:''}</button>`;
@@ -596,7 +596,7 @@ function lessonModal(id){
   const l = L(id), c = course(l.course_id), s = stu(c.student_id), t = tea(c.teacher_id), f = fbOf(l), q = reqOf(l);
   const st = isDone(l)?`<span class="tag ok">已上课</span>${!f&&!l.has_fb?' <span class="tag mute">教务确认</span>':''}${hrsTag(l)}`:l.status==='leave'?'<span class="tag seal">请假</span>':l.status==='cancelled'?'<span class="tag mute">已取消</span>':isPend(l)?'<span class="tag warn">待确认</span> <span class="muted xs">老师还没写反馈，暂不计课时</span>':'<span class="tag blue">待上课</span>';
   openModal(`${mHead(`${esc(s.name)} · ${esc(c.subject)}${l.kind?' · '+esc(l.kind):''}`)}
-  <dl class="kv"><dt>课程</dt><dd>${canSched() && l.status==='scheduled' ? `<select data-change="l-kind" data-lid="${l.id}"><option value="">—</option>${KINDS.map(x => `<option ${x===l.kind?'selected':''}>${x}</option>`).join('')}${l.kind && !KINDS.includes(l.kind) ? `<option selected>${esc(l.kind)}</option>` : ''}</select>` : esc(l.kind || '—')}</dd><dt>老师</dt><dd>${esc(t.name)}${t.loc?`（${esc(t.loc)}）`:''}</dd><dt>时间</dt><dd>${fmtMD(l.date)} ${l.start}–${l.end} 日本${t.tz==='CN'||s.tz==='CN'?` <span class="muted">／北京 ${timeFor(l,'CN')}</span>`:''}</dd>
+  <dl class="kv"><dt>课程</dt><dd>${canSched() && l.status==='scheduled' ? `<select data-change="l-kind" data-lid="${l.id}"><option value="">—</option>${KINDS.map(x => `<option ${x===l.kind?'selected':''}>${x}</option>`).join('')}${l.kind && !KINDS.includes(l.kind) ? `<option selected>${esc(l.kind)}</option>` : ''}</select>` : esc(l.kind || '—')}</dd><dt>老师</dt><dd>${esc(t.name)}${t.loc?`（${esc(t.loc)}）`:''}</dd><dt>时间</dt><dd>${fmtMD(l.date)} ${l.start}–${l.end} <span class="muted">北京时间</span></dd>
   <dt>状态</dt><dd>${st} ${l.makeup?'<span class="tag blue">补课</span>':''} ${l.moved?'<span class="tag warn">调过课</span>':''}${canSched() && (!f || isTop()) ? ` <button class="btn sm" data-act="makeup" data-v="${l.id}|${l.makeup?0:1}">${l.makeup?'取消补课标记':'标为补课'}</button>` : ''}</dd>${l.note?`<dt>备注</dt><dd>${esc(l.note)}</dd>`:''}
   ${l.status==='leave'?`<dt>扣学生课时</dt><dd class="num">${l.deduct} 小时（老师照发）</dd>`:''}${l.actual_note?`<dt>时长说明</dt><dd>${esc(l.actual_note)}</dd>`:''}${isDone(l)||isPend(l)?`<dt>反馈</dt><dd>${f?(f.status==='approved'?'已审批':'待审批'):l.has_fb?'已写':'<span class="tag warn">老师未写</span>'}</dd>`:''}
   ${q?`<dt>申请</dt><dd>${reqLine(q)}</dd>`:''}${chPendOf(l.id)?`<dt>老师申请</dt><dd><span class="tag warn">${chKind[chPendOf(l.id).kind]}待审批</span> <span class="small">${chText(chPendOf(l.id))}</span></dd>`:''}</dl>
@@ -640,7 +640,6 @@ function addLessonModal(){
   </div>
   <div id="al-note"></div>
   <div class="fields"><label class="field"><span>第一节日期</span><input type="date" id="al-d" value="${TODAY}"></label><label class="field"><span>开始（${tzName(myTz())}）</span><input type="time" id="al-s" value="${myTz()==='CN'?'18:00':'19:00'}"></label><label class="field"><span>结束</span><input type="time" id="al-e" value="${myTz()==='CN'?'20:00':'21:00'}"></label></div>
-  ${myTz()==='CN'?'<div class="note">请按<b>北京时间</b>填写，系统会自动换算成日本时间（＋1 小时）给学生和教务看。</div>':''}
   <div class="fields"><label class="field"><span>重复</span><select id="al-rep"><option value="month">每周同一时间，到这个月底</option><option value="1">只排这一节</option><option value="4">每周同一时间，共 4 周</option><option value="8">每周同一时间，共 8 周</option></select></label></div>
   <div class="muted xs">和这位老师已有的课时间重叠的，会自动跳过。</div>
   <div class="row"><button class="btn pri" data-act="save-lesson">${isT ? '提交排课申请' : '排课'}</button></div>`);
@@ -669,7 +668,7 @@ function studentForm(id){
   <label class="field"><span>方向</span><input type="text" id="sf-track" value="${esc(s.track)}" placeholder="例：学部 · 文科 / 大学院 · 写真"></label>
   <label class="field"><span>类别</span><select id="sf-grad"><option value="false" ${s.grad?'':'selected'}>学部</option><option value="true" ${s.grad?'selected':''}>大学院</option></select></label>
   <label class="field"><span>所在地</span><input type="text" id="sf-loc" value="${esc(s.loc)}" placeholder="例：东京 / 杭州"></label>
-  <label class="field"><span>显示时间</span><select id="sf-tz"><option value="JP" ${s.tz==='JP'?'selected':''}>日本时间</option><option value="CN" ${s.tz==='CN'?'selected':''}>北京时间</option></select></label>
+  <input type="hidden" id="sf-tz" value="CN">
   <label class="field"><span>负责教务</span><input type="text" id="sf-staff" value="${esc(s.staff)}" placeholder="例：金老师"></label>
   ${id?`<label class="field"><span>状态</span><select id="sf-active"><option value="true" ${s.active?'selected':''}>在读</option><option value="false" ${s.active?'':'selected'}>停课 / 毕业</option></select></label>`:''}</div>
   ${ownerStudentField(s)}
@@ -683,7 +682,7 @@ function teacherForm(id){
   <div class="fields"><label class="field"><span>姓名 *</span><input type="text" id="tf-name" value="${esc(t.name)}" placeholder="例：陆老师"></label>
   <label class="field"><span>主要科目</span><input type="text" id="tf-subject" value="${esc(t.subject)}" placeholder="可以从列表选，也可以直接写" list="subj-list"><datalist id="subj-list">${SUBJECTS.map(x => `<option value="${x}">`).join('')}</datalist></label>
   <label class="field"><span>所在地</span><input type="text" id="tf-loc" value="${esc(t.loc)}" placeholder="例：北京"></label>
-  <label class="field"><span>显示时间</span><select id="tf-tz"><option value="JP" ${t.tz==='JP'?'selected':''}>日本时间</option><option value="CN" ${t.tz==='CN'?'selected':''}>北京时间</option></select></label>
+  <input type="hidden" id="tf-tz" value="CN">
   ${id?`<label class="field"><span>状态</span><select id="tf-active"><option value="true" ${t.active?'selected':''}>在职</option><option value="false" ${t.active?'':'selected'}>离职</option></select></label>`:''}</div>
   <label class="field"><span>学历</span><input type="text" id="tf-edu" value="${esc(t.edu)}"></label>
   <label class="field"><span>教学经历</span><textarea id="tf-exp">${esc(t.exp)}</textarea></label>
@@ -707,7 +706,7 @@ function studentModal(id, tab){
   else if (['profile','score','target','review','fu'].includes(tab)) body = studentTrackTab(id, tab);
   else if (tab==='info'){
     const ps = personOf('student','student_id',id), pp = personOf('parent','student_id',id);
-    body = `<div class="grid2"><dl class="kv">${s.code?`<dt>编号</dt><dd class="num">${esc(s.code)}</dd>`:''}<dt>方向</dt><dd>${esc(s.track||'—')}（${s.grad?'大学院':'学部'}）</dd><dt>所在地</dt><dd>${esc(s.loc||'—')}（${s.tz==='CN'?'北京时间':'日本时间'}）</dd><dt>负责教务</dt><dd>${esc(s.staff||'—')}</dd>${s.memo?`<dt>教务备注</dt><dd>${esc(s.memo)}</dd>`:''}</dl>
+    body = `<div class="grid2"><dl class="kv">${s.code?`<dt>编号</dt><dd class="num">${esc(s.code)}</dd>`:''}<dt>方向</dt><dd>${esc(s.track||'—')}（${s.grad?'大学院':'学部'}）</dd><dt>所在地</dt><dd>${esc(s.loc||'—')}</dd><dt>负责教务</dt><dd>${esc(s.staff||'—')}</dd>${s.memo?`<dt>教务备注</dt><dd>${esc(s.memo)}</dd>`:''}</dl>
       <div class="row" style="align-content:flex-start">${isTop()?`<button class="btn sm" data-act="student-form" data-v="${id}">编辑资料</button>`:''}<button class="btn sm" data-act="stu-cal" data-v="${id}">看课表</button>
       ${ps?`<button class="btn sm" data-act="copy-link" data-v="${ps.key}">复制学生链接</button>`:''}${pp?`<button class="btn sm" data-act="copy-link" data-v="${pp.key}">复制家长链接</button>`:''}</div></div>
       <b>课程</b><div class="list">${cs.map(c=>`<div class="li small"><span class="grow">${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}${c.active?'':' <span class="tag mute">已停</span>'}</span>${isTop()?`<span class="num">${rateTxt(c.rate)}</span>`:''}${isAdmin()?`<button class="btn sm" data-act="course-edit" data-v="${c.id}">改</button>`:''}</div>`).join('')||'<div class="muted small">还没有课程</div>'}</div>
@@ -751,7 +750,7 @@ function tStuModal(cid){
 function reqModal(lid){
   const l = L(lid), c = course(l.course_id);
   openModal(`${mHead('申请改期 / 请假')}
-  <div class="small">${fmtMD(l.date)} ${l.start}–${l.end}（日本时间）· ${esc(c.subject)} · ${esc(tea(c.teacher_id).name)}</div>
+  <div class="small">${fmtMD(l.date)} ${l.start}–${l.end}（北京时间）· ${esc(c.subject)} · ${esc(tea(c.teacher_id).name)}</div>
   ${l.date===TODAY?'<div class="note warn">这是今天的课。当天请假原则上要扣一半课时，最终由教务老师决定。</div>':''}
   <label class="field"><span>申请什么</span><select id="rq-type" data-change="rq-type"><option>改期</option><option>请假</option></select></label>
   <label class="field"><span>原因（必填）</span><textarea id="rq-reason" placeholder="例：学校有考试 / 身体不舒服"></textarea></label>
