@@ -261,7 +261,7 @@ function pgCalendar(){
   if (S.calType==='t' && S.calId) ls = ls.filter(l => course(l.course_id).teacher_id===S.calId);
   const chip = l => { const c = course(l.course_id);
     const who = S.calType==='s' ? tea(c.teacher_id).name : S.calType==='t' ? stu(c.student_id).name : `${stu(c.student_id).name}·${tea(c.teacher_id).name.replace('老师','')}`;
-    return `<button class="lc ${l.status!=='scheduled'?'leave':''} ${isPend(l)?'pend':''} ${l.moved?'moved':''}" style="--hc:${slotHue(l.start)}" data-act="lesson" data-v="${l.id}"><span class="t">${l.start}</span>${l.makeup?'<b class="mk">补</b>':''}${fbMark(l)} ${esc(who)}<br>${esc(c.subject)}${l.kind?'·'+esc(l.kind):''}${l.status==='leave'?' 请假':l.status==='cancelled'?' 取消':''}</button>`; };
+    return `<button class="lc ${l.status!=='scheduled'?'leave':''} ${isPend(l)?'pend':''} ${l.moved?'moved':''}" style="--hc:${slotHue(l.start)}" data-act="lesson" data-v="${l.id}"><span class="t">${l.start}</span>${l.makeup?'<b class="mk">补</b>':''}${fbMark(l)} <b class="lc-w">${esc(who)}</b> <span class="lc-s">${esc(c.subject)}${l.kind?'·'+esc(l.kind):''}${l.status==='leave'?' 请假':l.status==='cancelled'?' 取消':''}</span></button>`; };
   let cells = ['一','二','三','四','五','六','日'].map((d,i) => `<div class="hd ${i>=5?'we':''}">${d}</div>`).join('');
   for (let i=0;i<lead;i++) cells += `<div class="day off"></div>`;
   for (let d=1; d<=last; d++){ const dd=`${S.month}-${pad(d)}`; cells += `<div class="day ${dd===TODAY?'today':''}"><span class="dn">${d}</span>${ls.filter(l=>l.date===dd).map(chip).join('')}</div>`; }

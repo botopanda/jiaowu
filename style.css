@@ -383,3 +383,17 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 /* 排课窗口的「补」按钮：按下变蓝＝补课 */
 .mk-btn{flex:none;width:40px;height:36px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--muted);font-weight:700;font-size:15px;cursor:pointer}
 .mk-btn.on{background:var(--blue);border-color:var(--blue);color:#fff}
+
+/* 教务大课表：正方形格子、一节课一行（参考谷歌日历） */
+.cal .day{aspect-ratio:1/1;min-height:96px;padding:6px 6px 8px;gap:3px}
+.cal .dn{align-self:center;font-size:12.5px;line-height:24px;min-width:24px;height:24px;text-align:center;border-radius:50%;margin-bottom:2px}
+.cal .day.today .dn{background:var(--nav);color:var(--nav-ink);border-radius:50%;padding:0;align-self:center}
+.cal .lc{display:block;border:0;border-left:0;background:color-mix(in srgb,var(--hc) 9%,transparent);border-radius:4px;padding:2px 6px;font-size:12px;line-height:1.5;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal .lc::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--hc);margin-right:5px;vertical-align:1px}
+.cal .lc:hover{background:color-mix(in srgb,var(--hc) 18%,transparent)}
+.cal .lc .t{font-size:11.5px;color:var(--muted);margin-right:3px}
+.cal .lc .lc-w{font-weight:600}
+.cal .lc .lc-s{color:var(--muted)}
+.cal .lc.leave{background:color-mix(in srgb,var(--seal) 8%,transparent)}
+.cal .lc.pend{outline:1px dashed color-mix(in srgb,var(--warn) 60%,transparent);outline-offset:-1px}
