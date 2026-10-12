@@ -64,12 +64,13 @@ let lastModal = null;
 function reopenModal(){ if (lastModal && document.querySelector('.modal')) lastModal(); }
 
 /* ───────── 工资：审核 / 结算 ───────── */
-const payOf = (tid, ym) => (DB.pay || []).find(p => p.teacher_id === tid && p.ym === ym) || {};
+const payOf = (tid, ym) => (DB.pay || []).find(p => p.teacher_id === tid && p.ym === ym && (p.book || 'K') === curBook()) || {};
 function payBadge(tid, ym){
   const p = payOf(tid, ym);
   return p.settled_at ? '<span class="tag ok">已结算</span>' : p.reviewed_at ? '<span class="tag blue">已审核</span>' : '<span class="tag mute">未审核</span>';
 }
 function payButtons(tid, ym){
+  if (isOwner() && S.book === 'all') return '<span class="muted xs">右上角切到「Project K」或「我的」再审核、结算</span>';
   const p = payOf(tid, ym);
   if (p.settled_at) return `<span class="muted xs">${esc(p.settled_by || '')} ${p.settled_at.slice(5,10).replace('-','/')} 结算</span><button class="btn sm" data-act="pay" data-v="${tid}|${ym}|settled|0">撤销结算</button>`;
   if (p.reviewed_at) return `<span class="muted xs">${esc(p.reviewed_by || '')} 已审核</span><button class="btn gold sm" data-act="pay" data-v="${tid}|${ym}|settled|1">结算完成</button><button class="btn sm" data-act="pay" data-v="${tid}|${ym}|reviewed|0">撤销审核</button>`;
@@ -82,7 +83,7 @@ document.addEventListener('click', async e => {
   try {
     if (a.dataset.act === 'file-del') { e.preventDefault(); await act('file_delete', {fid: v}, '已删除'); reopenModal(); }
     if (a.dataset.act === 'pay') { e.stopPropagation(); const [tid, ym, what, on] = v.split('|');
-      await act('pay_mark', {tid, month: ym, what, on_: on === '1'}, what === 'settled' ? (on === '1' ? '已标记结算完成' : '已撤销结算') : (on === '1' ? '已审核' : '已撤销审核')); }
+      await act('pay_mark', {tid, month: ym, what, on_: on === '1', ledger: curBook()}, what === 'settled' ? (on === '1' ? '已标记结算完成' : '已撤销结算') : (on === '1' ? '已审核' : '已撤销审核')); }
     if (a.dataset.act === 'makeup') { const [lid, on] = v.split('|'); await act('admin_update_lesson', {lid, d: {makeup: on === '1'}}, ME().role==='teacher' ? '已提交申请，教务批准后生效' : on === '1' ? '已标为补课' : '已取消补课标记'); lessonModal(lid); }
   } catch(err) { /* act() 已经提示过 */ }
 });

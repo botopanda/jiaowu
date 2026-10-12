@@ -132,6 +132,7 @@ async function load(){
   if (!S.month) S.month = TODAY.slice(0,7);
   if (!S.payMonth) S.payMonth = ymShift(TODAY.slice(0,7), -1);
   if (!S.teaMonth) S.teaMonth = TODAY.slice(0,7);
+  DB_ALL = DB; DB = bookView(DB_ALL);   // 总管理：按「全部 / Project K / 我的」筛选；其他人原样
 }
 // 点菜单、切回这个网页时：先马上显示，再在后台取最新数据（别人刚写的反馈、刚排的课）再画一遍
 // 正在打字或开着弹窗时不重画，免得把填了一半的内容冲掉
@@ -154,9 +155,9 @@ async function act(fn, args, okMsg, after){
 const app = document.getElementById('app');
 function render(){
   const me = ME();
-  const label = me.role==='admin' ? (me.level==='top' ? '教务 · 管理' : '教务') : {teacher:'任课老师', student:'学生', parent:'家长'}[me.role];
+  const label = me.role==='admin' ? (me.owner ? '总管理' : me.level==='top' ? '教务 · 管理' : '教务') : {teacher:'任课老师', student:'学生', parent:'家长'}[me.role];
   setTimeout(labelTables);
-  app.innerHTML = `<header class="top"><h1>一对一教务台</h1><span class="who">${esc(me.name)}${me.role==='parent'?'':' · '+label}</span><button class="btn sm" data-act="logout" title="让这台设备忘掉你的链接">退出</button></header>` + (isAdmin() ? adminView() : phoneView());
+  app.innerHTML = `<header class="top"><h1>一对一教务台</h1>${me.owner ? bookSwitch() : ''}<span class="who">${esc(me.name)}${me.role==='parent'?'':' · '+label}</span><button class="btn sm" data-act="logout" title="让这台设备忘掉你的链接">退出</button></header>` + (isAdmin() ? adminView() : phoneView());
 }
 
 /* ═════════════ 教务端 ═════════════ */
@@ -221,6 +222,7 @@ function pgOverview(){
     <button class="stat ${chPend().length?'al':''}" ${isTop()?'data-act="page" data-v="requests"':''}><small>老师排课申请</small><b>${chPend().length}</b></button>
     <button class="stat ${miss.length?'al':''}" ${isTop()?'data-act="page" data-v="feedback-missing"':''}><small>待确认的课</small><b>${miss.length}</b></button>
   </div>
+  ${ownerClashBlock()}
   <div class="grid2">
     <section class="card"><h3>今天的课</h3><div class="list">${today.length ? today.map(l => { const c=course(l.course_id);
       return `<div class="li"><span class="num">${l.start}</span><div class="grow">${esc(stu(c.student_id).name)} · ${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}</div>${l.status==='leave'?'<span class="tag seal">请假</span>':''}</div>`}).join('') : '<div class="empty">今天没有课</div>'}</div></section>
@@ -336,7 +338,7 @@ function pgStudents(){
   ${list.length ? `<div class="tw"><table class="rt stu-tbl"><thead><tr><th>编号</th><th>姓名</th><th>方向</th><th>任课老师</th><th>负责教务</th><th>${+ym.slice(5)} 月出勤</th><th>作业</th><th>${+ym.slice(5)} 月计划</th></tr></thead><tbody>
   ${list.map(s => { const cs = DB.courses.filter(c=>c.student_id===s.id), st = monthStats(s.id, ym), un = latestHw(s.id).filter(f=>!f.hw_sub).length;
     const pn = cs.filter(c => planText(c.id, ym)).length;
-    return `<tr class="click" data-act="student" data-v="${s.id}"><td class="num">${esc(s.code||'')}</td><td><b>${esc(s.name)}</b>${s.active?'':' <span class="tag mute">停课</span>'}<br><span class="xs muted">${esc(s.loc||'')}</span></td><td>${esc(s.direction||s.track||'')}${s.target_ym?`<br><span class="xs muted">目标 ${esc(s.target_ym)}</span>`:''}</td>
+    return `<tr class="click" data-act="student" data-v="${s.id}"><td class="num">${esc(s.code||'')}</td><td><b>${esc(s.name)}</b>${isMine(s)?' <span class="tag gold">我的</span>':''}${s.active?'':' <span class="tag mute">停课</span>'}<br><span class="xs muted">${esc(s.loc||'')}</span></td><td>${esc(s.direction||s.track||'')}${s.target_ym?`<br><span class="xs muted">目标 ${esc(s.target_ym)}</span>`:''}</td>
     <td>${teacherChips(cs) || '<span class="tag warn">还没有课程</span>'}</td><td>${esc(s.staff)}</td>
     <td class="num">${st.actual}/${st.req}${st.leave?` <span class="tag seal">请假 ${st.leave}</span>`:''}</td><td>${un?`<span class="tag warn">${un} 份未交</span>`:'<span class="tag ok">已交齐</span>'}</td>
     <td>${cs.length ? `<span class="tag ${pn===cs.length?'ok':'warn'}">${pn}/${cs.length}</span>` : ''}</td></tr>`}).join('')}
@@ -626,6 +628,7 @@ function studentForm(id){
   <label class="field"><span>显示时间</span><select id="sf-tz"><option value="JP" ${s.tz==='JP'?'selected':''}>日本时间</option><option value="CN" ${s.tz==='CN'?'selected':''}>北京时间</option></select></label>
   <label class="field"><span>负责教务</span><input type="text" id="sf-staff" value="${esc(s.staff)}" placeholder="例：金老师"></label>
   ${id?`<label class="field"><span>状态</span><select id="sf-active"><option value="true" ${s.active?'selected':''}>在读</option><option value="false" ${s.active?'':'selected'}>停课 / 毕业</option></select></label>`:''}</div>
+  ${ownerStudentField(s)}
   <label class="field"><span>教务备注（只有教务能看到）</span><textarea id="sf-memo">${esc(s.memo||'')}</textarea></label>
   ${id?'':'<div class="muted xs">保存后会自动生成这位学生和家长的两条专属链接。</div>'}
   <div class="row"><button class="btn pri" data-act="save-student" data-v="${id||''}">保存</button></div>`);
@@ -642,6 +645,7 @@ function teacherForm(id){
   <label class="field"><span>教学经历</span><textarea id="tf-exp">${esc(t.exp)}</textarea></label>
   <label class="field"><span>擅长领域</span><input type="text" id="tf-good" value="${esc(t.good)}"></label>
   ${id?'<div class="muted xs">老师离职后，记得到「链接与权限」里停用他的链接。</div>':'<div class="muted xs">保存后会自动生成这位老师的专属链接。</div>'}
+  ${ownerTeacherField(t)}
   <div class="row"><button class="btn pri" data-act="save-teacher" data-v="${id||''}">保存</button>${id && isTop()?`<button class="btn danger sm" style="margin-left:auto" data-act="teacher-del" data-v="${id}">删除这位老师</button>`:''}</div>`);
 }
 function studentModal(id, tab){
@@ -778,12 +782,14 @@ document.addEventListener('click', async e => {
     case 'save-student': { if(!val('sf-name').trim()){toast('请填写姓名',true);break;}
       const d={name:val('sf-name'), track:val('sf-track'), grad:val('sf-grad')==='true', loc:val('sf-loc'), tz:val('sf-tz'), staff:val('sf-staff'), memo:val('sf-memo')};
       if (v){ d.id=v; d.active = val('sf-active')!=='false'; }
-      const sid = await act('admin_save_student', {d}, v?'已保存':'已添加。接下来在「概况与课程」里给他添加课程'); studentModal(sid,'info'); break; }
+      const before = v ? stu(v).private : false;
+      const sid = await act('admin_save_student', {d}, v?'已保存':'已添加。接下来在「概况与课程」里给他添加课程'); await ownerAfterSave('student', sid, before); studentModal(sid,'info'); break; }
     case 'teacher-form': teacherForm(v); break;
     case 'save-teacher': { if(!val('tf-name').trim()){toast('请填写姓名',true);break;}
       const d={name:val('tf-name'), subject:val('tf-subject'), loc:val('tf-loc'), tz:val('tf-tz'), edu:val('tf-edu'), exp:val('tf-exp'), good:val('tf-good')};
       if (v){ d.id=v; d.active = val('tf-active')!=='false'; }
-      await act('admin_save_teacher', {d}, v?'已保存':'已添加，老师的专属链接也生成好了'); closeModal(); break; }
+      const before = v ? tea(v).private : false;
+      const tid = await act('admin_save_teacher', {d}, v?'已保存':'已添加，老师的专属链接也生成好了'); await ownerAfterSave('teacher', v || tid, before); closeModal(); break; }
     case 'add-course': { if(!val('cf-subj').trim()){toast('请填写科目',true);break;}
       await act('admin_save_course', {d:{student_id:v, teacher_id:val('cf-t'), subject:val('cf-subj'), rate:Number(val('cf-rate'))||0}}, '课程已添加，可以去排课了'); studentModal(v,'info'); break; }
     case 'course-edit': courseEdit(v); break;
