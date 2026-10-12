@@ -4,7 +4,7 @@
   --bg:#f7f5f0; --surface:#ffffff; --sunk:#f2efe8; --ink:#1a1814; --muted:#8a847a; --line:#e2ded6; --line-2:#ede9e2;
   --gold:#b8953a; --gold-text:#8c6d1f; --gold-soft:#f7efd9; --nav:#1a1814; --nav-ink:#f7f5f0;
   --seal:#b03a2e; --ok:#2a8a5e; --warn:#a8780e; --blue:#2a5f9e;
-  --h1:#b8953a; --h2:#6f8452; --h3:#4f7396; --h4:#a0645a; --h5:#86679a; --h6:#5f8a86;
+  --h1:#b8953a; --h2:#6f8452; --h3:#4f7396; --h4:#a0645a; --h5:#86679a; --h6:#5f8a86; --h7:#c4762f; --h8:#5d6db5; --h9:#8c8a3a;
   --f-disp:"Songti SC","STSong","SimSun","Noto Serif CJK SC","Source Han Serif SC",serif;
   --f-body:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;
   --f-num:ui-monospace,"SF Mono",Consolas,Menlo,monospace;
@@ -15,7 +15,7 @@
   --bg:#15130f; --surface:#1e1b16; --sunk:#191712; --ink:#ece6da; --muted:#9d9587; --line:#343027; --line-2:#2a2720;
   --gold:#d2b05a; --gold-text:#dcbb66; --gold-soft:#2c2616; --nav:#ece6da; --nav-ink:#15130f;
   --seal:#e36b5d; --ok:#5dc295; --warn:#e0b04a; --blue:#7aa8e0;
-  --h1:#d2b05a; --h2:#9cb57d; --h3:#82a6cb; --h4:#d4937f; --h5:#b699c8; --h6:#8cc2bd; color-scheme:dark}}
+  --h1:#d2b05a; --h2:#9cb57d; --h3:#82a6cb; --h4:#d4937f; --h5:#b699c8; --h6:#8cc2bd; --h7:#e9a463; --h8:#9aa7ec; --h9:#c6c46e; color-scheme:dark}}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.6;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
