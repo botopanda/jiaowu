@@ -1,5 +1,6 @@
 /* 方案 A 唯新风：暖白底、墨色导航、金棕强调。只用系统字体，不加载任何外部资源（国内打开更稳）。 */
 :root{
+  --am:#2e9e7a; --pm:#d9822b; --ev:#5b5fc7;
   --bg:#f7f5f0; --surface:#ffffff; --sunk:#f2efe8; --ink:#1a1814; --muted:#8a847a; --line:#e2ded6; --line-2:#ede9e2;
   --gold:#b8953a; --gold-text:#8c6d1f; --gold-soft:#f7efd9; --nav:#1a1814; --nav-ink:#f7f5f0;
   --seal:#b03a2e; --ok:#2a8a5e; --warn:#a8780e; --blue:#2a5f9e;
@@ -10,6 +11,7 @@
   --r:5px; color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root{
+  --am:#5cc9a3; --pm:#f0a85a; --ev:#9a9dff;
   --bg:#15130f; --surface:#1e1b16; --sunk:#191712; --ink:#ece6da; --muted:#9d9587; --line:#343027; --line-2:#2a2720;
   --gold:#d2b05a; --gold-text:#dcbb66; --gold-soft:#2c2616; --nav:#ece6da; --nav-ink:#15130f;
   --seal:#e36b5d; --ok:#5dc295; --warn:#e0b04a; --blue:#7aa8e0;
@@ -372,3 +374,8 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 /* 卡片列表：卡片宽度固定，只有一两张时不会被拉满整行 */
 .grid2.cards-fix{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
 @media (min-width:1400px){.grid2.cards-fix{grid-template-columns:repeat(auto-fill,minmax(380px,1fr))}}
+
+/* 课表按时间分颜色的图例 */
+.slot-lg{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.slot-lg i{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--hc);margin-left:6px}
+.slot-lg i:first-child{margin-left:0}
