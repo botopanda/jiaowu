@@ -353,7 +353,7 @@ function pgTeachers(){
     const done = ms.filter(l=>paidH(l)>0), plan = ms.filter(l=>l.status==='scheduled'), pn = ms.filter(isPend).length;
     const hDone = +done.reduce((a,l)=>a+paidH(l),0).toFixed(1), hPlan = +plan.reduce((a,l)=>a+dur(l),0).toFixed(1);
     const names = [...new Set(cs.map(c=>stu(c.student_id).name))];
-    return `<section class="card"><div class="row" style="margin-bottom:6px"><h3 style="margin-right:auto;font-size:16px">${esc(t.name)}</h3>${t.subject?subjTag(t.subject):''}<span class="tag mute">${t.loc?esc(t.loc)+' · ':''}${t.tz==='CN'?'北京时间':'日本时间'}</span></div>
+    return `<section class="card"><div class="row" style="margin-bottom:6px"><h3 style="margin-right:auto;font-size:16px">${esc(t.name)} ${tBookTag(t)}</h3>${t.subject?subjTag(t.subject):''}<span class="tag mute">${t.loc?esc(t.loc)+' · ':''}${t.tz==='CN'?'北京时间':'日本时间'}</span></div>
     <dl class="kv small"><dt>学历</dt><dd>${esc(t.edu||'—')}</dd><dt>经历</dt><dd>${esc(t.exp||'—')}</dd><dt>擅长</dt><dd>${esc(t.good||'—')}</dd>
     <dt>带的学生</dt><dd>${names.map(esc).join('、')||'—'}</dd>
     <dt>本月已上</dt><dd><b class="num">${hDone}</b> 小时 <span class="muted xs">（${done.length} 节）</span>${pn?` <span class="tag warn">${pn} 节待确认</span>`:''}</dd>
@@ -788,7 +788,7 @@ document.addEventListener('click', async e => {
     case 'save-teacher': { if(!val('tf-name').trim()){toast('请填写姓名',true);break;}
       const d={name:val('tf-name'), subject:val('tf-subject'), loc:val('tf-loc'), tz:val('tf-tz'), edu:val('tf-edu'), exp:val('tf-exp'), good:val('tf-good')};
       if (v){ d.id=v; d.active = val('tf-active')!=='false'; }
-      const before = v ? tea(v).private : false;
+      const before = v ? tea(v).book : 'K';
       const tid = await act('admin_save_teacher', {d}, v?'已保存':'已添加，老师的专属链接也生成好了'); await ownerAfterSave('teacher', v || tid, before); closeModal(); break; }
     case 'add-course': { if(!val('cf-subj').trim()){toast('请填写科目',true);break;}
       await act('admin_save_course', {d:{student_id:v, teacher_id:val('cf-t'), subject:val('cf-subj'), rate:Number(val('cf-rate'))||0}}, '课程已添加，可以去排课了'); studentModal(v,'info'); break; }

@@ -19,7 +19,7 @@ function bookView(all){
   const usedT = new Set(courses.map(c => c.teacher_id));
   return {...all,
     students: all.students.filter(s => sids.has(s.id)), courses, lessons,
-    teachers: all.teachers.filter(t => usedT.has(t.id) || (want ? t.private : !t.private)),
+    teachers: all.teachers.filter(t => usedT.has(t.id) || (want ? t.book !== 'K' : t.book !== 'mine')),   // 老师归属：K / mine / both
     feedbacks: all.feedbacks.filter(f => lids.has(f.lesson_id)),
     requests: all.requests.filter(q => lids.has(q.lesson_id)),
     plans: all.plans.filter(m => cids.has(m.course_id)),
@@ -56,10 +56,10 @@ function ownerClashes(){
   return out;
 }
 function ownerClashBlock(){
-  const xs = ownerClashes(); if (!xs.length) return '';
+  const xs = ownerClashes(); if (!xs.length) return ownerTeacherWarn();
   const nm = l => { const c = DB_ALL.courses.find(x => x.id === l.course_id), s = DB_ALL.students.find(x => x.id === c.student_id);
     return `${esc(s.name)}${s.private ? ' <span class="tag gold">我的</span>' : ''} ${l.start}–${l.end}`; };
-  return `<section class="card" style="border-left:4px solid var(--seal)"><h3>撞课提醒 <span class="muted xs" style="font-weight:400">两本账之间的撞课，潘老师、金老师那边看不到，需要你来调</span></h3>
+  return ownerTeacherWarn() + `<section class="card" style="border-left:4px solid var(--seal)"><h3>撞课提醒 <span class="muted xs" style="font-weight:400">两本账之间的撞课，潘老师、金老师那边看不到，需要你来调</span></h3>
     <div class="list">${xs.map(([a, b]) => { const c = DB_ALL.courses.find(x => x.id === a.course_id);
       return `<div class="li"><span class="tag seal">撞课</span><div class="grow"><b>${esc((DB_ALL.teachers.find(t => t.id === c.teacher_id) || {}).name || '')}</b> · ${fmtMD(a.date)}<br><span class="small">${nm(a)} ／ ${nm(b)}</span></div>
         <button class="btn sm" data-act="lesson" data-v="${isMine(DB_ALL.students.find(s => s.id === c.student_id)) ? a.id : b.id}">调我的这节</button></div>`; }).join('')}</div></section>`;
@@ -67,13 +67,27 @@ function ownerClashBlock(){
 
 // 学生 / 老师表单里的「归属」（只有总管理看得到）
 const ownerStudentField = s => isOwner() ? `<label class="field"><span>归属（只有你看得到这一项）</span><select id="sf-book"><option value="K" ${s.private?'':'selected'}>Project K（潘老师、金老师能看到）</option><option value="mine" ${s.private || (!s.id && S.book==='mine') ? 'selected' : ''}>我的（只有我能看到）</option></select></label>` : '';
-const ownerTeacherField = t => isOwner() ? `<label class="field"><span>归属（只有你看得到这一项）</span><select id="tf-book"><option value="K" ${t.private?'':'selected'}>大家都能看到</option><option value="mine" ${t.private || (!t.id && S.book==='mine') ? 'selected' : ''}>只教我的学生（潘老师、金老师看不到）</option></select></label>` : '';
+const T_BOOK = [['K','Project K（只教 Project K 的学生）'],['mine','我的（只教我的学生，潘老师、金老师看不到）'],['both','两边都教']];
+const ownerTeacherField = t => { if (!isOwner()) return ''; const cur = t.id ? (t.book || 'K') : (S.book === 'mine' ? 'mine' : 'K');
+  return `<label class="field"><span>归属（只有你看得到这一项）</span><select id="tf-book">${T_BOOK.map(([k, l]) => `<option value="${k}" ${k===cur?'selected':''}>${l}</option>`).join('')}</select></label>`; };
+const tBookTag = t => !isOwner() ? '' : t.book === 'mine' ? '<span class="tag gold">我的</span>' : t.book === 'both' ? '<span class="tag blue">两边都教</span>' : '';
 async function ownerAfterSave(kind, id, before){
   if (!isOwner()) return;
-  const want = val(kind === 'student' ? 'sf-book' : 'tf-book') === 'mine';
-  if (!!before === want) return;
-  await rpc('owner_set_private', {kind, xid: id, on_: want});
+  if (kind === 'teacher') {
+    const bk = val('tf-book'); if ((before || 'K') === bk) return;
+    await rpc('owner_set_teacher_book', {tid: id, bk});
+  } else {
+    const want = val('sf-book') === 'mine'; if (!!before === want) return;
+    await rpc('owner_set_private', {kind, xid: id, on_: want});
+  }
   await load(); render();
+}
+// 归属「我的」的老师却排了 Project K 学生的课 → 潘、金那边会看到这位老师，提醒一下
+function ownerTeacherWarn(){
+  if (!isOwner() || !DB_ALL) return '';
+  const priv = new Set(DB_ALL.students.filter(s => s.private).map(s => s.id));
+  const xs = DB_ALL.teachers.filter(t => t.book === 'mine' && DB_ALL.courses.some(c => c.teacher_id === t.id && !priv.has(c.student_id)));
+  return xs.length ? `<div class="note warn">${xs.map(t => `<b>${esc(t.name)}</b>`).join('、')} 归属是「我的」，但也在教 Project K 的学生，所以潘老师、金老师那边能看到这位老师（看不到你的学生）。如果是两边都教，建议把归属改成「两边都教」。</div>` : '';
 }
 
 document.addEventListener('click', e => {
