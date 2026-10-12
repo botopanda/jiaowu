@@ -99,8 +99,8 @@ document.addEventListener('click', e => {
 /* ───────── 老师链接：普通（只看 Project K）／完整（含我的学生，只有总管理看得到） ───────── */
 const ownerLinkTag = p => isOwner() && p.role === 'teacher'
   ? (p.full_view ? ' <span class="tag gold">完整：含我的学生</span>' : ' <span class="tag mute">普通：只看 Project K</span>') : '';
-const ownerLinkToggle = p => isOwner() && p.role === 'teacher' && p.id !== ME().id
-  ? `<button class="btn sm" data-act="link-full" data-v="${p.id}|${p.full_view ? 0 : 1}">${p.full_view ? '改成普通' : '改成完整'}</button>` : '';
+// 不提供「把同一条链接改成完整」：那样潘、金那边这位老师就一条链接都没有了。两边都教的老师一律「另外生成一条完整链接」
+const ownerLinkToggle = p => '';
 function ownerFullLinkBtn(t){
   if (!isOwner() || t.book === 'K') return '';
   const f = (DB_ALL.people || []).find(x => x.role === 'teacher' && x.teacher_id === t.id && x.active && x.full_view);
