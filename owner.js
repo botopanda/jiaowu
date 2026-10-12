@@ -104,8 +104,11 @@ const ownerLinkToggle = p => '';
 function ownerFullLinkBtn(t){
   if (!isOwner() || t.book === 'K') return '';
   const f = (DB_ALL.people || []).find(x => x.role === 'teacher' && x.teacher_id === t.id && x.active && x.full_view);
-  return f ? `<button class="btn sm" data-act="copy-link" data-v="${f.key}">复制完整链接</button>`
-           : `<button class="btn sm" data-act="link-full-new" data-v="${t.id}">生成完整链接</button>`;
+  // 两边都教的老师应该有一条普通链接给潘、金看；如果没有（比如以前整条改成了完整），提示补一条
+  const n = t.book === 'both' && !(DB_ALL.people || []).some(x => x.role === 'teacher' && x.teacher_id === t.id && x.active && !x.full_view);
+  return (n ? `<button class="btn sm danger" data-act="link-normal-new" data-v="${t.id}">缺普通链接，补一条</button>` : '')
+    + (f ? `<button class="btn sm" data-act="copy-link" data-v="${f.key}">复制完整链接</button>`
+         : `<button class="btn sm" data-act="link-full-new" data-v="${t.id}">生成完整链接</button>`);
 }
 document.addEventListener('click', async e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
@@ -114,6 +117,10 @@ document.addEventListener('click', async e => {
       const [pid, on] = a.dataset.v.split('|');
       if (on === '0' && !confirm('改成普通链接后，这位老师用这条链接就看不到你的学生了，潘老师、金老师也能看到这条链接。确定吗？')) return;
       await act('admin_link_update', {pid, d: {full: on === '1'}}, on === '1' ? '已改成完整链接，潘老师、金老师看不到它了' : '已改成普通链接');
+    }
+    if (a.dataset.act === 'link-normal-new') {
+      const t = tea(a.dataset.v);
+      await act('admin_link_create', {d: {name: t.name, role: 'teacher', teacher_id: t.id, full: false}}, `已给 ${t.name} 补了一条普通链接，潘老师、金老师那边能看到了`);
     }
     if (a.dataset.act === 'link-full-new') {
       const t = tea(a.dataset.v);
