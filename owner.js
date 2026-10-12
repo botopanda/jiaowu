@@ -1,15 +1,16 @@
 /* ══════════════════════════════════════════════════════════════
-   总管理：两本账（Project K / 我的）
-   · 只有总管理的链接会用到这里的东西；潘、金、普通教务的数据库根本不会给「我的」学生
-   · 右上角切换「全部 / Project K / 我的」，切换只是筛选显示，本机记住
+   总管理：两本账（Project K / Panda）
+   · 只有总管理的链接会用到这里的东西；潘、金、普通教务的数据库根本不会给「Panda」学生
+   · 右上角切换「全部 / Project K / Panda」，切换只是筛选显示，本机记住
    ══════════════════════════════════════════════════════════════ */
 let DB_ALL = null;
 try { S.book = localStorage.getItem('jw_book') || 'all'; } catch(e) { S.book = 'all'; }
 const isOwner = () => !!(DB_ALL ? DB_ALL.me : DB.me)?.owner;
 const curBook = () => isOwner() && S.book === 'mine' ? 'mine' : 'K';     // 工资结算记在哪本账
 const isMine = s => !!(s && s.private);
+const ownerUI = () => isOwner() && S.book !== 'K';   // Project K 视图要和潘、金看到的一模一样，总管理的小标签、按钮都藏起来
 
-// 按当前选的账本筛选数据（全部 / Project K / 我的）
+// 按当前选的账本筛选数据（全部 / Project K / Panda）
 function bookView(all){
   if (!all.me.owner || S.book === 'all') return all;
   const want = S.book === 'mine';
@@ -17,9 +18,12 @@ function bookView(all){
   const courses = all.courses.filter(c => sids.has(c.student_id)), cids = new Set(courses.map(c => c.id));
   const lessons = all.lessons.filter(l => cids.has(l.course_id)), lids = new Set(lessons.map(l => l.id));
   const usedT = new Set(courses.map(c => c.teacher_id));
+  // 老师归属：K / mine(Panda) / both。Project K 看不到只教 Panda 的老师；Panda 看不到只教 Project K 的老师
+  const teachers = all.teachers.filter(t => usedT.has(t.id) || (want ? t.book !== 'K' : t.book !== 'mine'));
+  const tids = new Set(teachers.map(t => t.id));
   return {...all,
     students: all.students.filter(s => sids.has(s.id)), courses, lessons,
-    teachers: all.teachers.filter(t => usedT.has(t.id) || (want ? t.book !== 'K' : t.book !== 'mine')),   // 老师归属：K / mine / both
+    teachers,
     feedbacks: all.feedbacks.filter(f => lids.has(f.lesson_id)),
     requests: all.requests.filter(q => lids.has(q.lesson_id)),
     plans: all.plans.filter(m => cids.has(m.course_id)),
@@ -31,17 +35,21 @@ function bookView(all){
     files: (all.files||[]).filter(x => sids.has(x.student_id)),
     changes: (all.changes||[]).filter(x => cids.has(x.course_id)),
     pay: (all.pay||[]).filter(x => (x.book || 'K') === (want ? 'mine' : 'K')),
-    people: (all.people||[]).filter(x => !x.student_id || sids.has(x.student_id)),
+    people: (all.people||[]).filter(x => want
+      // Panda：自己、Panda 学生和家长、Panda 老师的完整链接
+      ? (x.owner || (x.student_id && sids.has(x.student_id)) || (x.teacher_id && x.full_view && tids.has(x.teacher_id)))
+      // Project K：和潘、金看到的一样——没有总管理、没有完整链接、没有 Panda 学生和 Panda 老师
+      : (!x.owner && !x.full_view && (!x.student_id || sids.has(x.student_id)) && (!x.teacher_id || tids.has(x.teacher_id)))),
   };
 }
 function bookSwitch(){
-  return `<div class="seg book-seg" role="group" aria-label="账本">${[['all','全部'],['K','Project K'],['mine','我的']].map(([k, t]) =>
+  return `<div class="seg book-seg" role="group" aria-label="账本">${[['all','全部'],['K','Project K'],['mine','Panda']].map(([k, t]) =>
     `<button class="${S.book===k?'on':''}" data-act="book" data-v="${k}">${t}</button>`).join('')}</div>`;
 }
 
-// 撞课提醒：同一位老师、同一时间，Project K 和「我的」两边都排了课（潘、金那边不会被挡，所以要总管理来调）
+// 撞课提醒：同一位老师、同一时间，Project K 和「Panda」两边都排了课（潘、金那边不会被挡，所以要总管理来调）
 function ownerClashes(){
-  if (!isOwner() || !DB_ALL) return [];
+  if (!ownerUI() || !DB_ALL) return [];
   const priv = new Set(DB_ALL.students.filter(s => s.private).map(s => s.id));
   const cs = new Map(DB_ALL.courses.map(c => [c.id, c]));
   const ls = DB_ALL.lessons.filter(l => l.status === 'scheduled' && l.date >= TODAY);
@@ -58,19 +66,19 @@ function ownerClashes(){
 function ownerClashBlock(){
   const xs = ownerClashes(); if (!xs.length) return ownerTeacherWarn();
   const nm = l => { const c = DB_ALL.courses.find(x => x.id === l.course_id), s = DB_ALL.students.find(x => x.id === c.student_id);
-    return `${esc(s.name)}${s.private ? ' <span class="tag gold">我的</span>' : ''} ${l.start}–${l.end}`; };
+    return `${esc(s.name)}${s.private ? ' <span class="tag gold">Panda</span>' : ''} ${l.start}–${l.end}`; };
   return ownerTeacherWarn() + `<section class="card" style="border-left:4px solid var(--seal)"><h3>撞课提醒 <span class="muted xs" style="font-weight:400">两本账之间的撞课，潘老师、金老师那边看不到，需要你来调</span></h3>
     <div class="list">${xs.map(([a, b]) => { const c = DB_ALL.courses.find(x => x.id === a.course_id);
       return `<div class="li"><span class="tag seal">撞课</span><div class="grow"><b>${esc((DB_ALL.teachers.find(t => t.id === c.teacher_id) || {}).name || '')}</b> · ${fmtMD(a.date)}<br><span class="small">${nm(a)} ／ ${nm(b)}</span></div>
-        <button class="btn sm" data-act="lesson" data-v="${isMine(DB_ALL.students.find(s => s.id === c.student_id)) ? a.id : b.id}">调我的这节</button></div>`; }).join('')}</div></section>`;
+        <button class="btn sm" data-act="lesson" data-v="${isMine(DB_ALL.students.find(s => s.id === c.student_id)) ? a.id : b.id}">调 Panda 这节</button></div>`; }).join('')}</div></section>`;
 }
 
 // 学生 / 老师表单里的「归属」（只有总管理看得到）
-const ownerStudentField = s => isOwner() ? `<label class="field"><span>归属（只有你看得到这一项）</span><select id="sf-book"><option value="K" ${s.private?'':'selected'}>Project K（潘老师、金老师能看到）</option><option value="mine" ${s.private || (!s.id && S.book==='mine') ? 'selected' : ''}>我的（只有我能看到）</option></select></label>` : '';
-const T_BOOK = [['K','Project K（只教 Project K 的学生）'],['mine','我的（只教我的学生，潘老师、金老师看不到）'],['both','两边都教']];
+const ownerStudentField = s => isOwner() ? `<label class="field"><span>归属（只有你看得到这一项）</span><select id="sf-book"><option value="K" ${s.private?'':'selected'}>Project K（潘老师、金老师能看到）</option><option value="mine" ${s.private || (!s.id && S.book==='mine') ? 'selected' : ''}>Panda（只有我能看到）</option></select></label>` : '';
+const T_BOOK = [['K','Project K（只教 Project K 的学生）'],['mine','Panda（只教 Panda 的学生，潘老师、金老师看不到）'],['both','两边都教']];
 const ownerTeacherField = t => { if (!isOwner()) return ''; const cur = t.id ? (t.book || 'K') : (S.book === 'mine' ? 'mine' : 'K');
   return `<label class="field"><span>归属（只有你看得到这一项）</span><select id="tf-book">${T_BOOK.map(([k, l]) => `<option value="${k}" ${k===cur?'selected':''}>${l}</option>`).join('')}</select></label>`; };
-const tBookTag = t => !isOwner() ? '' : t.book === 'mine' ? '<span class="tag gold">我的</span>' : t.book === 'both' ? '<span class="tag blue">两边都教</span>' : '';
+const tBookTag = t => !ownerUI() ? '' : t.book === 'mine' ? '<span class="tag gold">Panda</span>' : t.book === 'both' ? '<span class="tag blue">两边都教</span>' : '';
 async function ownerAfterSave(kind, id, before){
   if (!isOwner()) return;
   if (kind === 'teacher') {
@@ -82,12 +90,12 @@ async function ownerAfterSave(kind, id, before){
   }
   await load(); render();
 }
-// 归属「我的」的老师却排了 Project K 学生的课 → 潘、金那边会看到这位老师，提醒一下
+// 归属「Panda」的老师却排了 Project K 学生的课 → 潘、金那边会看到这位老师，提醒一下
 function ownerTeacherWarn(){
-  if (!isOwner() || !DB_ALL) return '';
+  if (!ownerUI() || !DB_ALL) return '';
   const priv = new Set(DB_ALL.students.filter(s => s.private).map(s => s.id));
   const xs = DB_ALL.teachers.filter(t => t.book === 'mine' && DB_ALL.courses.some(c => c.teacher_id === t.id && !priv.has(c.student_id)));
-  return xs.length ? `<div class="note warn">${xs.map(t => `<b>${esc(t.name)}</b>`).join('、')} 归属是「我的」，但也在教 Project K 的学生，所以潘老师、金老师那边能看到这位老师（看不到你的学生）。如果是两边都教，建议把归属改成「两边都教」。</div>` : '';
+  return xs.length ? `<div class="note warn">${xs.map(t => `<b>${esc(t.name)}</b>`).join('、')} 归属是「Panda」，但也在教 Project K 的学生，所以潘老师、金老师那边能看到这位老师（看不到你的学生）。如果是两边都教，建议把归属改成「两边都教」。</div>` : '';
 }
 
 document.addEventListener('click', e => {
@@ -96,13 +104,13 @@ document.addEventListener('click', e => {
   DB = bookView(DB_ALL); render();
 });
 
-/* ───────── 老师链接：普通（只看 Project K）／完整（含我的学生，只有总管理看得到） ───────── */
-const ownerLinkTag = p => isOwner() && p.role === 'teacher'
-  ? (p.full_view ? ' <span class="tag gold">完整：含我的学生</span>' : ' <span class="tag mute">普通：只看 Project K</span>') : '';
+/* ───────── 老师链接：普通（只看 Project K）／完整（含 Panda 学生，只有总管理看得到） ───────── */
+const ownerLinkTag = p => ownerUI() && p.role === 'teacher'
+  ? (p.full_view ? ' <span class="tag gold">完整：含 Panda 学生</span>' : ' <span class="tag mute">普通：只看 Project K</span>') : '';
 // 不提供「把同一条链接改成完整」：那样潘、金那边这位老师就一条链接都没有了。两边都教的老师一律「另外生成一条完整链接」
 const ownerLinkToggle = p => '';
 function ownerFullLinkBtn(t){
-  if (!isOwner() || t.book === 'K') return '';
+  if (!ownerUI() || t.book === 'K') return '';
   const f = (DB_ALL.people || []).find(x => x.role === 'teacher' && x.teacher_id === t.id && x.active && x.full_view);
   // 两边都教的老师应该有一条普通链接给潘、金看；如果没有（比如以前整条改成了完整），提示补一条
   const n = t.book === 'both' && !(DB_ALL.people || []).some(x => x.role === 'teacher' && x.teacher_id === t.id && x.active && !x.full_view);

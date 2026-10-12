@@ -70,7 +70,7 @@ function payBadge(tid, ym){
   return p.settled_at ? '<span class="tag ok">已结算</span>' : p.reviewed_at ? '<span class="tag blue">已审核</span>' : '<span class="tag mute">未审核</span>';
 }
 function payButtons(tid, ym){
-  if (isOwner() && S.book === 'all') return '<span class="muted xs">右上角切到「Project K」或「我的」再审核、结算</span>';
+  if (isOwner() && S.book === 'all') return '<span class="muted xs">右上角切到「Project K」或「Panda」再审核、结算</span>';
   const p = payOf(tid, ym);
   if (p.settled_at) return `<span class="muted xs">${esc(p.settled_by || '')} ${p.settled_at.slice(5,10).replace('-','/')} 结算</span><button class="btn sm" data-act="pay" data-v="${tid}|${ym}|settled|0">撤销结算</button>`;
   if (p.reviewed_at) return `<span class="muted xs">${esc(p.reviewed_by || '')} 已审核</span><button class="btn gold sm" data-act="pay" data-v="${tid}|${ym}|settled|1">结算完成</button><button class="btn sm" data-act="pay" data-v="${tid}|${ym}|reviewed|0">撤销审核</button>`;

@@ -132,7 +132,7 @@ async function load(){
   if (!S.month) S.month = TODAY.slice(0,7);
   if (!S.payMonth) S.payMonth = ymShift(TODAY.slice(0,7), -1);
   if (!S.teaMonth) S.teaMonth = TODAY.slice(0,7);
-  DB_ALL = DB; DB = bookView(DB_ALL);   // 总管理：按「全部 / Project K / 我的」筛选；其他人原样
+  DB_ALL = DB; DB = bookView(DB_ALL);   // 总管理：按「全部 / Project K / Panda」筛选；其他人原样
 }
 // 点菜单、切回这个网页时：先马上显示，再在后台取最新数据（别人刚写的反馈、刚排的课）再画一遍
 // 正在打字或开着弹窗时不重画，免得把填了一半的内容冲掉
@@ -338,7 +338,7 @@ function pgStudents(){
   ${list.length ? `<div class="tw"><table class="rt stu-tbl"><thead><tr><th>编号</th><th>姓名</th><th>方向</th><th>任课老师</th><th>负责教务</th><th>${+ym.slice(5)} 月出勤</th><th>作业</th><th>${+ym.slice(5)} 月计划</th></tr></thead><tbody>
   ${list.map(s => { const cs = DB.courses.filter(c=>c.student_id===s.id), st = monthStats(s.id, ym), un = latestHw(s.id).filter(f=>!f.hw_sub).length;
     const pn = cs.filter(c => planText(c.id, ym)).length;
-    return `<tr class="click" data-act="student" data-v="${s.id}"><td class="num">${esc(s.code||'')}</td><td><b>${esc(s.name)}</b>${isMine(s)?' <span class="tag gold">我的</span>':''}${s.active?'':' <span class="tag mute">停课</span>'}<br><span class="xs muted">${esc(s.loc||'')}</span></td><td>${esc(s.direction||s.track||'')}${s.target_ym?`<br><span class="xs muted">目标 ${esc(s.target_ym)}</span>`:''}</td>
+    return `<tr class="click" data-act="student" data-v="${s.id}"><td class="num">${esc(s.code||'')}</td><td><b>${esc(s.name)}</b>${isMine(s) && ownerUI()?' <span class="tag gold">Panda</span>':''}${s.active?'':' <span class="tag mute">停课</span>'}<br><span class="xs muted">${esc(s.loc||'')}</span></td><td>${esc(s.direction||s.track||'')}${s.target_ym?`<br><span class="xs muted">目标 ${esc(s.target_ym)}</span>`:''}</td>
     <td>${teacherChips(cs) || '<span class="tag warn">还没有课程</span>'}</td><td>${esc(s.staff)}</td>
     <td class="num">${st.actual}/${st.req}${st.leave?` <span class="tag seal">请假 ${st.leave}</span>`:''}</td><td>${un?`<span class="tag warn">${un} 份未交</span>`:'<span class="tag ok">已交齐</span>'}</td>
     <td>${cs.length ? `<span class="tag ${pn===cs.length?'ok':'warn'}">${pn}/${cs.length}</span>` : ''}</td></tr>`}).join('')}
@@ -358,7 +358,7 @@ function pgTeachers(){
     <dt>带的学生</dt><dd>${names.map(esc).join('、')||'—'}</dd>
     <dt>本月已上</dt><dd><b class="num">${hDone}</b> 小时 <span class="muted xs">（${done.length} 节）</span>${pn?` <span class="tag warn">${pn} 节待确认</span>`:''}</dd>
     <dt>本月应上</dt><dd><b class="num">${hPlan}</b> 小时 <span class="muted xs">（${plan.length} 节）</span></dd></dl>
-    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="teacher-form" data-v="${t.id}">编辑</button>${p?`<button class="btn sm" data-act="copy-link" data-v="${p.key}">${isOwner() && t.book !== 'K' ? '复制普通链接' : '复制老师链接'}</button>`:''}${ownerFullLinkBtn(t)}</div></section>`}).join('')}</div>` : '<div class="card empty">还没有老师。点右上角「新增老师」开始。</div>'}`;
+    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="teacher-form" data-v="${t.id}">编辑</button>${p?`<button class="btn sm" data-act="copy-link" data-v="${p.key}">${ownerUI() && t.book !== 'K' ? '复制普通链接' : '复制老师链接'}</button>`:''}${ownerFullLinkBtn(t)}</div></section>`}).join('')}</div>` : '<div class="card empty">还没有老师。点右上角「新增老师」开始。</div>'}`;
 }
 
 function pgPayroll(){
@@ -722,7 +722,7 @@ function linkModal(){
   <label class="field" id="ln-target-f" hidden><span>对应的人</span><select id="ln-target"></select></label></div>
   <div class="note warn" id="ln-empty" hidden></div>
   <div id="ln-scope-f" class="field"><span>负责哪些学生（点选）</span><div class="chips">${DB.students.map(s=>`<button class="chip" data-act="ln-chip" data-v="${s.id}">${esc(s.name)}</button>`).join('')||'<span class="muted small">还没有学生</span>'}</div></div>
-  ${isOwner() ? '<label class="row small" id="ln-full-f"><input type="checkbox" id="ln-full"> 老师的完整链接（能看到我的学生；潘老师、金老师看不到这条链接）</label>' : ''}
+  ${isOwner() ? '<label class="row small" id="ln-full-f"><input type="checkbox" id="ln-full"> 老师的完整链接（能看到 Panda 学生；潘老师、金老师看不到这条链接）</label>' : ''}
   <div class="row"><button class="btn pri" data-act="link-create">生成链接</button></div>`);
 }
 function scopeModal(pid){
