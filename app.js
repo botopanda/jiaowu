@@ -261,13 +261,10 @@ function pgCalendar(){
   if (S.calType==='t' && S.calId) ls = ls.filter(l => course(l.course_id).teacher_id===S.calId);
   const chip = l => { const c = course(l.course_id);
     const who = S.calType==='s' ? tea(c.teacher_id).name : S.calType==='t' ? stu(c.student_id).name : `${stu(c.student_id).name}·${tea(c.teacher_id).name.replace('老师','')}`;
-    return `<button class="lc ${l.status!=='scheduled'?'leave':''} ${isPend(l)?'pend':''} ${l.moved?'moved':''}" style="--hc:${slotHue(l.start)}" data-act="lesson" data-v="${l.id}"><span class="t">${l.start}</span>${l.makeup?'<b class="mk">补</b>':''}${fbMark(l)} ${esc(who)} <span class="lc-s">${esc(c.subject)}${l.kind?'·'+esc(l.kind):''}${l.status==='leave'?' 请假':l.status==='cancelled'?' 取消':''}</span></button>`; };
+    return `<button class="lc ${l.status!=='scheduled'?'leave':''} ${isPend(l)?'pend':''} ${l.moved?'moved':''}" style="--hc:${slotHue(l.start)}" data-act="lesson" data-v="${l.id}"><span class="t">${l.start}</span>${l.makeup?'<b class="mk">补</b>':''}${fbMark(l)} ${esc(who)}<br>${esc(c.subject)}${l.kind?'·'+esc(l.kind):''}${l.status==='leave'?' 请假':l.status==='cancelled'?' 取消':''}</button>`; };
   let cells = ['一','二','三','四','五','六','日'].map((d,i) => `<div class="hd ${i>=5?'we':''}">${d}</div>`).join('');
   for (let i=0;i<lead;i++) cells += `<div class="day off"></div>`;
-  // 一屏放下整个月：格子高度＝屏幕剩下的高度 ÷ 行数；一格放不下的课收进「+N 更多」
-  const rows = Math.ceil((lead + last) / 7), cellH = Math.max(84, Math.floor((window.innerHeight - 255) / rows)), maxN = Math.max(1, Math.floor((cellH - 24) / 19));
-  for (let d=1; d<=last; d++){ const dd=`${S.month}-${pad(d)}`, dl = ls.filter(l=>l.date===dd), shown = dl.length > maxN ? dl.slice(0, maxN - 1) : dl;
-    cells += `<div class="day ${dd===TODAY?'today':''}"><span class="dn">${d}</span>${shown.map(chip).join('')}${dl.length > shown.length ? `<button class="lc-more" data-act="day-more" data-v="${dd}">+${dl.length - shown.length} 更多</button>` : ''}</div>`; }
+  for (let d=1; d<=last; d++){ const dd=`${S.month}-${pad(d)}`; cells += `<div class="day ${dd===TODAY?'today':''}"><span class="dn">${d}</span>${ls.filter(l=>l.date===dd).map(chip).join('')}</div>`; }
   for (let i=0;i<(7-(lead+last)%7)%7;i++) cells += `<div class="day off"></div>`;
   const byD = {}; ls.forEach(l => (byD[l.date] ??= []).push(l));
   const agenda = Object.keys(byD).sort().map(d => `<div class="dg ${d===TODAY?'today':''}">${fmtMD(d)}</div>` + byD[d].map(chip).join('')).join('') || '<div class="empty">这个月没有课</div>';
@@ -282,18 +279,8 @@ function pgCalendar(){
     ${who.length ? `<select id="cal-who" data-change="calwho"><option value="">选择${S.calType==='s'?'学生':'老师'}…</option>${who.map(x=>`<option value="${x.id}" ${S.calId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`:''}
   </div>
   <div class="row"><h3 style="font-size:16px">${esc(title)}</h3><span class="muted xs">共 ${ls.length} 节 · ${hours} 小时 · 日本时间 · 划线＝请假 · 「调」＝调过课 · ${slotLegend()}</span></div>
-  <div class="cal" style="--ch:${cellH}px">${cells}</div><div class="agenda">${agenda}</div>`;
+  <div class="cal">${cells}</div><div class="agenda">${agenda}</div>`;
 }
-// 点「+N 更多」：弹出这一天的全部课
-function dayModal(dd){
-  let ls = DB.lessons.filter(l => l.date===dd);
-  if (S.calType==='s' && S.calId) ls = ls.filter(l => course(l.course_id).student_id===S.calId);
-  if (S.calType==='t' && S.calId) ls = ls.filter(l => course(l.course_id).teacher_id===S.calId);
-  openModal(`${mHead(`${fmtMD(dd)} · ${ls.length} 节课`)}<div class="list">${ls.map(l => { const c = course(l.course_id);
-    return `<button class="li day-li" data-act="lesson" data-v="${l.id}" style="--hc:${slotHue(l.start)}"><span class="num">${l.start}–${l.end}</span><span class="grow"><b>${esc(stu(c.student_id).name)}</b> · ${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}${l.kind?` <span class="tag mute">${esc(l.kind)}</span>`:''}${l.makeup?' <span class="tag blue">补</span>':''}</span>${l.status==='leave'?'<span class="tag seal">请假</span>':l.status==='cancelled'?'<span class="tag mute">取消</span>':''}</button>`; }).join('')}</div>`);
-}
-// 窗口大小变了，课表重新按屏幕高度排
-let calRz; window.addEventListener('resize', () => { clearTimeout(calRz); calRz = setTimeout(() => { if (DB && isAdmin() && S.page==='calendar' && !document.querySelector('.modal')) render(); }, 200); });
 
 function pgRequests(){
   const pend = DB.requests.filter(q=>q.status==='pending'), done = DB.requests.filter(q=>q.status!=='pending').slice().reverse().slice(0,20);
@@ -821,7 +808,6 @@ document.addEventListener('click', async e => {
     case 'caltype': S.calType=v; S.calId=''; render(); break;
     case 'lesson': lessonModal(v); break;
     case 'add-lesson': addLessonModal(); break;
-    case 'day-more': dayModal(v); break;
     case 'al-mk': { const on = val('al-mk')!=='1'; document.getElementById('al-mk').value = on ? '1' : '0'; a.classList.toggle('on', on); a.setAttribute('aria-pressed', on); break; }
     case 'close': case 'close-bg': closeModal(); break;
     case 'fbtab': S.fbTab=v; S.sel.clear(); S.editing=null; render(); break;
