@@ -379,3 +379,7 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 .slot-lg{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .slot-lg i{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--hc);margin-left:6px}
 .slot-lg i:first-child{margin-left:0}
+
+/* 排课窗口的「补」按钮：按下变蓝＝补课 */
+.mk-btn{flex:none;width:40px;height:36px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--muted);font-weight:700;font-size:15px;cursor:pointer}
+.mk-btn.on{background:var(--blue);border-color:var(--blue);color:#fff}

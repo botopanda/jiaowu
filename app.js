@@ -635,13 +635,13 @@ function addLessonModal(){
   <div class="fields">
     <label class="field"><span>科目</span><select id="al-subj" data-change="al-pick"><option value="">选择科目…</option>${[...SUBJECTS, ...extra].map(x => `<option>${esc(x)}</option>`).join('')}<option value="__other">其他（自己填）</option></select>
       <input type="text" id="al-subj-x" placeholder="写科目名称，例：电影" data-change="al-pick" hidden style="margin-top:4px"></label>
-    <label class="field"><span>课程</span><select id="al-kind"><option value="">选择课程…</option>${KINDS.map(x => `<option>${x}</option>`).join('')}</select></label>
+    <div class="field"><span>课程</span><div class="row" style="flex-wrap:nowrap"><select id="al-kind" style="flex:1"><option value="">选择课程…</option>${KINDS.map(x => `<option>${x}</option>`).join('')}</select>
+      <button type="button" class="mk-btn" data-act="al-mk" aria-pressed="false" title="补课：按一下变蓝，再按一下取消">补</button><input type="hidden" id="al-mk" value="0"></div></div>
   </div>
   <div id="al-note"></div>
   <div class="fields"><label class="field"><span>第一节日期</span><input type="date" id="al-d" value="${TODAY}"></label><label class="field"><span>开始（${tzName(myTz())}）</span><input type="time" id="al-s" value="${myTz()==='CN'?'18:00':'19:00'}"></label><label class="field"><span>结束</span><input type="time" id="al-e" value="${myTz()==='CN'?'20:00':'21:00'}"></label></div>
   ${myTz()==='CN'?'<div class="note">请按<b>北京时间</b>填写，系统会自动换算成日本时间（＋1 小时）给学生和教务看。</div>':''}
-  <div class="fields"><label class="field"><span>类型</span><select id="al-mk"><option value="0">普通课</option><option value="1">补课</option></select></label>
-  <label class="field"><span>重复</span><select id="al-rep"><option value="month">每周同一时间，到这个月底</option><option value="1">只排这一节</option><option value="4">每周同一时间，共 4 周</option><option value="8">每周同一时间，共 8 周</option></select></label></div>
+  <div class="fields"><label class="field"><span>重复</span><select id="al-rep"><option value="month">每周同一时间，到这个月底</option><option value="1">只排这一节</option><option value="4">每周同一时间，共 4 周</option><option value="8">每周同一时间，共 8 周</option></select></label></div>
   <div class="muted xs">和这位老师已有的课时间重叠的，会自动跳过。</div>
   <div class="row"><button class="btn pri" data-act="save-lesson">${isT ? '提交排课申请' : '排课'}</button></div>`);
   alPick();
@@ -808,6 +808,7 @@ document.addEventListener('click', async e => {
     case 'caltype': S.calType=v; S.calId=''; render(); break;
     case 'lesson': lessonModal(v); break;
     case 'add-lesson': addLessonModal(); break;
+    case 'al-mk': { const on = val('al-mk')!=='1'; document.getElementById('al-mk').value = on ? '1' : '0'; a.classList.toggle('on', on); a.setAttribute('aria-pressed', on); break; }
     case 'close': case 'close-bg': closeModal(); break;
     case 'fbtab': S.fbTab=v; S.sel.clear(); S.editing=null; render(); break;
     case 'sel': S.sel.has(v)?S.sel.delete(v):S.sel.add(v); render(); break;
