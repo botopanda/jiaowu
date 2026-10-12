@@ -95,3 +95,30 @@ document.addEventListener('click', e => {
   S.book = a.dataset.v; try { localStorage.setItem('jw_book', S.book); } catch(err) {}
   DB = bookView(DB_ALL); render();
 });
+
+/* ───────── 老师链接：普通（只看 Project K）／完整（含我的学生，只有总管理看得到） ───────── */
+const ownerLinkTag = p => isOwner() && p.role === 'teacher'
+  ? (p.full_view ? ' <span class="tag gold">完整：含我的学生</span>' : ' <span class="tag mute">普通：只看 Project K</span>') : '';
+const ownerLinkToggle = p => isOwner() && p.role === 'teacher' && p.id !== ME().id
+  ? `<button class="btn sm" data-act="link-full" data-v="${p.id}|${p.full_view ? 0 : 1}">${p.full_view ? '改成普通' : '改成完整'}</button>` : '';
+function ownerFullLinkBtn(t){
+  if (!isOwner() || t.book === 'K') return '';
+  const f = (DB_ALL.people || []).find(x => x.role === 'teacher' && x.teacher_id === t.id && x.active && x.full_view);
+  return f ? `<button class="btn sm" data-act="copy-link" data-v="${f.key}">复制完整链接</button>`
+           : `<button class="btn sm" data-act="link-full-new" data-v="${t.id}">生成完整链接</button>`;
+}
+document.addEventListener('click', async e => {
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  try {
+    if (a.dataset.act === 'link-full') {
+      const [pid, on] = a.dataset.v.split('|');
+      if (on === '0' && !confirm('改成普通链接后，这位老师用这条链接就看不到你的学生了，潘老师、金老师也能看到这条链接。确定吗？')) return;
+      await act('admin_link_update', {pid, d: {full: on === '1'}}, on === '1' ? '已改成完整链接，潘老师、金老师看不到它了' : '已改成普通链接');
+    }
+    if (a.dataset.act === 'link-full-new') {
+      const t = tea(a.dataset.v);
+      const nk = await act('admin_link_create', {d: {name: t.name, role: 'teacher', teacher_id: t.id, full: true}});
+      copyText(linkOf(nk), `已生成 ${t.name} 的完整链接并复制。发给老师时告诉他「以这条为准」`);
+    }
+  } catch(err) { /* act() 已经提示过 */ }
+});
