@@ -383,3 +383,11 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 /* 排课窗口的「补」按钮：按下变蓝＝补课 */
 .mk-btn{flex:none;width:40px;height:36px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--muted);font-weight:700;font-size:15px;cursor:pointer}
 .mk-btn.on{background:var(--blue);border-color:var(--blue);color:#fff}
+
+/* 教务大课表：一屏放下整个月（格子高度由页面按屏幕算好传进来） */
+.cal .day{height:var(--ch,96px);min-height:0;overflow:hidden}
+.cal .lc{flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:17px;padding:0 4px}
+.cal .lc .lc-s{color:var(--muted)}
+.cal .lc-more{flex:none;border:0;background:none;text-align:left;padding:0 4px;font-size:11px;color:var(--gold-text);cursor:pointer;line-height:17px}
+.cal .lc-more:hover{text-decoration:underline}
+.day-li{width:100%;text-align:left;border:0;border-left:4px solid var(--hc);background:var(--surface);cursor:pointer}
