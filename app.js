@@ -349,7 +349,7 @@ function pgTeachers(){
   return `<div class="ph"><h2>老师档案</h2><button class="btn pri" data-act="teacher-form">＋ 新增老师</button></div>
   <div class="hint">履历可以你们填，也可以老师在自己的链接里填。</div>
   ${DB.teachers.length ? `<div class="grid2 cards-fix">${DB.teachers.map(t => { const cs = DB.courses.filter(c=>c.teacher_id===t.id), ym = TODAY.slice(0,7);
-    const ms = lsOfT(t.id).filter(l=>l.date.startsWith(ym)), p = (DB.people||[]).find(x => x.role==='teacher' && x.teacher_id===t.id && x.active && !x.full_view);
+    const ms = lsOfT(t.id).filter(l=>l.date.startsWith(ym)), p = teacherRealLink(t);
     const done = ms.filter(l=>paidH(l)>0), plan = ms.filter(l=>l.status==='scheduled'), pn = ms.filter(isPend).length;
     const hDone = +done.reduce((a,l)=>a+paidH(l),0).toFixed(1), hPlan = +plan.reduce((a,l)=>a+dur(l),0).toFixed(1);
     const names = [...new Set(cs.map(c=>stu(c.student_id).name))];
@@ -358,7 +358,7 @@ function pgTeachers(){
     <dt>带的学生</dt><dd>${names.map(esc).join('、')||'—'}</dd>
     <dt>本月已上</dt><dd><b class="num">${hDone}</b> 小时 <span class="muted xs">（${done.length} 节）</span>${pn?` <span class="tag warn">${pn} 节待确认</span>`:''}</dd>
     <dt>本月应上</dt><dd><b class="num">${hPlan}</b> 小时 <span class="muted xs">（${plan.length} 节）</span></dd></dl>
-    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="teacher-form" data-v="${t.id}">编辑</button>${p?`<button class="btn sm" data-act="copy-link" data-v="${p.key}">${ownerUI() && t.book !== 'K' ? '复制普通链接' : '复制老师链接'}</button>`:''}${ownerFullLinkBtn(t)}</div></section>`}).join('')}</div>` : '<div class="card empty">还没有老师。点右上角「新增老师」开始。</div>'}`;
+    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="teacher-form" data-v="${t.id}">编辑</button>${p?`<button class="btn sm" data-act="copy-link" data-v="${p.key}">复制老师链接</button>`:''}${ownerFullLinkBtn(t)}</div></section>`}).join('')}</div>` : '<div class="card empty">还没有老师。点右上角「新增老师」开始。</div>'}`;
 }
 
 function pgPayroll(){
@@ -387,7 +387,7 @@ function pgLinks(){
   const grp = [['教务','admin'],['任课老师','teacher'],['学生','student'],['家长','parent']];
   return `<div class="ph"><h2>链接与权限</h2><button class="btn pri" data-act="link-new">＋ 新建链接</button></div>
   <div class="note">每个人一条专属链接，打开就能用。点「复制链接」发到对方微信。<b>链接被转发、老师离职、学生毕业</b>时，点「重新生成」或「停用」，旧链接马上失效。新增老师、学生时会自动生成链接。</div>
-  ${grp.map(([g,r]) => { const ps = P.filter(p=>p.role===r); return ps.length ? `<section><h3 style="font-size:15px;margin:6px 0">${g}</h3><div class="tw"><table class="rt"><thead><tr><th>姓名</th><th>身份</th><th>能看到</th><th>状态</th><th></th></tr></thead><tbody>
+  ${grp.map(([g,r]) => { const ps = P.filter(p=>p.role===r && !ownerShadow(p)); return ps.length ? `<section><h3 style="font-size:15px;margin:6px 0">${g}</h3><div class="tw"><table class="rt"><thead><tr><th>姓名</th><th>身份</th><th>能看到</th><th>状态</th><th></th></tr></thead><tbody>
     ${ps.map(p => `<tr><td><b>${esc(p.name)}</b>${p.id===ME().id?' <span class="tag gold">我</span>':''}${ownerLinkTag(p)}</td><td><span class="tag ${p.level==='top'?'seal':p.role==='admin'?'gold':'mute'}">${p.role==='admin'?(p.level==='top'?'教务 · 管理':'教务 · 普通'):g}</span></td>
       <td class="small">${esc(scopeTxt(p))}${p.role==='admin'&&p.level!=='top'?` <button class="btn sm" data-act="scope-edit" data-v="${p.id}">改范围</button>`:''}</td>
       <td>${p.active?'<span class="tag ok">启用</span>':'<span class="tag seal">已停用</span>'}</td>
@@ -722,7 +722,6 @@ function linkModal(){
   <label class="field" id="ln-target-f" hidden><span>对应的人</span><select id="ln-target"></select></label></div>
   <div class="note warn" id="ln-empty" hidden></div>
   <div id="ln-scope-f" class="field"><span>负责哪些学生（点选）</span><div class="chips">${DB.students.map(s=>`<button class="chip" data-act="ln-chip" data-v="${s.id}">${esc(s.name)}</button>`).join('')||'<span class="muted small">还没有学生</span>'}</div></div>
-  ${isOwner() ? '<label class="row small" id="ln-full-f"><input type="checkbox" id="ln-full"> 老师的完整链接（能看到 Panda 学生；潘老师、金老师看不到这条链接）</label>' : ''}
   <div class="row"><button class="btn pri" data-act="link-create">生成链接</button></div>`);
 }
 function scopeModal(pid){

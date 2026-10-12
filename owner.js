@@ -104,20 +104,29 @@ document.addEventListener('click', e => {
   DB = bookView(DB_ALL); render();
 });
 
-/* ───────── 老师链接：普通（只看 Project K）／完整（含 Panda 学生，只有总管理看得到） ───────── */
-const ownerLinkTag = p => ownerUI() && p.role === 'teacher'
-  ? (p.full_view ? ' <span class="tag gold">完整：含 Panda 学生</span>' : ' <span class="tag mute">普通：只看 Project K</span>') : '';
-// 不提供「把同一条链接改成完整」：那样潘、金那边这位老师就一条链接都没有了。两边都教的老师一律「另外生成一条完整链接」
-const ownerLinkToggle = p => '';
-function ownerFullLinkBtn(t){
-  if (!ownerUI() || t.book === 'K') return '';
-  const f = (DB_ALL.people || []).find(x => x.role === 'teacher' && x.teacher_id === t.id && x.active && x.full_view);
-  // 两边都教的老师应该有一条普通链接给潘、金看；如果没有（比如以前整条改成了完整），提示补一条
-  const n = t.book === 'both' && !(DB_ALL.people || []).some(x => x.role === 'teacher' && x.teacher_id === t.id && x.active && !x.full_view);
-  return (n ? `<button class="btn sm danger" data-act="link-normal-new" data-v="${t.id}">缺普通链接，补一条</button>` : '')
-    + (f ? `<button class="btn sm" data-act="copy-link" data-v="${f.key}">复制完整链接</button>`
-         : `<button class="btn sm" data-act="link-full-new" data-v="${t.id}">生成完整链接</button>`);
+/* ───────── 老师链接：一位老师一行（总管理在「全部 / Panda」里看） ─────────
+   两边都教的老师有两条链接：老师自己用的完整链接，和一条只给潘、金看的普通链接（总管理这边不显示）。
+   切换归属时，数据库会自动处理这两条链接，老师自己的链接永远不变。 */
+const T_BOOK_TAG = {K: ['mute', '只属于 Project K'], mine: ['gold', '只属于 Panda'], both: ['blue', '两边都教 · 完整链接']};
+// 只给潘、金看的那条普通链接（两边都教的老师才有）
+const ownerShadow = p => ownerUI() && p.role === 'teacher' && (tea(p.teacher_id) || {}).book === 'both' && !p.full_view;
+// 老师自己用的那条链接
+function teacherRealLink(t){
+  const ls = (DB.people || []).filter(x => x.role === 'teacher' && x.teacher_id === t.id && x.active);
+  return ownerUI() && t.book !== 'K' ? (ls.find(x => x.full_view) || ls[0]) : (ls.find(x => !x.full_view) || ls[0]);
 }
+const ownerLinkTag = p => { if (!ownerUI() || p.role !== 'teacher') return ''; const [c, l] = T_BOOK_TAG[(tea(p.teacher_id) || {}).book || 'K']; return ` <span class="tag ${c}">${l}</span>`; };
+const ownerLinkToggle = p => ownerUI() && p.role === 'teacher'
+  ? `<select class="t-book-sel" data-tid="${p.teacher_id}" aria-label="老师归属">${[['K','只属于 Project K'],['mine','只属于 Panda'],['both','两边都教']].map(([k, l]) => `<option value="${k}" ${((tea(p.teacher_id) || {}).book || 'K') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>` : '';
+const ownerFullLinkBtn = t => '';
+document.addEventListener('change', async e => {
+  const el = e.target; if (!el.classList || !el.classList.contains('t-book-sel')) return;
+  const tid = el.dataset.tid, bk = el.value, t = tea(tid);
+  const msg = {K: `${t.name} 改成只属于 Project K。老师原来的链接不变，以后只看得到 Project K 的学生`,
+               mine: `${t.name} 改成只属于 Panda。老师原来的链接不变，潘老师、金老师那边看不到这位老师了`,
+               both: `${t.name} 改成两边都教。老师原来的链接不变，现在两边的学生都看得到；潘老师、金老师那边看到的是一条只看 Project K 的链接`}[bk];
+  try { await act('owner_set_teacher_book', {tid, bk}, msg); } catch(err) { render(); }
+});
 document.addEventListener('click', async e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
   try {
