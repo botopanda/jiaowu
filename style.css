@@ -369,3 +369,6 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 /* 总管理：账本切换 */
 .book-seg{flex:none}
 .book-seg button{padding:3px 10px;font-size:12.5px}
+/* 卡片列表：卡片宽度固定，只有一两张时不会被拉满整行 */
+.grid2.cards-fix{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+@media (min-width:1400px){.grid2.cards-fix{grid-template-columns:repeat(auto-fill,minmax(380px,1fr))}}

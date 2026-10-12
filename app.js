@@ -348,7 +348,7 @@ function pgStudents(){
 function pgTeachers(){
   return `<div class="ph"><h2>老师档案</h2><button class="btn pri" data-act="teacher-form">＋ 新增老师</button></div>
   <div class="hint">履历可以你们填，也可以老师在自己的链接里填。</div>
-  ${DB.teachers.length ? `<div class="grid2">${DB.teachers.map(t => { const cs = DB.courses.filter(c=>c.teacher_id===t.id), ym = TODAY.slice(0,7);
+  ${DB.teachers.length ? `<div class="grid2 cards-fix">${DB.teachers.map(t => { const cs = DB.courses.filter(c=>c.teacher_id===t.id), ym = TODAY.slice(0,7);
     const ms = lsOfT(t.id).filter(l=>l.date.startsWith(ym)), p = personOf('teacher','teacher_id',t.id);
     const done = ms.filter(l=>paidH(l)>0), plan = ms.filter(l=>l.status==='scheduled'), pn = ms.filter(isPend).length;
     const hDone = +done.reduce((a,l)=>a+paidH(l),0).toFixed(1), hPlan = +plan.reduce((a,l)=>a+dur(l),0).toFixed(1);
