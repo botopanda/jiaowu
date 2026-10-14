@@ -11,9 +11,9 @@ const sUnHw = s => latestHw(s.id).filter(f => !f.hw_sub);
 const sUnConfirm = s => fbOfS(s.id).filter(f => !f.confirm);
 const sSelfDue = s => !reviewOf(s.id, TODAY.slice(0,7))?.self_eval && +TODAY.slice(8,10) >= 20;   // 每月 20 号以后提醒写自评
 function sTabs(s){
-  return [['a','首页'],['b','课表'],['c','作业',sUnHw(s).length],['d','上课记录',sUnConfirm(s).length],['e','我的',sSelfDue(s)?1:0]];
+  return [['a','首页'],['b','课表'],['c','作业',sUnHw(s).length],['d','上课记录',sUnConfirm(s).length],...(ckListsOf(s.id).length ? [['f','通关']] : []),['e','我的',sSelfDue(s)?1:0]];
 }
-function sView(s){ return ({a:sHome2, b:sSched, c:sHomework2, d:sFeedback2, e:sMine}[S.tab] || sHome2)(s); }
+function sView(s){ return ({a:sHome2, b:sSched, c:sHomework2, d:sFeedback2, e:sMine, f:sCheck}[S.tab] || sHome2)(s); }
 
 /* ───────── 首页 ───────── */
 function sHome2(s){
@@ -112,7 +112,6 @@ function sMine(s){
   <h3 class="sh-sec" id="m-target">目标大学与出愿日程</h3>
   ${s.target_ym || s.direction ? `<div class="card small">${s.direction?`<span class="tag gold">${esc(s.direction)}</span> `:''}${s.target_ym?`目标入学 <b>${tgtLabel(s.target_ym)}</b>`:''}</div>` : ''}
   ${targetsView(s.id, false)}
-  ${ckListsOf(s.id).length ? `<h3 class="sh-sec" id="m-check">通关点检</h3>${ckView(s.id)}` : ''}
   <h3 class="sh-sec" id="m-score">成绩变化</h3><div class="card">${scoreTrend(s.id)}</div>
   <h3 class="sh-sec" id="m-month">月度自评</h3>
   <section class="card self-card"><b>${ymLabel(ym)} · 我的自我评价</b>

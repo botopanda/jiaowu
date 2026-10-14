@@ -50,7 +50,6 @@ function ckList(l, edit){
       ${g.items.map(i => { no++; return `<div class="ck-row ${i.level >= 3 ? 'pass' : ''}">
         <span class="ck-no num">${no}</span>
         <span class="ck-name">${esc(i.name)}${i.note ? `<span class="muted xs"> · ${esc(i.note)}</span>` : ''}</span>
-        <span class="ck-plan num muted">${esc(i.plan)}</span>
         <span class="ck-lv">${CK_LV.map(([t, c], k) => `<button class="ck-b ${i.level >= k + 1 ? 'on' : ''}" style="--c:${c}" ${edit ? `data-act="ck-lv" data-v="${i.id}|${k + 1}|${i.level}"` : 'disabled'} title="${t}">${t}</button>`).join('')}</span>
         <span class="ck-day num ${i.passed_on ? '' : 'muted'}">${i.passed_on ? sMD(i.passed_on) : '—'}</span>
         ${edit && CK_EDIT ? `<span class="ck-ops"><button class="btn sm" data-act="ck-item-edit" data-v="${i.id}">改</button><button class="btn sm" data-act="ck-item-add" data-v="${l.id}|${i.id}">＋</button><button class="btn sm danger" data-act="ck-item-del" data-v="${i.id}">删</button></span>` : ''}</div>`; }).join('')}</div>`; }).join('')}
@@ -66,6 +65,33 @@ function ckNewForm(sid, has){
       <button class="btn pri sm" data-act="ck-new" data-v="${sid}">建立</button></div>
     ${isAdmin() && ts.length ? `<div class="muted xs">模板：${ts.map(t => `${esc(t.name)} <button class="link-btn" data-act="ck-tpl-del" data-v="${t.id}">删除</button>`).join('　')}</div>` : ''}</section>`;
 }
+
+/* ───────── 单独的页面 ───────── */
+// 教务 / 老师：上面是每个学生一张进度卡片，点哪个学生，下面展开他完整的点检表
+function ckPage(students, sub){
+  const edit = ckCanEdit();
+  const has = students.filter(s => ckListsOf(s.id).length).sort((x, y) => pyCmp(x.name, y.name));
+  const without = students.filter(s => !ckListsOf(s.id).length).sort((x, y) => pyCmp(x.name, y.name));
+  if (!has.some(s => s.id === S.ckSid)) S.ckSid = has[0] ? has[0].id : '';
+  const card = s => { const ls = ckListsOf(s.id), st = ckStat({items: ls.flatMap(l => l.items)});
+    return `<button class="card ck-pick ${s.id === S.ckSid ? 'on' : ''}" data-act="ck-pick" data-v="${s.id}">
+      <div class="row"><b>${esc(s.name)}</b><span class="muted xs" style="margin-left:auto">${ls.map(l => esc(l.title)).join('、')}</span></div>
+      <div class="ck-bar"><i style="width:${st.pct}%"></i></div>
+      <div class="small">已通关 <b class="num">${st.pass}</b> / ${st.n}${st.cur ? `<span class="muted"> · 现在：${esc(st.cur.name)}</span>` : st.n ? ' · <span class="tag ok">全部通关</span>' : ''}</div></button>`; };
+  return `<div class="ph"><h2>通关点检</h2></div>${sub ? `<div class="hint">${sub}</div>` : ''}
+  ${has.length ? `<div class="ck-cards">${has.map(card).join('')}</div>` : '<div class="card empty">还没有学生建通关点检表</div>'}
+  ${edit && without.length ? `<section class="card ck-new"><b class="small">给学生建通关点检表</b><div class="row">
+      <select id="ck-sid-page"><option value="">选择学生…</option>${without.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
+      <select id="ck-tpl-page">${(CK.templates || []).map(t => `<option value="${t.id}">模板：${esc(t.name)}（${t.n} 关）</option>`).join('')}<option value="">空白表（自己加关卡）</option></select>
+      <input type="text" id="ck-title-page" placeholder="表名，例：通关点检表" style="flex:1;min-width:140px"><button class="btn pri sm" data-act="ck-new" data-v="page">建立</button></div>
+      ${isAdmin() && (CK.templates || []).length ? `<div class="muted xs">模板：${CK.templates.map(t => `${esc(t.name)} <button class="link-btn" data-act="ck-tpl-del" data-v="${t.id}">删除</button>`).join('　')}</div>` : ''}</section>` : ''}
+  ${S.ckSid ? `<div class="dg">${esc(stu(S.ckSid).name)} 的通关点检表</div>${ckListsOf(S.ckSid).map(l => ckList(l, edit)).join('')}
+     ${edit ? `<div class="row"><button class="btn sm" data-act="ck-more" data-v="${S.ckSid}">再给 ${esc(stu(S.ckSid).name)} 建一张表</button></div><div id="ck-more-box"></div>` : ''}` : ''}`;
+}
+const pgChecks = () => ckPage(DB.students.filter(s => s.active !== false), '每个学生一张卡片，点一下看他完整的点检表。这一页学生和家长也能在自己的链接里看到（只能看）。');
+const tChecks = t => ckPage(DB.students.filter(s => DB.courses.some(c => c.student_id === s.id && c.teacher_id === t.id)), '上完课在这里给学生打档。');
+// 学生 / 家长：整张表，只能看
+const sCheck = s => `<h2 style="font-size:19px">通关点检</h2>${ckView(s.id) || '<div class="empty">还没有通关点检表</div>'}`;
 
 // 家长 / 学生看的简版：进度条＋按阶段一行一行
 function ckView(sid){
@@ -86,23 +112,24 @@ document.addEventListener('click', async e => {
       await rpc('check_level', {iid, lv: want}); await redraw();
     }
     if (k === 'ck-new') {
+      const sid = v === 'page' ? val('ck-sid-page') : v; if (!sid) { toast('请选择学生', true); return; }
       const tpl = val('ck-tpl-' + v) || null, title = val('ck-title-' + v).trim() || '通关点检表';
-      await rpc('check_create', {sid: v, title, tpl}); toast('已建立'); await redraw();
+      await rpc('check_create', {sid, title, tpl}); S.ckSid = sid; toast('已建立'); await redraw();
     }
+    if (k === 'ck-pick') { S.ckSid = v; render(); }
+    if (k === 'ck-more') { const box = document.getElementById('ck-more-box'); if (box) box.innerHTML = ckNewForm(v, 1); }
     if (k === 'ck-item-add') {
       const [lid, after] = v.split('|'), l = CK.lists.find(x => x.id === lid), ref = l.items.find(i => i.id === after) || l.items[l.items.length - 1];
       const name = prompt('关卡名称', ''); if (!name) return;
       const stage = prompt('属于哪个阶段', ref ? ref.stage : '') ?? '';
-      const plan = prompt('计划月份（可以不填），例：2027.03', '') ?? '';
-      await rpc('check_item_save', {d: {checklist_id: lid, after: after || '', name, stage, plan}}); await redraw();
+      await rpc('check_item_save', {d: {checklist_id: lid, after: after || '', name, stage}}); await redraw();
     }
     if (k === 'ck-item-edit') {
       const it = CK.lists.flatMap(l => l.items).find(i => i.id === v);
       const name = prompt('关卡名称', it.name); if (name === null) return;
       const stage = prompt('阶段', it.stage); if (stage === null) return;
-      const plan = prompt('计划月份', it.plan); if (plan === null) return;
       const note = prompt('备注（可以不填）', it.note || ''); if (note === null) return;
-      await rpc('check_item_save', {d: {id: v, name, stage, plan, note}}); await redraw();
+      await rpc('check_item_save', {d: {id: v, name, stage, note}}); await redraw();
     }
     if (k === 'ck-item-del') { if (!confirm('删掉这一关？')) return; await rpc('check_item_delete', {iid: v}); await redraw(); }
     if (k === 'ck-rename') { const l = CK.lists.find(x => x.id === v), t = prompt('表名', l.title); if (!t) return; await rpc('check_list_update', {lid: v, title: t}); await redraw(); }

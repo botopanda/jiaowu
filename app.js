@@ -179,13 +179,13 @@ function adminView(){
   const pend = DB.feedbacks.filter(f => f.status==='pending').length, reqN = DB.requests.filter(q => q.status==='pending').length + chPend().length;
   const items = isTop()
     ? [['日常',[['overview','总览'],['calendar','课表与排课'],['requests','改期 · 请假',reqN],['feedback','反馈审批',pend]]],
-       ['学生',[['students','学生档案'],['apply','升学与出愿'],['schools','院校库'],['reviews','月度回访'],['followups','跟进记录']]],
+       ['学生',[['students','学生档案'],['checks','通关点检'],['apply','升学与出愿'],['schools','院校库'],['reviews','月度回访'],['followups','跟进记录']]],
        ['管理',[['teachers','老师档案'],['payroll','课时与工资'],['links','链接与权限']]]]
-    : [['日常',[['overview','总览'],['calendar','课表与排课']]],['学生',[['students','学生档案'],['apply','升学与出愿'],['schools','院校库'],['reviews','月度回访'],['followups','跟进记录']]]];
+    : [['日常',[['overview','总览'],['calendar','课表与排课']]],['学生',[['students','学生档案'],['checks','通关点检'],['apply','升学与出愿'],['schools','院校库'],['reviews','月度回访'],['followups','跟进记录']]]];
   const nav = items.map(([g,list]) => `<div class="grp">${g}</div>` + list.map(([k,t,n]) =>
     `<button class="nav ${S.page===k?'on':''}" data-act="page" data-v="${k}"><span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')).join('');
-  const P = {overview:pgOverview, calendar:pgCalendar, requests:pgRequests, apply:pgApply2, reviews:pgReviews, followups:pgFollowups, feedback:pgFeedback, students:pgStudents, teachers:pgTeachers, payroll:pgPayroll, links:pgLinks, schools:pgSchools};
-  const page = (isTop() || ['overview','calendar','students','apply','schools','reviews','followups'].includes(S.page)) ? (P[S.page]||pgOverview) : pgOverview;
+  const P = {checks:pgChecks, overview:pgOverview, calendar:pgCalendar, requests:pgRequests, apply:pgApply2, reviews:pgReviews, followups:pgFollowups, feedback:pgFeedback, students:pgStudents, teachers:pgTeachers, payroll:pgPayroll, links:pgLinks, schools:pgSchools};
+  const page = (isTop() || ['overview','calendar','students','checks','apply','schools','reviews','followups'].includes(S.page)) ? (P[S.page]||pgOverview) : pgOverview;
   return `<div class="layout"><nav class="side" aria-label="教务导航">${nav}</nav><main class="main">${page()}</main></div>`;
 }
 const scopeNote = () => !isTop() ? `<div class="scope">你负责 ${DB.students.length} 位学生，只显示他们的资料。</div>` : '';
@@ -416,15 +416,15 @@ function phoneView(){
   if (me.role==='teacher'){
     const t = tea(me.teacher_id);
     const n = needFb().length + DB.feedbacks.filter(f => f.hw_sub && !f.hw_fb).length;
-    tabs = [['a','课表'],['b','我的学生'],['c','反馈·批改',n],['d','我的']];
-    body = {a:tSchedule,b:tStudents,c:tWrite,d:tMe}[S.tab](t);
+    tabs = [['a','课表'],['b','我的学生'],['c','反馈·批改',n],['f','通关点检'],['d','我的']];
+    body = ({a:tSchedule,b:tStudents,c:tWrite,d:tMe,f:tChecks}[S.tab] || tSchedule)(t);
   } else if (me.role==='student'){
     const s = stu(me.student_id);
     tabs = sTabs(s); body = sView(s);   // 学生端在 student.js
   } else {
     const s = stu(me.student_id);
-    tabs = [['a','概况'],['b','老师反馈'],['c','课表'],['d','档案'],['e','月度']];
-    body = {a:pOverview,b:pFeedback,c:pSchedule,d:profilePage,e:pMonthly}[S.tab]?.(s) ?? pOverview(s);
+    tabs = [['a','概况'],['b','老师反馈'],['c','课表'],...(ckListsOf(s.id).length ? [['f','通关']] : []),['d','档案'],['e','月度']];
+    body = {a:pOverview,b:pFeedback,c:pSchedule,d:profilePage,e:pMonthly,f:sCheck}[S.tab]?.(s) ?? pOverview(s);
   }
   // 电脑上菜单在左侧（和教务一样），手机上在底部（大拇指好点）
   return `<div class="layout pl"><nav class="side pside" aria-label="菜单">${tabs.map(([k,t,n])=>`<button class="nav ${S.tab===k?'on':''}" data-act="tab" data-v="${k}"><span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')}</nav>
@@ -579,7 +579,7 @@ function pOverview(s){
     ${leaves.map(l=>`<div class="card small"><span class="tag seal">请假</span> ${fmtMD(l.date)} ${esc(course(l.course_id).subject)} · ${esc(l.note)}</div>`).join('')}`; };
   return `<h2 style="font-size:19px">${esc(s.name)} 的学习情况</h2>${block(ym)}
   <div class="dg">${+ym.slice(5)} 月学习计划</div><div class="card">${mpView(s.id, ym)}</div>
-  ${block(prev)}${ckListsOf(s.id).length ? `<div class="dg">通关进度</div>${ckView(s.id)}` : ''}<div class="dg">接下来的课</div>${agenda(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name,4)}`;
+  ${block(prev)}<div class="dg">接下来的课</div>${agenda(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name,4)}`;
 }
 const pFeedback = s => `<div class="muted xs">老师的课后反馈经教务审核后显示在这里。</div>` + (fbOfS(s.id).slice().reverse().slice(0,20).map(f=>fbMini(f,false)).join('') || '<div class="empty">还没有反馈</div>');
 const pSchedule = s => schedule(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name);
@@ -698,12 +698,11 @@ function studentModal(id, tab){
   const ym = TODAY.slice(0,7), nx = ymShift(ym,1), pv = ymShift(ym,-1);
   // 左侧菜单按用途分组
   const groups = [['基本',[['info','概况与课程'],['profile','档案资料'],['note','私下备注']]],
-    ['学习',[['mp','月计划'],['fb','反馈'],['score','成绩'],['check','通关点检']]],
+    ['学习',[['mp','月计划'],['fb','反馈'],['score','成绩']]],
     ['升学',[['target','大学与出愿'],['fu','跟进记录'],['review','月度回访']]],
     ['给家长看',[['pfview','家长看到的档案'],['board','跟进看板']]]];
   let body = '';
-  if (tab==='check') body = ckBlock(id);
-  else if (tab==='pfview') body = `<div class="hint" style="margin:0">这就是学生和家长在自己链接「档案」里看到的页面，照 Excel 第一页的顺序。</div>${profilePage(s)}`;
+  if (tab==='pfview') body = `<div class="hint" style="margin:0">这就是学生和家长在自己链接「档案」里看到的页面，照 Excel 第一页的顺序。</div>${profilePage(s)}`;
   else if (tab==='board') body = boardView(id);
   else if (['profile','score','target','review','fu'].includes(tab)) body = studentTrackTab(id, tab);
   else if (tab==='info'){
@@ -742,7 +741,6 @@ function tStuModal(cid){
   const c = course(cid), s = stu(c.student_id), ym = TODAY.slice(0,7), nx = ymShift(ym,1);
   openModal(`${mHead(`${esc(s.name)} · ${esc(c.subject)}`)}
   ${teacherTrackBlock(s.id)}
-  <b class="small">通关点检 <span class="muted xs" style="font-weight:400">上完课在这里打档，学生和家长能看到</span></b>${ckBlock(s.id)}
   <b class="small">月计划 <span class="muted xs" style="font-weight:400">学生和家长能看到</span></b>
   ${[ym,nx].map(m=>`<label class="field"><span>${ymLabel(m)}</span><textarea id="mp-${m}-${cid}" style="min-height:52px" placeholder="这个月要完成什么，例：日本史近代收尾，每周 1 篇记述">${esc(planText(cid,m))}</textarea></label>`).join('')}
   <div class="row"><button class="btn pri sm" data-act="t-mp-save" data-v="${cid}">保存计划</button></div>
