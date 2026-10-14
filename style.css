@@ -422,3 +422,6 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 @media (max-width:760px){
   .ck-row{grid-template-columns:24px minmax(0,1fr) auto;grid-template-areas:"no name day" "no lv lv" "no ops ops"}
 }
+/* 「已通关 5 / 46」：数字和斜线同一种字体 */
+.ck-frac{font-family:var(--f-body);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ck-frac b{font-weight:700}

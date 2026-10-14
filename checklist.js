@@ -36,7 +36,7 @@ function ckBlock(sid, mode){
 function ckSummary(l){
   const st = ckStat(l);
   return `<div class="ck-sum"><div class="ck-bar"><i style="width:${st.pct}%"></i></div>
-    <span class="small">已通关 <b class="num">${st.pass}</b> / ${st.n} 关（${st.pct}%）</span>${st.cur ? `<span class="muted small">现在：${esc(st.cur.stage)} · ${esc(st.cur.name)}</span>` : st.n ? '<span class="tag ok">全部通关</span>' : ''}</div>`;
+    <span class="small">已通关 <span class="ck-frac"><b>${st.pass}</b> / ${st.n}</span> 关（${st.pct}%）</span>${st.cur ? `<span class="muted small">现在：${esc(st.cur.stage)} · ${esc(st.cur.name)}</span>` : st.n ? '<span class="tag ok">全部通关</span>' : ''}</div>`;
 }
 function ckList(l, edit){
   const stages = []; l.items.forEach(i => { const g = stages.find(x => x.stage === i.stage); g ? g.items.push(i) : stages.push({stage: i.stage, items: [i]}); });
@@ -77,7 +77,7 @@ function ckPage(students, sub){
     return `<button class="card ck-pick ${s.id === S.ckSid ? 'on' : ''}" data-act="ck-pick" data-v="${s.id}">
       <div class="row"><b>${esc(s.name)}</b><span class="muted xs" style="margin-left:auto">${ls.map(l => esc(l.title)).join('、')}</span></div>
       <div class="ck-bar"><i style="width:${st.pct}%"></i></div>
-      <div class="small">已通关 <b class="num">${st.pass}</b> / ${st.n}${st.cur ? `<span class="muted"> · 现在：${esc(st.cur.name)}</span>` : st.n ? ' · <span class="tag ok">全部通关</span>' : ''}</div></button>`; };
+      <div class="small">已通关 <span class="ck-frac"><b>${st.pass}</b> / ${st.n}</span>${st.cur ? `<span class="muted"> · 现在：${esc(st.cur.name)}</span>` : st.n ? ' · <span class="tag ok">全部通关</span>' : ''}</div></button>`; };
   return `<div class="ph"><h2>通关点检</h2></div>${sub ? `<div class="hint">${sub}</div>` : ''}
   ${has.length ? `<div class="ck-cards">${has.map(card).join('')}</div>` : '<div class="card empty">还没有学生建通关点检表</div>'}
   ${edit && without.length ? `<section class="card ck-new"><b class="small">给学生建通关点检表</b><div class="row">
