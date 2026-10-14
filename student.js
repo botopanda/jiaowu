@@ -112,6 +112,7 @@ function sMine(s){
   <h3 class="sh-sec" id="m-target">目标大学与出愿日程</h3>
   ${s.target_ym || s.direction ? `<div class="card small">${s.direction?`<span class="tag gold">${esc(s.direction)}</span> `:''}${s.target_ym?`目标入学 <b>${tgtLabel(s.target_ym)}</b>`:''}</div>` : ''}
   ${targetsView(s.id, false)}
+  ${ckListsOf(s.id).length ? `<h3 class="sh-sec" id="m-check">通关点检</h3>${ckView(s.id)}` : ''}
   <h3 class="sh-sec" id="m-score">成绩变化</h3><div class="card">${scoreTrend(s.id)}</div>
   <h3 class="sh-sec" id="m-month">月度自评</h3>
   <section class="card self-card"><b>${ymLabel(ym)} · 我的自我评价</b>

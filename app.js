@@ -145,6 +145,7 @@ async function load(){
   if (!S.month) S.month = TODAY.slice(0,7);
   if (!S.payMonth) S.payMonth = ymShift(TODAY.slice(0,7), -1);
   if (!S.teaMonth) S.teaMonth = TODAY.slice(0,7);
+  try { CK = await rpc('checks_load') || {templates: [], lists: []}; } catch(e) { CK = {templates: [], lists: []}; }
   DB_ALL = DB; DB = bookView(DB_ALL);   // 总管理：按「全部 / Project K / Panda」筛选；其他人原样
 }
 // 点菜单、切回这个网页时：先马上显示，再在后台取最新数据（别人刚写的反馈、刚排的课）再画一遍
@@ -578,7 +579,7 @@ function pOverview(s){
     ${leaves.map(l=>`<div class="card small"><span class="tag seal">请假</span> ${fmtMD(l.date)} ${esc(course(l.course_id).subject)} · ${esc(l.note)}</div>`).join('')}`; };
   return `<h2 style="font-size:19px">${esc(s.name)} 的学习情况</h2>${block(ym)}
   <div class="dg">${+ym.slice(5)} 月学习计划</div><div class="card">${mpView(s.id, ym)}</div>
-  ${block(prev)}<div class="dg">接下来的课</div>${agenda(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name,4)}`;
+  ${block(prev)}${ckListsOf(s.id).length ? `<div class="dg">通关进度</div>${ckView(s.id)}` : ''}<div class="dg">接下来的课</div>${agenda(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name,4)}`;
 }
 const pFeedback = s => `<div class="muted xs">老师的课后反馈经教务审核后显示在这里。</div>` + (fbOfS(s.id).slice().reverse().slice(0,20).map(f=>fbMini(f,false)).join('') || '<div class="empty">还没有反馈</div>');
 const pSchedule = s => schedule(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name);
@@ -697,11 +698,12 @@ function studentModal(id, tab){
   const ym = TODAY.slice(0,7), nx = ymShift(ym,1), pv = ymShift(ym,-1);
   // 左侧菜单按用途分组
   const groups = [['基本',[['info','概况与课程'],['profile','档案资料'],['note','私下备注']]],
-    ['学习',[['mp','月计划'],['fb','反馈'],['score','成绩']]],
+    ['学习',[['mp','月计划'],['fb','反馈'],['score','成绩'],['check','通关点检']]],
     ['升学',[['target','大学与出愿'],['fu','跟进记录'],['review','月度回访']]],
     ['给家长看',[['pfview','家长看到的档案'],['board','跟进看板']]]];
   let body = '';
-  if (tab==='pfview') body = `<div class="hint" style="margin:0">这就是学生和家长在自己链接「档案」里看到的页面，照 Excel 第一页的顺序。</div>${profilePage(s)}`;
+  if (tab==='check') body = ckBlock(id);
+  else if (tab==='pfview') body = `<div class="hint" style="margin:0">这就是学生和家长在自己链接「档案」里看到的页面，照 Excel 第一页的顺序。</div>${profilePage(s)}`;
   else if (tab==='board') body = boardView(id);
   else if (['profile','score','target','review','fu'].includes(tab)) body = studentTrackTab(id, tab);
   else if (tab==='info'){
@@ -740,6 +742,7 @@ function tStuModal(cid){
   const c = course(cid), s = stu(c.student_id), ym = TODAY.slice(0,7), nx = ymShift(ym,1);
   openModal(`${mHead(`${esc(s.name)} · ${esc(c.subject)}`)}
   ${teacherTrackBlock(s.id)}
+  <b class="small">通关点检 <span class="muted xs" style="font-weight:400">上完课在这里打档，学生和家长能看到</span></b>${ckBlock(s.id)}
   <b class="small">月计划 <span class="muted xs" style="font-weight:400">学生和家长能看到</span></b>
   ${[ym,nx].map(m=>`<label class="field"><span>${ymLabel(m)}</span><textarea id="mp-${m}-${cid}" style="min-height:52px" placeholder="这个月要完成什么，例：日本史近代收尾，每周 1 篇记述">${esc(planText(cid,m))}</textarea></label>`).join('')}
   <div class="row"><button class="btn pri sm" data-act="t-mp-save" data-v="${cid}">保存计划</button></div>

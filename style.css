@@ -383,3 +383,31 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 /* 排课窗口的「补」按钮：按下变蓝＝补课 */
 .mk-btn{flex:none;width:40px;height:36px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--muted);font-weight:700;font-size:15px;cursor:pointer}
 .mk-btn.on{background:var(--blue);border-color:var(--blue);color:#fff}
+
+/* 通关点检表 */
+.ck-card{display:flex;flex-direction:column;gap:8px}
+.ck-sum{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.ck-bar{flex:1 1 160px;max-width:320px;height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}
+.ck-bar i{display:block;height:100%;background:var(--ok)}
+.ck-legend{display:flex;flex-wrap:wrap;gap:4px 12px}
+.ck-legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.ck-stage{border-top:1px solid var(--line);padding-top:6px}
+.ck-st{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;font-family:var(--f-disp)}
+.ck-row{display:grid;grid-template-columns:28px minmax(0,1fr) 96px auto 48px auto;align-items:center;gap:6px 10px;padding:4px 0;border-bottom:1px dashed var(--line-2,var(--line))}
+.ck-row.pass .ck-name{color:var(--ok)}
+.ck-no{color:var(--muted);font-size:12px;text-align:right}
+.ck-name{min-width:0}
+.ck-plan{font-size:12px}
+.ck-lv{display:flex;gap:4px}
+.ck-b{border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:4px;font-size:11.5px;padding:2px 6px;cursor:pointer;white-space:nowrap}
+.ck-b.on{background:var(--c);border-color:var(--c);color:#fff}
+.ck-b:disabled{cursor:default}
+.ck-day{font-size:12px;text-align:center}
+.ck-ops{display:flex;gap:3px}
+.ck-new .row{flex-wrap:wrap}
+.link-btn{border:0;background:none;color:var(--seal);cursor:pointer;font-size:12px;padding:0}
+@media (max-width:760px){
+  .ck-row{grid-template-columns:24px minmax(0,1fr) auto;grid-template-areas:"no name day" "no plan plan" "no lv lv" "no ops ops"}
+  .ck-no{grid-area:no}.ck-name{grid-area:name}.ck-plan{grid-area:plan}.ck-lv{grid-area:lv}.ck-day{grid-area:day}.ck-ops{grid-area:ops}
+  .ck-b{flex:1;padding:5px 2px}
+}
