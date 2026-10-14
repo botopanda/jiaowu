@@ -44,7 +44,7 @@ function ckList(l, edit){
   return `<section class="card ck-card"><div class="row"><h3 style="margin-right:auto;font-size:16px">${esc(l.title)}</h3>
       ${edit ? `<button class="btn sm ${CK_EDIT?'pri':''}" data-act="ck-edit">${CK_EDIT ? '完成编辑' : '编辑关卡'}</button>` : ''}</div>
     ${ckSummary(l)}
-    <div class="ck-legend muted xs">${CK_LV.map(([t, c]) => `<span><i style="background:${c}"></i>${t}</span>`).join('')}<span>点一下打档，再点一下退回上一档；到「通关」自动记通关日</span></div>
+    <div class="ck-legend muted xs">${CK_LV.map(([t, c]) => `<span><i style="background:${c}"></i>${t}</span>`).join('')}${edit ? "<span>点一下打档，再点一下退回上一档；到「通关」自动记通关日</span>" : ""}</div>
     ${stages.map(g => { const done = g.items.filter(i => i.level >= 3).length;
       return `<div class="ck-stage"><div class="ck-st"><b>${esc(g.stage || '（未分阶段）')}</b><span class="muted xs">${done}/${g.items.length}</span></div>
       ${g.items.map(i => { no++; return `<div class="ck-row ${i.level >= 3 ? 'pass' : ''}">
