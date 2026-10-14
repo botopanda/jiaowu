@@ -24,14 +24,18 @@ const ckStat = l => {
 // 能不能给这个学生的点检表传作品：教务、老师、学生本人
 const ckCanUpload = sid => ['admin','teacher'].includes(ME().role) || (ME().role === 'student' && ME().student_id === sid);
 function ckFiles(i, sid){
-  const fs = i.files || [], up = ckCanUpload(sid) && i.level >= 3 && fs.length < 9;
-  if (!fs.length && !up) return '';
+  const fs = i.files || [];
+  if (!fs.length) return '';
   const canDel = f => isTop() || f.uploaded_by === ME().name;
   return `<div class="ck-files">${fs.map(f => `<span class="fitem">
       <a href="${fileUrl(f)}" target="_blank" rel="noopener" title="${esc(f.name)}${f.uploaded_by ? ' · ' + esc(f.uploaded_by) + ' 上传' : ''}">${isImg(f) ? `<img src="${fileUrl(f)}" alt="${esc(f.name)}" loading="lazy">` : `<span class="fpdf">PDF</span><span class="fname">${esc(f.name)}</span>`}</a>
       ${canDel(f) ? `<button class="fdel" data-act="file-del" data-v="${f.id}" aria-label="删除这个文件">×</button>` : ''}</span>`).join('')}
-    ${up ? uploadBtn('ck', i.id, fs.length ? '再传几张' : '上传满意作品') : ''}</div>`;
+  </div>`;
 }
+// 每一行最后的「上传」按钮
+const ckUp = (i, sid) => ckCanUpload(sid) && (i.files || []).length < 9
+  ? `<span class="ck-up"><label class="ck-b" for="up-ck-${i.id}" title="上传作品（照片 / PDF）">上传</label><input type="file" id="up-ck-${i.id}" accept="image/*,.pdf,application/pdf" multiple data-change="file-up" data-purpose="ck" data-ref="${i.id}" hidden></span>`
+  : '<span class="ck-up"></span>';
 
 // 一个学生的全部点检表（还没读到时先显示「读取中」，读完自动重画）
 function ckBlock(sid, mode){
@@ -64,6 +68,7 @@ function ckList(l, edit){
         <span class="ck-name">${esc(i.name)}${i.note ? `<span class="muted xs"> · ${esc(i.note)}</span>` : ''}</span>
         <span class="ck-lv">${CK_LV.map(([t, c], k) => `<button class="ck-b ${i.level >= k + 1 ? 'on' : ''}" style="--c:${c}" ${edit ? `data-act="ck-lv" data-v="${i.id}|${k + 1}|${i.level}"` : 'disabled'} title="${t}">${t}</button>`).join('')}</span>
         <span class="ck-day num ${i.passed_on ? '' : 'muted'}">${i.passed_on ? sMD(i.passed_on) : '—'}</span>
+        ${ckUp(i, l.student_id)}
         ${ckFiles(i, l.student_id)}
         ${edit && CK_EDIT ? `<span class="ck-ops"><button class="btn sm" data-act="ck-item-edit" data-v="${i.id}">改</button><button class="btn sm" data-act="ck-item-add" data-v="${l.id}|${i.id}">＋</button><button class="btn sm danger" data-act="ck-item-del" data-v="${i.id}">删</button></span>` : ''}</div>`; }).join('')}</div>`; }).join('')}
     ${edit && CK_EDIT ? `<div class="row" style="margin-top:8px"><button class="btn sm" data-act="ck-item-add" data-v="${l.id}|">＋ 在最后加一关</button><button class="btn sm" data-act="ck-rename" data-v="${l.id}">改表名</button>

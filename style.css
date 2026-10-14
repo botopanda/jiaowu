@@ -430,3 +430,13 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 .ck-files{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:2px 0 4px 38px}
 .ck-files .fitem img{width:64px;height:64px;object-fit:cover}
 @media (max-width:760px){.ck-files{grid-area:auto;grid-column:1/-1;padding-left:30px}}
+
+/* 通关点检：「上传」放在每一行最后，和档位按钮一样的样子 */
+.ck-row{grid-template-columns:28px minmax(0,1fr) auto 48px 44px auto}
+.ck-up{display:flex;justify-content:flex-end}
+.ck-up .ck-b{color:var(--ink)}
+.ck-up .ck-b:hover{border-color:var(--gold)}
+@media (max-width:760px){
+  .ck-row{grid-template-columns:24px minmax(0,1fr) auto;grid-template-areas:"no name day" "no lv up" "no ops ops"}
+  .ck-up{grid-area:up}
+}
