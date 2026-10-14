@@ -425,3 +425,8 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 /* 「已通关 5 / 46」：数字和斜线同一种字体 */
 .ck-frac{font-family:var(--f-body);font-variant-numeric:tabular-nums;white-space:nowrap}
 .ck-frac b{font-weight:700}
+
+/* 通关点检：每一关的满意作品 */
+.ck-files{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:2px 0 4px 38px}
+.ck-files .fitem img{width:64px;height:64px;object-fit:cover}
+@media (max-width:760px){.ck-files{grid-area:auto;grid-column:1/-1;padding-left:30px}}

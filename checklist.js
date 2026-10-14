@@ -21,6 +21,18 @@ const ckStat = l => {
   return {n, pass, pct: n ? Math.round(pass / n * 100) : 0, cur};
 };
 
+// 能不能给这个学生的点检表传作品：教务、老师、学生本人
+const ckCanUpload = sid => ['admin','teacher'].includes(ME().role) || (ME().role === 'student' && ME().student_id === sid);
+function ckFiles(i, sid){
+  const fs = i.files || [], up = ckCanUpload(sid) && i.level >= 3 && fs.length < 9;
+  if (!fs.length && !up) return '';
+  const canDel = f => isTop() || f.uploaded_by === ME().name;
+  return `<div class="ck-files">${fs.map(f => `<span class="fitem">
+      <a href="${fileUrl(f)}" target="_blank" rel="noopener" title="${esc(f.name)}${f.uploaded_by ? ' · ' + esc(f.uploaded_by) + ' 上传' : ''}">${isImg(f) ? `<img src="${fileUrl(f)}" alt="${esc(f.name)}" loading="lazy">` : `<span class="fpdf">PDF</span><span class="fname">${esc(f.name)}</span>`}</a>
+      ${canDel(f) ? `<button class="fdel" data-act="file-del" data-v="${f.id}" aria-label="删除这个文件">×</button>` : ''}</span>`).join('')}
+    ${up ? uploadBtn('ck', i.id, fs.length ? '再传几张' : '上传满意作品') : ''}</div>`;
+}
+
 // 一个学生的全部点检表（还没读到时先显示「读取中」，读完自动重画）
 function ckBlock(sid, mode){
   if (!CK){
@@ -34,9 +46,9 @@ function ckBlock(sid, mode){
   return out;
 }
 function ckSummary(l){
-  const st = ckStat(l);
+  const st = ckStat(l), works = l.items.reduce((a, i) => a + (i.files || []).length, 0);
   return `<div class="ck-sum"><div class="ck-bar"><i style="width:${st.pct}%"></i></div>
-    <span class="small">已通关 <span class="ck-frac">${st.pass} / ${st.n}</span> 关（${st.pct}%）</span>${st.cur ? `<span class="muted small">现在：${esc(st.cur.stage)} · ${esc(st.cur.name)}</span>` : st.n ? '<span class="tag ok">全部通关</span>' : ''}</div>`;
+    <span class="small">已通关 <span class="ck-frac">${st.pass} / ${st.n}</span> 关（${st.pct}%）${works ? ` · 作品 ${works} 个` : ''}</span>${st.cur ? `<span class="muted small">现在：${esc(st.cur.stage)} · ${esc(st.cur.name)}</span>` : st.n ? '<span class="tag ok">全部通关</span>' : ''}</div>`;
 }
 function ckList(l, edit){
   const stages = []; l.items.forEach(i => { const g = stages.find(x => x.stage === i.stage); g ? g.items.push(i) : stages.push({stage: i.stage, items: [i]}); });
@@ -52,6 +64,7 @@ function ckList(l, edit){
         <span class="ck-name">${esc(i.name)}${i.note ? `<span class="muted xs"> · ${esc(i.note)}</span>` : ''}</span>
         <span class="ck-lv">${CK_LV.map(([t, c], k) => `<button class="ck-b ${i.level >= k + 1 ? 'on' : ''}" style="--c:${c}" ${edit ? `data-act="ck-lv" data-v="${i.id}|${k + 1}|${i.level}"` : 'disabled'} title="${t}">${t}</button>`).join('')}</span>
         <span class="ck-day num ${i.passed_on ? '' : 'muted'}">${i.passed_on ? sMD(i.passed_on) : '—'}</span>
+        ${ckFiles(i, l.student_id)}
         ${edit && CK_EDIT ? `<span class="ck-ops"><button class="btn sm" data-act="ck-item-edit" data-v="${i.id}">改</button><button class="btn sm" data-act="ck-item-add" data-v="${l.id}|${i.id}">＋</button><button class="btn sm danger" data-act="ck-item-del" data-v="${i.id}">删</button></span>` : ''}</div>`; }).join('')}</div>`; }).join('')}
     ${edit && CK_EDIT ? `<div class="row" style="margin-top:8px"><button class="btn sm" data-act="ck-item-add" data-v="${l.id}|">＋ 在最后加一关</button><button class="btn sm" data-act="ck-rename" data-v="${l.id}">改表名</button>
       ${isAdmin() ? `<button class="btn sm" data-act="ck-tpl-save" data-v="${l.id}">另存为模板</button><button class="btn sm danger" style="margin-left:auto" data-act="ck-del" data-v="${l.id}">删除整张表</button>` : ''}</div>` : ''}
@@ -77,7 +90,7 @@ function ckPage(students, sub){
     return `<button class="card ck-pick ${s.id === S.ckSid ? 'on' : ''}" data-act="ck-pick" data-v="${s.id}">
       <div class="row"><b>${esc(s.name)}</b><span class="muted xs" style="margin-left:auto">${ls.map(l => esc(l.title)).join('、')}</span></div>
       <div class="ck-bar"><i style="width:${st.pct}%"></i></div>
-      <div class="small">已通关 <span class="ck-frac">${st.pass} / ${st.n}</span>${st.cur ? `<span class="muted"> · 现在：${esc(st.cur.name)}</span>` : st.n ? ' · <span class="tag ok">全部通关</span>' : ''}</div></button>`; };
+      <div class="small">已通关 <span class="ck-frac">${st.pass} / ${st.n}</span>${(() => { const w = ls.reduce((a, l) => a + l.items.reduce((b, i) => b + (i.files || []).length, 0), 0); return w ? ` · 作品 ${w} 个` : ''; })()}${st.cur ? `<span class="muted"> · 现在：${esc(st.cur.name)}</span>` : st.n ? ' · <span class="tag ok">全部通关</span>' : ''}</div></button>`; };
   return `<div class="ph"><h2>通关点检</h2></div>${sub ? `<div class="hint">${sub}</div>` : ''}
   ${has.length ? `<div class="ck-cards">${has.map(card).join('')}</div>` : '<div class="card empty">还没有学生建通关点检表</div>'}
   ${edit && without.length ? `<section class="card ck-new"><b class="small">给学生建通关点检表</b><div class="row">

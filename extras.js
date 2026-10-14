@@ -54,7 +54,7 @@ document.addEventListener('change', async e => {
   try {
     for (const f of files) await uploadOne(f, purpose, ref);
     await load(); render(); reopenModal();
-    toast(purpose === 'hw' ? '作业已上传，老师能看到了' : '已上传，学生能看到了');
+    toast(purpose === 'hw' ? '作业已上传，老师能看到了' : purpose === 'ck' ? '作品已上传' : '已上传，学生能看到了');
   } catch(err) { toast(err.message, true); }
   finally { document.body.classList.remove('busy'); el.value = ''; }
 });
