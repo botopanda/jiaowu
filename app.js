@@ -182,6 +182,7 @@ async function load(){
   if (!S.payMonth) S.payMonth = ymShift(TODAY.slice(0,7), -1);
   if (!S.teaMonth) S.teaMonth = TODAY.slice(0,7);
   try { CK = await rpc('checks_load') || {templates: [], lists: []}; } catch(e) { CK = {templates: [], lists: []}; }
+  if (typeof cvLoad === 'function') await cvLoad();   // 老师履历（teacher_cv.js）
   DB_ALL = DB; DB = bookView(DB_ALL);   // 总管理：按「全部 / Project K / Panda」筛选；其他人原样
 }
 // 点菜单、切回这个网页时：先马上显示，再在后台取最新数据（别人刚写的反馈、刚排的课）再画一遍
@@ -397,18 +398,19 @@ function pgStudents(){
 
 function pgTeachers(){
   return `<div class="ph"><h2>老师档案</h2><button class="btn pri" data-act="teacher-form">＋ 新增老师</button></div>
-  <div class="hint">履历可以你们填，也可以老师在自己的链接里填。</div>
+  <div class="hint">点「履历」看、填老师的简历和资料（学生和家长看不到）；老师也可以在自己链接的「我的」里填。</div>
   ${DB.teachers.length ? `<div class="grid2 cards-fix">${DB.teachers.map(t => { const cs = DB.courses.filter(c=>c.teacher_id===t.id), ym = TODAY.slice(0,7);
     const ms = lsOfT(t.id).filter(l=>l.date.startsWith(ym)), p = teacherRealLink(t);
     const done = ms.filter(l=>paidH(l)>0), plan = ms.filter(l=>l.status==='scheduled'), pn = ms.filter(isPend).length;
     const hDone = +done.reduce((a,l)=>a+paidH(l),0).toFixed(1), hPlan = +plan.reduce((a,l)=>a+dur(l),0).toFixed(1);
     const names = [...new Set(cs.map(c=>stu(c.student_id).name))];
-    return `<section class="card"><div class="row" style="margin-bottom:6px"><h3 style="margin-right:auto;font-size:16px">${esc(t.name)} ${tBookTag(t)}</h3>${t.subject?subjTag(t.subject):''}${t.loc?`<span class="tag mute">${esc(t.loc)}</span>`:''}</div>
-    <dl class="kv small"><dt>学历</dt><dd>${esc(t.edu||'—')}</dd><dt>经历</dt><dd>${esc(t.exp||'—')}</dd><dt>擅长</dt><dd>${esc(t.good||'—')}</dd>
+    return `<section class="card"><div class="row" style="margin-bottom:6px">${cvPhoto(t, 'sm')}<h3 style="margin-right:auto;font-size:16px">${esc(t.name)} ${tBookTag(t)}</h3>${t.subject?subjTag(t.subject):''}${t.loc?`<span class="tag mute">${esc(t.loc)}</span>`:''}</div>
+    ${cvOf(t.id).tagline ? `<div class="small" style="margin:-2px 0 6px">${esc(cvOf(t.id).tagline)}</div>` : ''}
+    <dl class="kv small">${cvBrief(t)}
     <dt>带的学生</dt><dd>${names.map(esc).join('、')||'—'}</dd>
     <dt>本月已上</dt><dd><b class="num">${hDone}</b> 小时 <span class="muted xs">（${done.length} 节）</span>${pn?` <span class="tag warn">${pn} 节待确认</span>`:''}</dd>
     <dt>本月应上</dt><dd><b class="num">${hPlan}</b> 小时 <span class="muted xs">（${plan.length} 节）</span></dd></dl>
-    <div class="row" style="margin-top:8px"><button class="btn sm" data-act="teacher-form" data-v="${t.id}">编辑</button>${p?`<button class="btn sm" data-act="copy-link" data-v="${p.key}">复制老师链接</button>`:''}${ownerFullLinkBtn(t)}</div></section>`}).join('')}</div>` : '<div class="card empty">还没有老师。点右上角「新增老师」开始。</div>'}`;
+    <div class="row" style="margin-top:8px"><button class="btn pri sm" data-act="cv-open" data-v="${t.id}">履历</button><button class="btn sm" data-act="teacher-form" data-v="${t.id}">编辑</button>${p?`<button class="btn sm" data-act="copy-link" data-v="${p.key}">复制老师链接</button>`:''}${ownerFullLinkBtn(t)}</div></section>`}).join('')}</div>` : '<div class="card empty">还没有老师。点右上角「新增老师」开始。</div>'}`;
 }
 
 function pgPayroll(){
@@ -570,11 +572,7 @@ function tWrite(t){
 function tMe(t){
   const ls = lsOfT(t.id).filter(l=>l.date.startsWith(S.teaMonth) && paidH(l)>0), h = ls.reduce((a,l)=>a+paidH(l),0);
   const months = [TODAY.slice(0,7), ymShift(TODAY.slice(0,7),-1), ymShift(TODAY.slice(0,7),-2)];
-  return `<section class="card" style="display:flex;flex-direction:column;gap:8px"><h3 style="font-size:16px">我的履历</h3>
-    <label class="field"><span>学历</span><input type="text" id="me-edu" value="${esc(t.edu)}"></label>
-    <label class="field"><span>教学经历</span><textarea id="me-exp">${esc(t.exp)}</textarea></label>
-    <label class="field"><span>擅长领域</span><input type="text" id="me-good" value="${esc(t.good)}"></label>
-    <button class="btn pri" data-act="save-me">保存履历</button></section>
+  return `<h3 class="dg" style="margin-top:0">我的履历</h3>${cvView(t)}
   <section class="card"><div class="row" style="margin-bottom:4px"><h3 style="font-size:16px;margin-right:auto">课时记录</h3><select id="tea-m" data-change="team">${months.map(v=>`<option value="${v}" ${v===S.teaMonth?'selected':''}>${ymLabel(v)}</option>`).join('')}</select></div>
   <div class="muted xs" style="margin-bottom:4px">自动记录，不用再整理清单发给教务。${ls.length?` 这个月：${payBadge(t.id, S.teaMonth)}`:''}</div>
   ${ls.length?`<div class="list">${ls.map(l=>`<div class="li small"><span class="num">${sMD(l.date)}</span><span class="num">${timeFor(l,t.tz)}</span><span class="grow">${esc(stu(course(l.course_id).student_id).name)}</span><span class="num">${paidH(l)}h</span>${l.status==='leave'?'<span class="tag seal">请假</span>':''}</div>`).join('')}</div>
@@ -725,9 +723,7 @@ function teacherForm(id){
   <label class="field"><span>所在地</span><input type="text" id="tf-loc" value="${esc(t.loc)}" placeholder="例：北京"></label>
   <input type="hidden" id="tf-tz" value="CN">
   ${id?`<label class="field"><span>状态</span><select id="tf-active"><option value="true" ${t.active?'selected':''}>在职</option><option value="false" ${t.active?'':'selected'}>离职</option></select></label>`:''}</div>
-  <label class="field"><span>学历</span><input type="text" id="tf-edu" value="${esc(t.edu)}"></label>
-  <label class="field"><span>教学经历</span><textarea id="tf-exp">${esc(t.exp)}</textarea></label>
-  <label class="field"><span>擅长领域</span><input type="text" id="tf-good" value="${esc(t.good)}"></label>
+  ${id ? '<div class="muted xs">学历、工作经历、简历原件在老师卡片上的「履历」里填。</div>' : ''}
   ${id?'<div class="muted xs">老师离职后，记得到「链接与权限」里停用他的链接。</div>':'<div class="muted xs">保存后会自动生成这位老师的专属链接。</div>'}
   ${ownerTeacherField(t)}
   <div class="row"><button class="btn pri" data-act="save-teacher" data-v="${id||''}">保存</button>${id && isTop()?`<button class="btn danger sm" style="margin-left:auto" data-act="teacher-del" data-v="${id}">删除这位老师</button>`:''}</div>`);
@@ -875,7 +871,7 @@ document.addEventListener('click', async e => {
       const sid = await act('admin_save_student', {d}, v?'已保存':'已添加。接下来在「概况与课程」里给他添加课程'); await ownerAfterSave('student', sid, before); studentModal(sid,'info'); break; }
     case 'teacher-form': teacherForm(v); break;
     case 'save-teacher': { if(!val('tf-name').trim()){toast('请填写姓名',true);break;}
-      const d={name:val('tf-name'), subject:val('tf-subject'), loc:val('tf-loc'), tz:val('tf-tz'), edu:val('tf-edu'), exp:val('tf-exp'), good:val('tf-good')};
+      const d={name:val('tf-name'), subject:val('tf-subject'), loc:val('tf-loc'), tz:val('tf-tz')};
       if (v){ d.id=v; d.active = val('tf-active')!=='false'; }
       const before = v ? tea(v).book : 'K';
       const tid = await act('admin_save_teacher', {d}, v?'已保存':'已添加，老师的专属链接也生成好了'); await ownerAfterSave('teacher', v || tid, before); closeModal(); break; }
@@ -931,7 +927,6 @@ document.addEventListener('click', async e => {
     case 'done-all': { const ids = needFb().map(l=>l.id); if (!confirm(`把 ${ids.length} 节待确认的课全部标为已上课（按排课时长计入课时）？\n有提前结束、上超或者没上的，请先单独处理。`)) break;
       await act('admin_mark_done_many', {ids}, '已标为已上课'); break; }
     case 'grade': { const t=val('gr-'+v).trim(); if(!t){toast('先写批改意见',true);break;} await act('teacher_grade', {fid:v, fb:t}, '批改完成，学生能看到了'); break; }
-    case 'save-me': await act('teacher_save_profile', {edu:val('me-edu'), exp:val('me-exp'), good:val('me-good')}, '履历已保存'); break;
     case 'confirm': { const [id,r]=v.split('|'); await act('student_confirm', {fid:id, rating:r}, r==='满意'?'已确认，谢谢':'已确认，教务老师会看到你的评价'); break; }
     case 'hw-done': await act('student_hw_done', {fid:v, note:val('hw-'+v)}, '已提交，老师会批改'); break;
     case 'req-open': reqModal(v); break;

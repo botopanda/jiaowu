@@ -1,4 +1,3 @@
-/* 老师履历预览（确认后正式上线；这个文件不在加载清单里） */
 /* ══════════════════════════════════════════════════════════════
    老师履历（数据库第 23 步）—— 只有教务和老师本人看得到，学生、家长拿不到
    · 名片：照片、日文名、一句话、标签、性别 / 生日 / 电话 / 邮箱
@@ -32,9 +31,8 @@ function cvBrief(t){
     <dt>简历原件</dt><dd>${n ? `<span class="tag ok">已上传 ${n} 个</span>` : '<span class="muted">还没上传</span>'}</dd>`;
 }
 function cvFileRow(f){
-  return `<div class="cv-file"><a href="${fileUrl(f)}" target="_blank" rel="noopener"><span class="fpdf">${esc(cvExt(f))}</span><span class="cv-fn">${esc(f.name)}</span></a>
-    <span class="muted xs">${cvSize(f.size || 0)} · ${esc(f.uploaded_by)} ${String(f.created_at).slice(0, 10)}</span>
-    <button class="btn sm danger" data-act="cv-fdel" data-v="${f.id}">删除</button></div>`;
+  return `<div class="cv-file"><a href="${fileUrl(f)}" target="_blank" rel="noopener" title="${esc(f.name)}"><span class="fpdf">${esc(cvExt(f))}</span><span class="cv-fn">${esc(f.name)}</span></a>
+    <div class="row xs"><span class="muted">${cvSize(f.size || 0)} · ${esc(f.uploaded_by)} ${String(f.created_at).slice(0, 10)} 上传</span><button class="btn sm danger" style="margin-left:auto" data-act="cv-fdel" data-v="${f.id}">删除</button></div></div>`;
 }
 const cvEntry = (title, sub, period, note) => `<div class="cv-i"><div class="cv-p">${esc(period || '')}</div><div class="cv-b"><b>${esc(title || '')}</b>${sub ? `<div class="cv-r">${esc(sub)}</div>` : ''}${note ? `<div class="cv-n">${esc(note)}</div>` : ''}</div></div>`;
 
@@ -130,54 +128,3 @@ document.addEventListener('click', async e => {
       await act('cv_file_delete', {fid: v}, '已删除'); reopenModal(); }
   } catch(err) { /* act() 已经提示过 */ }
 });
-
-function pgTeachers(){
-  return `<div class="ph"><h2>老师档案</h2><button class="btn pri" data-act="teacher-form">＋ 新增老师</button></div>
-  <div class="hint">点「履历」看、填老师的简历和资料（学生和家长看不到）；老师也可以在自己链接的「我的」里填。</div>
-  ${DB.teachers.length ? `<div class="grid2 cards-fix">${DB.teachers.map(t => { const cs = DB.courses.filter(c=>c.teacher_id===t.id), ym = TODAY.slice(0,7);
-    const ms = lsOfT(t.id).filter(l=>l.date.startsWith(ym)), p = teacherRealLink(t);
-    const done = ms.filter(l=>paidH(l)>0), plan = ms.filter(l=>l.status==='scheduled'), pn = ms.filter(isPend).length;
-    const hDone = +done.reduce((a,l)=>a+paidH(l),0).toFixed(1), hPlan = +plan.reduce((a,l)=>a+dur(l),0).toFixed(1);
-    const names = [...new Set(cs.map(c=>stu(c.student_id).name))];
-    return `<section class="card"><div class="row" style="margin-bottom:6px">${cvPhoto(t, 'sm')}<h3 style="margin-right:auto;font-size:16px">${esc(t.name)} ${tBookTag(t)}</h3>${t.subject?subjTag(t.subject):''}${t.loc?`<span class="tag mute">${esc(t.loc)}</span>`:''}</div>
-    ${cvOf(t.id).tagline ? `<div class="small" style="margin:-2px 0 6px">${esc(cvOf(t.id).tagline)}</div>` : ''}
-    <dl class="kv small">${cvBrief(t)}
-    <dt>带的学生</dt><dd>${names.map(esc).join('、')||'—'}</dd>
-    <dt>本月已上</dt><dd><b class="num">${hDone}</b> 小时 <span class="muted xs">（${done.length} 节）</span>${pn?` <span class="tag warn">${pn} 节待确认</span>`:''}</dd>
-    <dt>本月应上</dt><dd><b class="num">${hPlan}</b> 小时 <span class="muted xs">（${plan.length} 节）</span></dd></dl>
-    <div class="row" style="margin-top:8px"><button class="btn pri sm" data-act="cv-open" data-v="${t.id}">履历</button><button class="btn sm" data-act="teacher-form" data-v="${t.id}">编辑</button>${p?`<button class="btn sm" data-act="copy-link" data-v="${p.key}">复制老师链接</button>`:''}${ownerFullLinkBtn(t)}</div></section>`}).join('')}</div>` : '<div class="card empty">还没有老师。点右上角「新增老师」开始。</div>'}`;
-}
-
-
-function tMe(t){
-  const ls = lsOfT(t.id).filter(l=>l.date.startsWith(S.teaMonth) && paidH(l)>0), h = ls.reduce((a,l)=>a+paidH(l),0);
-  const months = [TODAY.slice(0,7), ymShift(TODAY.slice(0,7),-1), ymShift(TODAY.slice(0,7),-2)];
-  return `<h3 class="dg" style="margin-top:0">我的履历</h3>${cvView(t)}
-  <section class="card"><div class="row" style="margin-bottom:4px"><h3 style="font-size:16px;margin-right:auto">课时记录</h3><select id="tea-m" data-change="team">${months.map(v=>`<option value="${v}" ${v===S.teaMonth?'selected':''}>${ymLabel(v)}</option>`).join('')}</select></div>
-  <div class="muted xs" style="margin-bottom:4px">自动记录，不用再整理清单发给教务。${ls.length?` 这个月：${payBadge(t.id, S.teaMonth)}`:''}</div>
-  ${ls.length?`<div class="list">${ls.map(l=>`<div class="li small"><span class="num">${sMD(l.date)}</span><span class="num">${timeFor(l,t.tz)}</span><span class="grow">${esc(stu(course(l.course_id).student_id).name)}</span><span class="num">${paidH(l)}h</span>${l.status==='leave'?'<span class="tag seal">请假</span>':''}</div>`).join('')}</div>
-  <div class="row" style="justify-content:flex-end;margin-top:4px"><b class="num">共 ${h} 小时</b></div>`:'<div class="empty">这个月还没有上完的课</div>'}</section>`;
-}
-
-function teacherForm(id){
-  const t = id ? tea(id) : {name:'', subject:'', loc:'', tz:'JP', edu:'', exp:'', good:'', active:true};
-  openModal(`${mHead(id?'编辑老师':'新增老师')}
-  <div class="fields"><label class="field"><span>姓名 *</span><input type="text" id="tf-name" value="${esc(t.name)}" placeholder="例：陆老师"></label>
-  <label class="field"><span>主要科目</span><input type="text" id="tf-subject" value="${esc(t.subject)}" placeholder="可以从列表选，也可以直接写" list="subj-list"><datalist id="subj-list">${SUBJECTS.map(x => `<option value="${x}">`).join('')}</datalist></label>
-  <label class="field"><span>所在地</span><input type="text" id="tf-loc" value="${esc(t.loc)}" placeholder="例：北京"></label>
-  <input type="hidden" id="tf-tz" value="CN">
-  ${id?`<label class="field"><span>状态</span><select id="tf-active"><option value="true" ${t.active?'selected':''}>在职</option><option value="false" ${t.active?'':'selected'}>离职</option></select></label>`:''}</div>
-  ${id ? '<div class="muted xs">学历、工作经历、简历原件在老师卡片上的「履历」里填。</div>' : ''}
-  ${id?'<div class="muted xs">老师离职后，记得到「链接与权限」里停用他的链接。</div>':'<div class="muted xs">保存后会自动生成这位老师的专属链接。</div>'}
-  ${ownerTeacherField(t)}
-  <div class="row"><button class="btn pri" data-act="save-teacher" data-v="${id||''}">保存</button>${id && isTop()?`<button class="btn danger sm" style="margin-left:auto" data-act="teacher-del" data-v="${id}">删除这位老师</button>`:''}</div>`);
-}
-
-function uploadBtn(purpose, ref, label, accept = 'image/*,.pdf,application/pdf'){
-  const id = `up-${purpose}-${ref}`;
-  return `<label class="btn sm" for="${id}" style="display:inline-block">${label}</label><input type="file" id="${id}" accept="${accept}" ${purpose === 'cvp' ? '' : 'multiple'} data-change="file-up" data-purpose="${purpose}" data-ref="${ref}" hidden>`;
-}
-
-// 照片上传前压缩：长边最多 1800 像素，转成 JPEG
-
-window.__cvPreview = 3;

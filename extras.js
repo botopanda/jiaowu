@@ -17,9 +17,9 @@ function fileList(ref, purpose, label){
     ${canDel(f) ? `<button class="fdel" data-act="file-del" data-v="${f.id}" aria-label="删除这个文件">×</button>` : ''}</span>`).join('')}</div>`;
 }
 // 上传按钮
-function uploadBtn(purpose, ref, label){
+function uploadBtn(purpose, ref, label, accept = 'image/*,.pdf,application/pdf'){
   const id = `up-${purpose}-${ref}`;
-  return `<label class="btn sm" for="${id}" style="display:inline-block">${label}</label><input type="file" id="${id}" accept="image/*,.pdf,application/pdf" multiple data-change="file-up" data-purpose="${purpose}" data-ref="${ref}" hidden>`;
+  return `<label class="btn sm" for="${id}" style="display:inline-block">${label}</label><input type="file" id="${id}" accept="${accept}" ${purpose === 'cvp' ? '' : 'multiple'} data-change="file-up" data-purpose="${purpose}" data-ref="${ref}" hidden>`;
 }
 
 // 照片上传前压缩：长边最多 1800 像素，转成 JPEG
@@ -35,19 +35,20 @@ async function shrink(file){
     return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', {type: 'image/jpeg'});
   } catch(e) { return file; }   // 浏览器读不了（比如有些 HEIC），就原样上传
 }
+const MIME_BY_EXT = {pdf: 'application/pdf', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', heif: 'image/heif'};
 async function uploadOne(file, purpose, ref){
-  const f = await shrink(file);
-  if (f.size > 10 * 1024 * 1024) throw new Error(`「${file.name}」超过 10MB，请压缩后再传`);
+  const f = await shrink(file), isCv = /^cv/.test(purpose), max = isCv ? 20 : 10;   // 老师履历的文件（cv / cvp / cvw）走单独的通道
+  if (f.size > max * 1024 * 1024) throw new Error(`「${file.name}」超过 ${max}MB，请压缩后再传`);
   const ext = (f.name.split('.').pop() || '').toLowerCase() || (f.type === 'application/pdf' ? 'pdf' : 'jpg');
-  const path = await rpc('file_ticket', {purpose, ref, ext});
+  const path = await rpc(isCv ? 'cv_ticket' : 'file_ticket', isCv ? {kind: purpose, tid: ref, ext} : {purpose, ref, ext});
   let r;
   try {
     r = await fetch(`${SB_URL}/storage/v1/object/files/${path}`, {
-      method: 'POST', headers: {apikey: SB_KEY, 'Content-Type': f.type || 'application/octet-stream', 'x-upsert': 'false'}, body: f,
+      method: 'POST', headers: {apikey: SB_KEY, 'Content-Type': f.type || MIME_BY_EXT[ext] || 'application/octet-stream', 'x-upsert': 'false'}, body: f,
     });
   } catch(e) { throw new Error(`「${file.name}」没传上去，网络不太稳定，请换个网络或稍后再试`); }
   if (!r.ok) { let m = ''; try { m = (await r.json()).message || ''; } catch(e) {} throw new Error('上传没成功，请稍后再试' + (m ? `（${m}）` : '')); }
-  await rpc('file_done', {fpath: path, fname: file.name, fmime: f.type, fsize: f.size});
+  await rpc(isCv ? 'cv_done' : 'file_done', {fpath: path, fname: file.name, fmime: f.type || MIME_BY_EXT[ext] || '', fsize: f.size});
 }
 document.addEventListener('change', async e => {
   const el = e.target;
@@ -57,7 +58,7 @@ document.addEventListener('change', async e => {
   try {
     for (const f of files) await uploadOne(f, purpose, ref);
     await load(); render(); reopenModal();
-    toast(purpose === 'hw' ? '作业已上传，老师能看到了' : purpose === 'ck' ? '作品已上传' : '已上传，学生能看到了');
+    toast({hw: '作业已上传，老师能看到了', ck: '作品已上传', cv: '简历已上传', cvp: '照片已更新', cvw: '作品已上传'}[purpose] || '已上传，学生能看到了');
   } catch(err) { toast(err.message, true); }
   finally { document.body.classList.remove('busy'); el.value = ''; }
 });
