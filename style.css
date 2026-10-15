@@ -440,3 +440,23 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
   .ck-row{grid-template-columns:24px minmax(0,1fr) auto;grid-template-areas:"no name day" "no lv up" "no ops ops"}
   .ck-up{grid-area:up}
 }
+
+/* ══════ 2026-10-15 设计统一（效果图确认）══════ */
+/* 1. 颜色收一收：红＝要处理，绿＝完成了，其他状态都用灰字；标签去掉边框 */
+.tag{border:0!important;background:none!important;padding:0 2px!important;color:var(--muted)!important;font-weight:400}
+.tag.seal,.tag.warn{color:var(--seal)!important;font-weight:600}
+.tag.ok{color:var(--ok)!important}
+.todo-dot.blue,.todo-dot.gold{background:var(--muted)}
+/* 2. 数字跟正文同一种字体（课表格子里的时间保留等宽，方便对齐） */
+.num,.stat b,.bst b,.cd-n b,.nx-when .num{font-family:var(--f-body)!important;font-variant-numeric:tabular-nums}
+/* 3. 菜单图标、顶栏图标 */
+.nav-ic{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.side .nav{justify-content:flex-start;gap:8px}
+.side .nav .cnt{margin-left:auto}
+.tabbar button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 0 6px}
+.tabbar .dot{top:2px;margin-left:16px}
+.top h1{display:flex;align-items:center}
+.top .logo{width:26px;height:26px;border-radius:6px;margin-right:8px;flex:none}
+/* 4. 卡片更干净：去掉左边彩色竖条，科目颜色只留在科目名前的小方块 */
+.les,.nx-card,.fbx,.fbp{border-left-width:1px!important;border-left-color:var(--line)!important}
+@media (max-width:760px){.side .nav{gap:6px}.side .nav-ic{width:17px;height:17px}}

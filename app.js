@@ -89,6 +89,39 @@ function subjField(id, cur){
     <input type="text" id="${id}-x" value="${other ? esc(cur) : ''}" placeholder="写科目名称，例：电影" ${other ? '' : 'hidden'} style="margin-top:4px"></label>`;
 }
 const subjVal = id => val(id) === '__other' ? val(id + '-x').trim() : val(id);
+// 菜单图标：按菜单名字配（四种身份共用）
+const NAV_ICONS = (() => {
+  const cal = '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>';
+  const chat = '<path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12h5"/>';
+  const flag = '<path d="M5 21V4h11l-2 4 2 4H5"/>';
+  const me = '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>';
+  const home = '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>';
+  return {
+    '总览': '<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/>',
+    '课表与排课': cal, '课表': cal,
+    '改期 · 请假': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    '反馈审批': '<path d="M4 5h16v11H8l-4 4z"/><path d="M9 10l2 2 4-4"/>',
+    '学生档案': '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5 6.5-5s5.5 1.5 6.5 5"/><path d="M16 6h5M16 10h5M18 14h3"/>',
+    '通关点检': flag, '通关': flag,
+    '升学与出愿': '<path d="M3 9l9-5 9 5-9 5z"/><path d="M7 11v5c3 2 7 2 10 0v-5"/>',
+    '院校库': '<path d="M3 21h18M5 21V10M19 21V10M9 21v-6h6v6M3 10l9-6 9 6"/>',
+    '月度回访': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 13h8M8 17h5M8 3v4M16 3v4"/>',
+    '月度': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 13h8M8 17h5M8 3v4M16 3v4"/>',
+    '跟进记录': '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    '老师档案': '<circle cx="12" cy="7" r="3.5"/><path d="M5 21c1-4 3.5-6 7-6s6 2 7 6"/>',
+    '课时与工资': '<rect x="3" y="6" width="18" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/>',
+    '链接与权限': '<path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1"/><path d="M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/>',
+    '数据备份': '<path d="M12 3v12M7 10l5 5 5-5M4 19h16"/>',
+    '首页': home, '概况': home,
+    '作业': '<path d="M5 4h11l3 3v13H5z"/><path d="M9 12h6M9 16h6"/>',
+    '上课记录': chat, '老师反馈': chat,
+    '我的学生': '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5 6.5-5s5.5 1.5 6.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14c3 0 5 2 5.5 5"/>',
+    '反馈·批改': '<path d="M4 5h16v11H8l-4 4z"/><path d="M9 10l2 2 4-4"/>',
+    '档案': '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 16.5c.8-1.6 2-2.3 3.5-2.3s2.7.7 3.5 2.3M15 10h4M15 13h3"/>',
+    '我的': me,
+  };
+})();
+const navIcon = t => NAV_ICONS[t] ? `<svg class="nav-ic" viewBox="0 0 24 24" aria-hidden="true">${NAV_ICONS[t]}</svg>` : '';
 const subjTag = s => `<span class="subj" style="--hc:${hue(s)}">${esc(s)}</span>`;
 const TAGS_GOOD = ['优秀认真','积极配合','进步明显','基础扎实','主动提问'];
 const TAGS_WARN = ['容易走神','未完成任务','基础薄弱','需要督促','状态低迷'];
@@ -174,7 +207,7 @@ function render(){
   const me = ME();
   const label = me.role==='admin' ? (me.owner ? '总管理' : me.level==='top' ? '教务 · 管理' : '教务') : {teacher:'任课老师', student:'学生', parent:'家长'}[me.role];
   setTimeout(labelTables);
-  app.innerHTML = `<header class="top"><h1>学生教务管理系统</h1>${me.owner ? bookSwitch() : ''}<span class="who">${esc(me.name)}${me.role==='parent' || me.owner ?'':' · '+label}</span>${['student','parent'].includes(me.role) ? '' : '<button class="btn sm" data-act="logout" title="让这台设备忘掉你的链接">退出</button>'}</header>` + (isAdmin() ? adminView() : phoneView());
+  app.innerHTML = `<header class="top"><h1><img class="logo" src="apple-touch-icon.png" alt="">学生教务管理系统</h1>${me.owner ? bookSwitch() : ''}<span class="who">${esc(me.name)}${me.role==='parent' || me.owner ?'':' · '+label}</span>${['student','parent'].includes(me.role) ? '' : '<button class="btn sm" data-act="logout" title="让这台设备忘掉你的链接">退出</button>'}</header>` + (isAdmin() ? adminView() : phoneView());
 }
 
 /* ═════════════ 教务端 ═════════════ */
@@ -186,7 +219,7 @@ function adminView(){
        ['管理',[['teachers','老师档案'],['payroll','课时与工资'],['links','链接与权限'],['backup','数据备份']]]]
     : [['日常',[['overview','总览'],['calendar','课表与排课']]],['学生',[['students','学生档案'],['checks','通关点检'],['apply','升学与出愿'],['schools','院校库'],['reviews','月度回访'],['followups','跟进记录']]]];
   const nav = items.map(([g,list]) => `<div class="grp">${g}</div>` + list.map(([k,t,n]) =>
-    `<button class="nav ${S.page===k?'on':''}" data-act="page" data-v="${k}"><span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')).join('');
+    `<button class="nav ${S.page===k?'on':''}" data-act="page" data-v="${k}">${navIcon(t)}<span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')).join('');
   const P = {backup:pgBackup, checks:pgChecks, overview:pgOverview, calendar:pgCalendar, requests:pgRequests, apply:pgApply2, reviews:pgReviews, followups:pgFollowups, feedback:pgFeedback, students:pgStudents, teachers:pgTeachers, payroll:pgPayroll, links:pgLinks, schools:pgSchools};
   const page = (isTop() || ['overview','calendar','students','checks','apply','schools','reviews','followups'].includes(S.page)) ? (P[S.page]||pgOverview) : pgOverview;
   return `<div class="layout"><nav class="side" aria-label="教务导航">${nav}</nav><main class="main">${page()}</main></div>`;
@@ -430,9 +463,9 @@ function phoneView(){
     body = {a:pOverview,b:pFeedback,c:pSchedule,d:s=>profilePage(s,{hideEmpty:true}),e:pMonthly,f:sCheck}[S.tab]?.(s) ?? pOverview(s);
   }
   // 电脑上菜单在左侧（和教务一样），手机上在底部（大拇指好点）
-  return `<div class="layout pl"><nav class="side pside" aria-label="菜单">${tabs.map(([k,t,n])=>`<button class="nav ${S.tab===k?'on':''}" data-act="tab" data-v="${k}"><span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')}</nav>
+  return `<div class="layout pl"><nav class="side pside" aria-label="菜单">${tabs.map(([k,t,n])=>`<button class="nav ${S.tab===k?'on':''}" data-act="tab" data-v="${k}">${navIcon(t)}<span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')}</nav>
     <div class="pw"><div class="phone"><div class="p-body">${body}</div></div></div></div>
-    <nav class="tabbar" style="grid-template-columns:repeat(${tabs.length},1fr)">${tabs.map(([k,t,n])=>`<button class="${S.tab===k?'on':''}" data-act="tab" data-v="${k}">${t}${n?`<span class="dot">${n}</span>`:''}</button>`).join('')}</nav>`;
+    <nav class="tabbar" style="grid-template-columns:repeat(${tabs.length},1fr)">${tabs.map(([k,t,n])=>`<button class="${S.tab===k?'on':''}" data-act="tab" data-v="${k}">${navIcon(t)}<span>${t}</span>${n?`<span class="dot">${n}</span>`:''}</button>`).join('')}</nav>`;
 }
 function reqLine(q){
   if (!q) return '';
