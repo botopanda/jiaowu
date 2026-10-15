@@ -15,7 +15,7 @@ function sWeek(s){
   const ls = lsOfS(s.id).filter(l => l.status === 'scheduled' && l.date >= TODAY && l.date <= end);
   return `<section class="card"><div class="row"><h3 class="sh-h" style="margin-right:auto">本周课程</h3><button class="btn sm" data-act="tab" data-v="b">看课表 ›</button></div>
     ${ls.length ? `<div class="wk">${ls.map(l => { const c = course(l.course_id);
-      return `<div class="wk-row ${l.date === TODAY ? 'today' : ''}"><span class="wk-d">${dayWord(l.date)}</span><span class="num">${timeFor(l, s.tz)}</span><span class="grow">${subjTag(c.subject)}${l.kind ? `<span class="muted xs"> · ${esc(l.kind)}</span>` : ''}</span><span class="muted small">${esc(tea(c.teacher_id).name)}</span></div>`; }).join('')}</div>`
+      return `<div class="wk-row ${l.date === TODAY ? 'today' : ''} ${l.date === TODAY && l.end <= nowJST() ? 'past' : ''}"><span class="wk-d">${dayWord(l.date)}</span><span class="num">${timeFor(l, s.tz)}</span><span class="grow">${subjTag(c.subject)}${l.kind ? `<span class="muted xs"> · ${esc(l.kind)}</span>` : ''}</span><span class="muted small">${esc(tea(c.teacher_id).name)}</span></div>`; }).join('')}</div>`
       : `<div class="sh-empty">${sUp(s).length ? '这 7 天没有课。' : '还没有排课，老师排好后会显示在这里。'}</div>`}</section>`;
 }
 // 通关进度（有点检表才显示）
@@ -58,6 +58,7 @@ function sSide(s){
   .wk-row:first-child{border-top:0}
   .wk-row.today .wk-d{color:var(--seal);font-weight:600}
   .wk-d{min-width:96px;font-size:13px}
+  .wk-row.past{opacity:.45}
   .sh-empty{color:var(--muted);font-size:13.5px;padding:10px 0 4px}
   .side-me{display:flex;align-items:center;gap:10px;padding:6px 8px 14px;margin-bottom:6px;border-bottom:1px solid var(--line)}
   .side-av{width:40px;height:40px;border-radius:50%;background:var(--gold);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex:none}
