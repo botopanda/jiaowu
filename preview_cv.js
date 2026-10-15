@@ -21,8 +21,8 @@ const cvExt = f => (f.name.split('.').pop() || '').toUpperCase().slice(0, 4);
 // 头像：有照片用照片，没有就用名字最后一个字
 function cvPhoto(t, big){
   const p = cvFiles(t.id, 'cvp')[0];
-  return p ? `<a class="cv-ph ${big ? 'big' : ''}" href="${fileUrl(p)}" target="_blank" rel="noopener"><img src="${fileUrl(p)}" alt="${esc(t.name)}的照片"></a>`
-           : `<span class="cv-ph ${big ? 'big' : ''} none">${esc((t.name || '?').replace('老师', '').slice(-1))}</span>`;
+  return p ? `<a class="cv-ph ${big || ''}" href="${fileUrl(p)}" target="_blank" rel="noopener"><img src="${fileUrl(p)}" alt="${esc(t.name)}的照片"></a>`
+           : `<span class="cv-ph ${big || ''} none">${esc((t.name || '?').replace('老师', '').slice(-1))}</span>`;
 }
 // 老师档案卡片上的一小段摘要
 function cvBrief(t){
@@ -43,7 +43,7 @@ function cvView(t){
   const c = cvOf(t.id), cvs = cvFiles(t.id, 'cv'), works = cvFiles(t.id, 'cvw'), age = cvAge(c.birthday);
   const info = [['性别', c.gender], ['生日', c.birthday ? `${c.birthday}${age !== '' ? `（${age} 岁）` : ''}` : ''], ['电话', c.phone], ['邮箱', c.email]].filter(x => x[1]);
   const empty = !c.tagline && !(c.edu || []).length && !(c.jobs || []).length;
-  return `<section class="card cv-head">${cvPhoto(t, true)}
+  return `<section class="card cv-head">${cvPhoto(t, 'big')}
     <div class="cv-id"><div class="cv-name">${esc(t.name)}${c.ja ? `<span class="muted">${esc(c.ja)}</span>` : ''}</div>
       ${c.tagline ? `<div class="cv-tl">${esc(c.tagline)}</div>` : ''}
       ${(c.tags || []).length ? `<div class="cv-tags">${c.tags.map(x => `<span>${esc(x)}</span>`).join('')}</div>` : ''}
@@ -56,10 +56,10 @@ function cvView(t){
       <section class="card"><h3 class="cv-h">工作经历</h3>${(c.jobs || []).length ? c.jobs.map(j => cvEntry(j.org, j.role, j.period, j.note)).join('') : '<div class="muted small">还没填</div>'}</section>
     </div>
     <div class="cv-col">
-      <section class="card"><h3 class="cv-h">学历</h3>${(c.edu || []).length ? c.edu.map(e => cvEntry(e.school, e.degree, e.period, e.note)).join('') : '<div class="muted small">还没填</div>'}</section>
       <section class="card"><div class="row"><h3 class="cv-h" style="margin-right:auto">简历原件</h3>${uploadBtn('cv', t.id, '上传简历', 'image/*,.pdf,application/pdf,.doc,.docx')}</div>
         <div class="muted xs">PDF、Word、图片都可以，一个文件最大 20MB。</div>
         ${cvs.length ? cvs.map(cvFileRow).join('') : '<div class="muted small" style="margin-top:6px">还没上传</div>'}</section>
+      <section class="card"><h3 class="cv-h">学历</h3>${(c.edu || []).length ? c.edu.map(e => cvEntry(e.school, e.degree, e.period, e.note)).join('') : '<div class="muted small">还没填</div>'}</section>
       <section class="card"><div class="row"><h3 class="cv-h" style="margin-right:auto">代表作品</h3>${uploadBtn('cvw', t.id, '上传作品')}</div>
         ${works.length ? `<div class="cv-works">${works.map(f => `<span class="fitem"><a href="${fileUrl(f)}" target="_blank" rel="noopener" title="${esc(f.name)}">${isImg(f) ? `<img src="${fileUrl(f)}" alt="${esc(f.name)}" loading="lazy">` : `<span class="fpdf">PDF</span><span class="fname">${esc(f.name)}</span>`}</a><button class="fdel" data-act="cv-fdel" data-v="${f.id}" aria-label="删除这个作品">×</button></span>`).join('')}</div>` : '<div class="muted small">还没上传</div>'}</section>
       ${c.memo ? `<section class="card"><h3 class="cv-h">备注</h3><div class="cv-n">${esc(c.memo)}</div></section>` : ''}
@@ -139,7 +139,7 @@ function pgTeachers(){
     const done = ms.filter(l=>paidH(l)>0), plan = ms.filter(l=>l.status==='scheduled'), pn = ms.filter(isPend).length;
     const hDone = +done.reduce((a,l)=>a+paidH(l),0).toFixed(1), hPlan = +plan.reduce((a,l)=>a+dur(l),0).toFixed(1);
     const names = [...new Set(cs.map(c=>stu(c.student_id).name))];
-    return `<section class="card"><div class="row" style="margin-bottom:6px"><h3 style="margin-right:auto;font-size:16px">${esc(t.name)} ${tBookTag(t)}</h3>${t.subject?subjTag(t.subject):''}${t.loc?`<span class="tag mute">${esc(t.loc)}</span>`:''}</div>
+    return `<section class="card"><div class="row" style="margin-bottom:6px">${cvPhoto(t, 'sm')}<h3 style="margin-right:auto;font-size:16px">${esc(t.name)} ${tBookTag(t)}</h3>${t.subject?subjTag(t.subject):''}${t.loc?`<span class="tag mute">${esc(t.loc)}</span>`:''}</div>
     ${cvOf(t.id).tagline ? `<div class="small" style="margin:-2px 0 6px">${esc(cvOf(t.id).tagline)}</div>` : ''}
     <dl class="kv small">${cvBrief(t)}
     <dt>带的学生</dt><dd>${names.map(esc).join('、')||'—'}</dd>
@@ -180,4 +180,4 @@ function uploadBtn(purpose, ref, label, accept = 'image/*,.pdf,application/pdf')
 
 // 照片上传前压缩：长边最多 1800 像素，转成 JPEG
 
-window.__cvPreview = true;
+window.__cvPreview = 2;
