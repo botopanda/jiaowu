@@ -1,11 +1,13 @@
 /* ══════════════════════════════════════════════════════════════
    学生端（2026-10 改版）
    底部菜单：首页 / 课表 / 作业 / 上课记录 / 我的
-   · 首页：下一节课、待办、出愿倒计时、本月学习计划
+   · 首页：下一节课、本周课程、待办 ｜ 通关进度、最近反馈、出愿倒计时、本月学习计划
+   · 电脑左侧菜单：上面学生名片，下面「我的老师」
    · 上课记录、作业：平时收起，点开看全文
    · 我的：目标大学与出愿日程、成绩变化、月度自评、个人档案
    ══════════════════════════════════════════════════════════════ */
 const nowJST = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16);   // 现在几点（北京时间）
+const addDay = (d, n) => { const x = pd(d); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`; };
 const dayWord = d => { const n = dBetween(TODAY, d); return n === 0 ? '今天' : n === 1 ? '明天' : n === 2 ? '后天' : fmtMD(d); };
 const sUnHw = s => latestHw(s.id).filter(f => !f.hw_sub);
 const sUnConfirm = s => fbOfS(s.id).filter(f => !f.confirm);
@@ -18,9 +20,50 @@ function sView(s){ return ({a:sHome2, b:sSched, c:sHomework2, d:sFeedback2, e:sM
 /* ───────── 首页 ───────── */
 function sHome2(s){
   const h = +nowJST().slice(0,2), greet = h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 13 ? '中午好' : h < 18 ? '下午好' : '晚上好';
-  return `<div class="sh-hi"><h2>${greet}</h2><span class="muted small">${fmtMD(TODAY)}</span></div>
-  <div class="grid2 sh-grid"><div class="sh-col">${sNextCard(s)}${sTodo(s)}</div><div class="sh-col">${sCountdown(s)}
-    <section class="card"><h3 class="sh-h">${+TODAY.slice(5,7)} 月学习计划</h3>${mpView(s.id, TODAY.slice(0,7))}</section></div></div>`;
+  return `<div class="sh-hi"><h2>${greet}，${esc(s.name)}</h2><span class="muted small">${fmtMD(TODAY)}</span></div>
+  <div class="grid2 sh-grid"><div class="sh-col">${sUp(s).length ? sNextCard(s) : ''}${sWeek(s)}${sTodo(s)}</div>
+    <div class="sh-col">${sCkCard(s)}${sLastFb(s)}${sCountdown(s)}
+      <section class="card"><h3 class="sh-h">${+TODAY.slice(5,7)} 月学习计划</h3>${mpView(s.id, TODAY.slice(0,7))}</section></div></div>`;
+}
+const sUp = s => { const now = nowJST(); return lsOfS(s.id).filter(l => l.status === 'scheduled' && (l.date > TODAY || (l.date === TODAY && l.end > now))); };
+// 本周课程：今天起 7 天，一行一节
+function sWeek(s){
+  const end = addDay(TODAY, 6);
+  const ls = lsOfS(s.id).filter(l => l.status === 'scheduled' && l.date >= TODAY && l.date <= end);
+  return `<section class="card"><div class="row"><h3 class="sh-h" style="margin-right:auto">本周课程</h3><button class="btn sm" data-act="tab" data-v="b">看课表 ›</button></div>
+    ${ls.length ? `<div class="wk">${ls.map(l => { const c = course(l.course_id);
+      return `<div class="wk-row ${l.date === TODAY ? 'today' : ''} ${l.date === TODAY && l.end <= nowJST() ? 'past' : ''}"><span class="wk-d">${dayWord(l.date)}</span><span class="num">${timeFor(l, s.tz)}</span><span class="grow">${subjTag(c.subject)}${l.kind ? `<span class="muted xs"> · ${esc(l.kind)}</span>` : ''}</span><span class="muted small">${esc(tea(c.teacher_id).name)}</span></div>`; }).join('')}</div>`
+      : `<div class="sh-empty">${sUp(s).length ? '这 7 天没有课。' : '还没有排课，老师排好后会显示在这里。'}</div>`}</section>`;
+}
+// 通关进度（有点检表才显示）
+function sCkCard(s){
+  if (typeof ckListsOf === 'undefined') return '';
+  const ls = ckListsOf(s.id); if (!ls.length) return '';
+  const st = ckStat({items: ls.flatMap(l => l.items)});
+  return `<section class="card"><div class="row"><h3 class="sh-h" style="margin-right:auto">通关进度</h3><button class="btn sm" data-act="tab" data-v="f">去看 ›</button></div>
+    <div class="ck-bar" style="max-width:none;margin-top:6px"><i style="width:${st.pct}%"></i></div>
+    <div class="small" style="margin-top:6px">已通关 <span class="ck-frac">${st.pass} / ${st.n}</span> 关${st.cur ? `<span class="muted"> · 现在：${esc(st.cur.stage)} · ${esc(st.cur.name)}</span>` : ''}</div></section>`;
+}
+// 最近一次老师反馈
+function sLastFb(s){
+  const fs = fbOfS(s.id), f = fs[fs.length - 1];
+  if (!f) return `<section class="card"><h3 class="sh-h">最近的老师反馈</h3><div class="sh-empty">上完第一节课后，老师写的反馈会出现在这里。</div></section>`;
+  const l = L(f.lesson_id), c = course(l.course_id), txt = String(f.content || '');
+  return `<section class="card"><div class="row"><h3 class="sh-h" style="margin-right:auto">最近的老师反馈</h3><button class="btn sm" data-act="tab" data-v="d">全部 ›</button></div>
+    <div class="small"><span class="muted">${fmtMD(l.date)}</span> ${subjTag(c.subject)} <span class="muted">${esc(tea(c.teacher_id).name)}</span></div>
+    <div style="margin-top:4px">${esc(txt.slice(0, 70))}${txt.length > 70 ? '…' : ''}</div>
+    ${f.hw ? `<div class="small" style="margin-top:4px"><span class="muted">作业：</span>${esc(f.hw)}</div>` : ''}</section>`;
+}
+// 左边菜单栏：上面学生小名片，下面「我的老师」
+function sSide(s){
+  const cs = DB.courses.filter(c => c.student_id === s.id && c.active !== false), by = {};
+  cs.forEach(c => (by[c.teacher_id] ??= []).push(c.subject));
+  const sub = [s.direction || s.track, s.target_ym ? `目标 ${tgtLabel(s.target_ym)}` : ''].filter(Boolean);
+  return {
+    top: `<div class="side-me"><span class="side-av">${esc((s.name || '?').slice(-1))}</span><div><b>${esc(s.name)}</b>${sub.map(x => `<div class="muted xs">${esc(x)}</div>`).join('')}</div></div>`,
+    bottom: `<div class="side-foot">${Object.keys(by).length ? `<div class="grp">我的老师</div>${Object.entries(by).map(([tid, subs]) => `<div class="side-tea"><b>${esc(tea(tid).name)}</b><span class="muted xs">${subs.map(esc).join('、')}</span></div>`).join('')}` : ''}
+      <div class="muted xs side-help">有问题直接微信联系教务老师</div></div>`,
+  };
 }
 function sNextCard(s){
   const now = nowJST();
