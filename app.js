@@ -315,7 +315,7 @@ function pgCalendar(){
     <div class="seg">${[['all','全部'],['s','按学生'],['t','按老师']].map(([k,t])=>`<button class="${S.calType===k?'on':''}" data-act="caltype" data-v="${k}">${t}</button>`).join('')}</div>
     ${who.length ? `<select id="cal-who" data-change="calwho"><option value="">选择${S.calType==='s'?'学生':'老师'}…</option>${who.map(x=>`<option value="${x.id}" ${S.calId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`:''}
   </div>
-  <div class="row"><h3 style="font-size:16px">${esc(title)}</h3><span class="muted xs">共 ${ls.length} 节 · ${hours} 小时 · 北京时间 · 划线＝请假 · 「调」＝调过课 · ${slotLegend()}</span></div>
+  <div class="row"><h3 style="font-size:16px">${esc(title)}</h3><span class="muted xs">共 ${ls.length} 节 · ${hours} 小时 · 北京时间 · 划线＝请假 · 「调」＝调过课 · ${slotLegend()}</span>${S.calType==='s' && S.calId ? `<span style="margin-left:auto">${sxBtn(S.calId)}</span>` : ''}</div>
   <div class="cal">${cells}</div><div class="agenda">${agenda}</div>`;
 }
 
@@ -492,9 +492,9 @@ function lessonItem(l, tz, whoFn, canReq, canEdit){
   return `<div class="les" style="--hc:${slotHue(timeFor(l,tz))}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}</div><div style="min-width:0;flex:1">${subjTag(c.subject)}${l.kind?` <span class="tag mute">${esc(l.kind)}</span>`:''} · ${esc(whoFn(c))}${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调课</span>':''}${l.status==='leave'?' <span class="tag seal">请假</span>':''}${l.status==='cancelled'?' <span class="tag mute">已取消</span>':''}${['student','parent'].includes(ME().role) ? (l.status==='scheduled' && l.date<TODAY ? ' <span class="tag mute">已上</span>' : '') : `${isDone(l)?(hasFb(l)?' <span class="tag ok">已反馈</span>':' <span class="tag ok">已上</span>'):''}${isPend(l)?` <span class="tag warn">${ME().role==='teacher'?'待写反馈':'待确认'}</span>`:''}`}${hrsTag(l)}
     ${reqLine(q)}${canReq && !leave && l.date>=TODAY && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave && !fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}</div></div>`;
 }
-function schedule(ls, tz, whoFn, canReq=false, canEdit=false){
+function schedule(ls, tz, whoFn, canReq=false, canEdit=false, extra=''){
   const toggle = `<div class="seg" role="group" aria-label="课表看法">${[['cal','月历'],['list','列表']].map(([k,t])=>`<button class="${PV===k?'on':''}" data-act="pview" data-v="${k}">${t}</button>`).join('')}</div>`;
-  if (PV==='list') return `<div class="row" style="justify-content:space-between">${tzNote(tz)}${toggle}</div>${agenda(ls,tz,whoFn,30,canReq,canEdit)}`;
+  if (PV==='list') return `<div class="row" style="justify-content:space-between">${tzNote(tz)}<span class="row">${extra}${toggle}</span></div>${agenda(ls,tz,whoFn,30,canReq,canEdit)}`;
   const ym = S.pMonth || (S.pMonth = TODAY.slice(0,7)), [y,m] = ym.split('-').map(Number);
   const first = new Date(y,m-1,1), last = new Date(y,m,0).getDate(), lead = (first.getDay()+6)%7;
   const sel = S.pDay && S.pDay.startsWith(ym) ? S.pDay : (TODAY.startsWith(ym) ? TODAY : `${ym}-01`);
@@ -509,7 +509,7 @@ function schedule(ls, tz, whoFn, canReq=false, canEdit=false){
       ${dl.length>3?`<span class="more m">+${dl.length-3}</span>`:''}${dl.length>5?`<span class="more d">+${dl.length-5}</span>`:''}</button>`;
   }
   const day = mine.filter(l=>l.date===sel);
-  return `<div class="row" style="justify-content:space-between">${tzNote(tz)}${toggle}</div>
+  return `<div class="row" style="justify-content:space-between">${tzNote(tz)}<span class="row">${extra}${toggle}</span></div>
   <div class="card ph-cal">
     <div class="row" style="justify-content:space-between;margin-bottom:6px"><button class="btn sm" data-act="pmonth" data-v="-1" aria-label="上个月">‹</button>
       <b class="num" style="font-size:16px">${y}.${pad(m)}</b><span class="row"><button class="btn sm" data-act="pmonth" data-v="0">本月</button><button class="btn sm" data-act="pmonth" data-v="1" aria-label="下个月">›</button></span></div>
@@ -619,7 +619,7 @@ function pOverview(s){
   ${block(prev)}<div class="dg">接下来的课</div>${agenda(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name,4)}`;
 }
 const pFeedback = s => `<div class="muted xs">老师的课后反馈经教务审核后显示在这里。</div>` + (fbOfS(s.id).slice().reverse().slice(0,20).map(f=>fbMini(f,false)).join('') || '<div class="empty">还没有反馈</div>');
-const pSchedule = s => schedule(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name);
+const pSchedule = s => schedule(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name,false,false,sxBtn(s.id));
 
 /* ═════════════ 弹窗 ═════════════ */
 const mroot = document.getElementById('modal-root');

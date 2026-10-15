@@ -53,13 +53,15 @@ async function sxCanvas(sid, ym){
         g.fillStyle = SX_TINT[sl]; sxRound(g, cx, cy, cw, CH, 6); g.fill();
         g.fillStyle = SX_C[sl]; sxRound(g, cx, cy, 4, CH, 2); g.fill();
         g.fillStyle = SX_C.ink; g.font = font(14, true); g.fillText(`${l.start}–${l.end}`, cx + 9, cy + 21);
-        if (l.makeup) { g.fillStyle = SX_C.seal; g.font = font(11, true); g.textAlign = 'right'; g.fillText('补', cx + cw - 5, cy + 20); g.textAlign = 'left'; }
-        const who = tea(co.teacher_id).name || '', avail = cw - 14;
+        // 第二行：［补］科目·课程类型（放不下就只写科目）……右边是老师
+        let lx = cx + 9;
+        if (l.makeup) { g.fillStyle = SX_C.seal; g.font = font(12.5, true); g.fillText('补', lx, cy + 40); lx += g.measureText('补').width + 4; }
+        const who = tea(co.teacher_id).name || '', avail = cx + cw - 5 - lx;
         g.font = font(12.5); const ww = g.measureText(who).width;
         let what = co.subject + (l.kind ? '·' + l.kind : '');
         g.font = font(12.5, true); if (g.measureText(what).width + ww + 6 > avail) what = co.subject;
-        what = sxFit(g, what, Math.max(30, avail - ww - 6));
-        g.fillStyle = SX_C[sl]; g.fillText(what, cx + 9, cy + 40);
+        what = sxFit(g, what, Math.max(24, avail - ww - 6));
+        g.fillStyle = SX_C[sl]; g.fillText(what, lx, cy + 40);
         const wl = g.measureText(what).width; g.fillStyle = SX_C.muted; g.font = font(12.5); g.textAlign = 'right'; g.fillText(sxFit(g, who, Math.max(0, avail - wl - 6)), cx + cw - 5, cy + 40); g.textAlign = 'left';
       });
     }

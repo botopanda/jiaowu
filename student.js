@@ -102,7 +102,7 @@ function sCountdown(s){
 }
 
 /* ───────── 课表 ───────── */
-const sSched = s => `<div class="muted xs">点某一天看当天的课；有事可以在课下面申请改期或请假。</div>${schedule(lsOfS(s.id), s.tz, c => tea(c.teacher_id).name, true)}`;
+const sSched = s => `<div class="muted xs">点某一天看当天的课；有事可以在课下面申请改期或请假。</div>${schedule(lsOfS(s.id), s.tz, c => tea(c.teacher_id).name, true, false, sxBtn(s.id))}`;
 
 /* ───────── 作业：平时收起，点「我完成了」再填 ───────── */
 function sHomework2(s){
