@@ -49,16 +49,16 @@ function cvView(t){
       ${(c.tags || []).length ? `<div class="cv-tags">${c.tags.map(x => `<span>${esc(x)}</span>`).join('')}</div>` : ''}
       ${info.length ? `<dl class="kv small cv-info">${info.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : ''}
       <div class="row" style="margin-top:6px">${uploadBtn('cvp', t.id, cvFiles(t.id, 'cvp').length ? '换照片' : '上传照片', 'image/*')}<button class="btn pri sm" data-act="cv-edit" data-v="${t.id}">编辑履历</button></div>
-    </div></section>
+    </div>
+    <div class="cv-orig"><div class="row"><h3 class="cv-h" style="margin:0 auto 0 0">简历原件</h3>${uploadBtn('cv', t.id, '上传简历', 'image/*,.pdf,application/pdf,.doc,.docx')}</div>
+      <div class="muted xs" style="margin-top:2px">电子版简历传在这里。PDF、Word、图片都可以，一个最大 20MB。</div>
+      ${cvs.length ? cvs.map(cvFileRow).join('') : '<div class="cv-none">还没上传</div>'}</div></section>
   ${empty ? `<div class="note">履历还没填。点「编辑履历」按块填写；手上有电子版简历的，先在「简历原件」里传上来。</div>` : ''}
   <div class="cv-grid">
     <div class="cv-col">
       <section class="card"><h3 class="cv-h">工作经历</h3>${(c.jobs || []).length ? c.jobs.map(j => cvEntry(j.org, j.role, j.period, j.note)).join('') : '<div class="muted small">还没填</div>'}</section>
     </div>
     <div class="cv-col">
-      <section class="card"><div class="row"><h3 class="cv-h" style="margin-right:auto">简历原件</h3>${uploadBtn('cv', t.id, '上传简历', 'image/*,.pdf,application/pdf,.doc,.docx')}</div>
-        <div class="muted xs">PDF、Word、图片都可以，一个文件最大 20MB。</div>
-        ${cvs.length ? cvs.map(cvFileRow).join('') : '<div class="muted small" style="margin-top:6px">还没上传</div>'}</section>
       <section class="card"><h3 class="cv-h">学历</h3>${(c.edu || []).length ? c.edu.map(e => cvEntry(e.school, e.degree, e.period, e.note)).join('') : '<div class="muted small">还没填</div>'}</section>
       <section class="card"><div class="row"><h3 class="cv-h" style="margin-right:auto">代表作品</h3>${uploadBtn('cvw', t.id, '上传作品')}</div>
         ${works.length ? `<div class="cv-works">${works.map(f => `<span class="fitem"><a href="${fileUrl(f)}" target="_blank" rel="noopener" title="${esc(f.name)}">${isImg(f) ? `<img src="${fileUrl(f)}" alt="${esc(f.name)}" loading="lazy">` : `<span class="fpdf">PDF</span><span class="fname">${esc(f.name)}</span>`}</a><button class="fdel" data-act="cv-fdel" data-v="${f.id}" aria-label="删除这个作品">×</button></span>`).join('')}</div>` : '<div class="muted small">还没上传</div>'}</section>
@@ -102,8 +102,8 @@ function cvForm(){
     <label class="field"><span>生日</span><input type="date" id="cvf-birthday" value="${esc(d.birthday || '')}"></label></div>
   <label class="field"><span>一句话介绍</span><input type="text" id="cvf-tagline" value="${esc(d.tagline || '')}" placeholder="例：擅长漫画、角色设计与古风技法"></label>
   <label class="field"><span>标签（用顿号或空格隔开）</span><input type="text" id="cvf-tags" value="${esc((d.tags || []).join('、'))}" placeholder="例：漫画、角色设计、分镜"></label>
-  <div class="fields"><label class="field"><span>电话</span><input type="tel" id="cvf-phone" value="${esc(d.phone || '')}"></label>
-    <label class="field"><span>邮箱</span><input type="email" id="cvf-email" value="${esc(d.email || '')}"></label></div>
+  <div class="fields"><label class="field"><span>电话</span><input type="text" inputmode="tel" id="cvf-phone" value="${esc(d.phone || '')}"></label>
+    <label class="field"><span>邮箱</span><input type="text" inputmode="email" id="cvf-email" value="${esc(d.email || '')}"></label></div>
   ${cvBlock('jobs', CV_JOB, '工作经历（新的放上面）')}
   ${cvBlock('edu', CV_EDU, '学历')}
   <label class="field"><span>备注</span><textarea id="cvf-memo" rows="2">${esc(d.memo || '')}</textarea></label>
@@ -180,4 +180,4 @@ function uploadBtn(purpose, ref, label, accept = 'image/*,.pdf,application/pdf')
 
 // 照片上传前压缩：长边最多 1800 像素，转成 JPEG
 
-window.__cvPreview = 2;
+window.__cvPreview = 3;
