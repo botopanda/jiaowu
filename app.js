@@ -31,11 +31,14 @@ async function readShort(){
 }
 
 async function rpc(fn, args = {}){
-  const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
-    method: 'POST',
-    headers: {apikey: SB_KEY, 'Content-Type': 'application/json'},
-    body: JSON.stringify({k: KEY, ...args}),
-  });
+  let r;
+  try {
+    r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: {apikey: SB_KEY, 'Content-Type': 'application/json'},
+      body: JSON.stringify({k: KEY, ...args}),
+    });
+  } catch(e) { throw new Error('网络不太稳定，没连上，请稍后再试'); }   // 断网、信号差时浏览器只会报英文 Failed to fetch
   const text = await r.text();
   let j = null; try { j = text ? JSON.parse(text) : null; } catch(e) {}
   if (!r.ok) {

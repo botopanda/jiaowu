@@ -40,9 +40,12 @@ async function uploadOne(file, purpose, ref){
   if (f.size > 10 * 1024 * 1024) throw new Error(`「${file.name}」超过 10MB，请压缩后再传`);
   const ext = (f.name.split('.').pop() || '').toLowerCase() || (f.type === 'application/pdf' ? 'pdf' : 'jpg');
   const path = await rpc('file_ticket', {purpose, ref, ext});
-  const r = await fetch(`${SB_URL}/storage/v1/object/files/${path}`, {
-    method: 'POST', headers: {apikey: SB_KEY, 'Content-Type': f.type || 'application/octet-stream', 'x-upsert': 'false'}, body: f,
-  });
+  let r;
+  try {
+    r = await fetch(`${SB_URL}/storage/v1/object/files/${path}`, {
+      method: 'POST', headers: {apikey: SB_KEY, 'Content-Type': f.type || 'application/octet-stream', 'x-upsert': 'false'}, body: f,
+    });
+  } catch(e) { throw new Error(`「${file.name}」没传上去，网络不太稳定，请换个网络或稍后再试`); }
   if (!r.ok) { let m = ''; try { m = (await r.json()).message || ''; } catch(e) {} throw new Error('上传没成功，请稍后再试' + (m ? `（${m}）` : '')); }
   await rpc('file_done', {fpath: path, fname: file.name, fmime: f.type, fsize: f.size});
 }
