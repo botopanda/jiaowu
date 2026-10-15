@@ -477,3 +477,5 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 .side-help{padding:8px 10px 0}
 
 @media (min-width:761px){.pside{display:flex;flex-direction:column}}
+/* 链接做成的按钮不要下划线（导出图片的「下载图片」） */
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
