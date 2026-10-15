@@ -4,10 +4,11 @@ const addDay = (d, n) => { const x = pd(d); x.setDate(x.getDate() + n); return `
 function sHome2(s){
   const h = +nowJST().slice(0,2), greet = h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 13 ? '中午好' : h < 18 ? '下午好' : '晚上好';
   return `<div class="sh-hi"><h2>${greet}，${esc(s.name)}</h2><span class="muted small">${fmtMD(TODAY)}</span></div>
-  <div class="grid2 sh-grid"><div class="sh-col">${sNextCard(s)}${sWeek(s)}${sTodo(s)}</div>
+  <div class="grid2 sh-grid"><div class="sh-col">${sUp(s).length ? sNextCard(s) : ''}${sWeek(s)}${sTodo(s)}</div>
     <div class="sh-col">${sCkCard(s)}${sLastFb(s)}${sCountdown(s)}
       <section class="card"><h3 class="sh-h">${+TODAY.slice(5,7)} 月学习计划</h3>${mpView(s.id, TODAY.slice(0,7))}</section></div></div>`;
 }
+const sUp = s => { const now = nowJST(); return lsOfS(s.id).filter(l => l.status === 'scheduled' && (l.date > TODAY || (l.date === TODAY && l.end > now))); };
 // 本周课程：今天起 7 天，一行一节
 function sWeek(s){
   const end = addDay(TODAY, 6);
@@ -15,7 +16,7 @@ function sWeek(s){
   return `<section class="card"><div class="row"><h3 class="sh-h" style="margin-right:auto">本周课程</h3><button class="btn sm" data-act="tab" data-v="b">看课表 ›</button></div>
     ${ls.length ? `<div class="wk">${ls.map(l => { const c = course(l.course_id);
       return `<div class="wk-row ${l.date === TODAY ? 'today' : ''}"><span class="wk-d">${dayWord(l.date)}</span><span class="num">${timeFor(l, s.tz)}</span><span class="grow">${subjTag(c.subject)}${l.kind ? `<span class="muted xs"> · ${esc(l.kind)}</span>` : ''}</span><span class="muted small">${esc(tea(c.teacher_id).name)}</span></div>`; }).join('')}</div>`
-      : '<div class="sh-empty">这周还没有排课，老师排好后会显示在这里。</div>'}</section>`;
+      : `<div class="sh-empty">${sUp(s).length ? '这 7 天没有课。' : '还没有排课，老师排好后会显示在这里。'}</div>`}</section>`;
 }
 // 通关进度（有点检表才显示）
 function sCkCard(s){
@@ -23,7 +24,7 @@ function sCkCard(s){
   const ls = ckListsOf(s.id); if (!ls.length) return '';
   const st = ckStat({items: ls.flatMap(l => l.items)});
   return `<section class="card"><div class="row"><h3 class="sh-h" style="margin-right:auto">通关进度</h3><button class="btn sm" data-act="tab" data-v="f">去看 ›</button></div>
-    <div class="ck-bar" style="max-width:none"><i style="width:${st.pct}%"></i></div>
+    <div class="ck-bar" style="max-width:none;margin-top:6px"><i style="width:${st.pct}%"></i></div>
     <div class="small" style="margin-top:6px">已通关 <span class="ck-frac">${st.pass} / ${st.n}</span> 关${st.cur ? `<span class="muted"> · 现在：${esc(st.cur.stage)} · ${esc(st.cur.name)}</span>` : ''}</div></section>`;
 }
 // 最近一次老师反馈
@@ -40,9 +41,9 @@ function sLastFb(s){
 function sSide(s){
   const cs = DB.courses.filter(c => c.student_id === s.id && c.active !== false), by = {};
   cs.forEach(c => (by[c.teacher_id] ??= []).push(c.subject));
-  const sub = [s.direction || s.track, s.target_ym ? `目标 ${tgtLabel(s.target_ym)}` : ''].filter(Boolean).join(' · ');
+  const sub = [s.direction || s.track, s.target_ym ? `目标 ${tgtLabel(s.target_ym)}` : ''].filter(Boolean);
   return {
-    top: `<div class="side-me"><span class="side-av">${esc((s.name || '?').slice(-1))}</span><div><b>${esc(s.name)}</b>${sub ? `<div class="muted xs">${esc(sub)}</div>` : ''}</div></div>`,
+    top: `<div class="side-me"><span class="side-av">${esc((s.name || '?').slice(-1))}</span><div><b>${esc(s.name)}</b>${sub.map(x => `<div class="muted xs">${esc(x)}</div>`).join('')}</div></div>`,
     bottom: `<div class="side-foot">${Object.keys(by).length ? `<div class="grp">我的老师</div>${Object.entries(by).map(([tid, subs]) => `<div class="side-tea"><b>${esc(tea(tid).name)}</b><span class="muted xs">${subs.map(esc).join('、')}</span></div>`).join('')}` : ''}
       <div class="muted xs side-help">有问题直接微信联系教务老师</div></div>`,
   };
@@ -51,6 +52,7 @@ function sSide(s){
 (function(){
   const st = document.createElement('style'); st.id = '__prev_home';
   st.textContent = `
+  .sh-grid .nx-later{display:none}
   .wk{display:flex;flex-direction:column}
   .wk-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line)}
   .wk-row:first-child{border-top:0}
