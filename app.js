@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   一对一教务台 · 正式版第 1 版
+   学生教务管理系统（原名：一对一教务台）
    数据全部通过 Supabase 的「门卫函数」读写（见 数据库/01_建表与权限.sql）。
    网页只用浏览器自带的 fetch，不加载任何外部脚本。
    ══════════════════════════════════════════════════════════════ */
@@ -174,7 +174,7 @@ function render(){
   const me = ME();
   const label = me.role==='admin' ? (me.owner ? '总管理' : me.level==='top' ? '教务 · 管理' : '教务') : {teacher:'任课老师', student:'学生', parent:'家长'}[me.role];
   setTimeout(labelTables);
-  app.innerHTML = `<header class="top"><h1>一对一教务台</h1>${me.owner ? bookSwitch() : ''}<span class="who">${esc(me.name)}${me.role==='parent' || me.owner ?'':' · '+label}</span><button class="btn sm" data-act="logout" title="让这台设备忘掉你的链接">退出</button></header>` + (isAdmin() ? adminView() : phoneView());
+  app.innerHTML = `<header class="top"><h1>学生教务管理系统</h1>${me.owner ? bookSwitch() : ''}<span class="who">${esc(me.name)}${me.role==='parent' || me.owner ?'':' · '+label}</span>${['student','parent'].includes(me.role) ? '' : '<button class="btn sm" data-act="logout" title="让这台设备忘掉你的链接">退出</button>'}</header>` + (isAdmin() ? adminView() : phoneView());
 }
 
 /* ═════════════ 教务端 ═════════════ */
@@ -183,11 +183,11 @@ function adminView(){
   const items = isTop()
     ? [['日常',[['overview','总览'],['calendar','课表与排课'],['requests','改期 · 请假',reqN],['feedback','反馈审批',pend]]],
        ['学生',[['students','学生档案'],['checks','通关点检'],['apply','升学与出愿'],['schools','院校库'],['reviews','月度回访'],['followups','跟进记录']]],
-       ['管理',[['teachers','老师档案'],['payroll','课时与工资'],['links','链接与权限']]]]
+       ['管理',[['teachers','老师档案'],['payroll','课时与工资'],['links','链接与权限'],['backup','数据备份']]]]
     : [['日常',[['overview','总览'],['calendar','课表与排课']]],['学生',[['students','学生档案'],['checks','通关点检'],['apply','升学与出愿'],['schools','院校库'],['reviews','月度回访'],['followups','跟进记录']]]];
   const nav = items.map(([g,list]) => `<div class="grp">${g}</div>` + list.map(([k,t,n]) =>
     `<button class="nav ${S.page===k?'on':''}" data-act="page" data-v="${k}"><span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')).join('');
-  const P = {checks:pgChecks, overview:pgOverview, calendar:pgCalendar, requests:pgRequests, apply:pgApply2, reviews:pgReviews, followups:pgFollowups, feedback:pgFeedback, students:pgStudents, teachers:pgTeachers, payroll:pgPayroll, links:pgLinks, schools:pgSchools};
+  const P = {backup:pgBackup, checks:pgChecks, overview:pgOverview, calendar:pgCalendar, requests:pgRequests, apply:pgApply2, reviews:pgReviews, followups:pgFollowups, feedback:pgFeedback, students:pgStudents, teachers:pgTeachers, payroll:pgPayroll, links:pgLinks, schools:pgSchools};
   const page = (isTop() || ['overview','calendar','students','checks','apply','schools','reviews','followups'].includes(S.page)) ? (P[S.page]||pgOverview) : pgOverview;
   return `<div class="layout"><nav class="side" aria-label="教务导航">${nav}</nav><main class="main">${page()}</main></div>`;
 }
@@ -427,7 +427,7 @@ function phoneView(){
   } else {
     const s = stu(me.student_id);
     tabs = [['a','概况'],['b','老师反馈'],['c','课表'],...(ckListsOf(s.id).length ? [['f','通关']] : []),['d','档案'],['e','月度']];
-    body = {a:pOverview,b:pFeedback,c:pSchedule,d:profilePage,e:pMonthly,f:sCheck}[S.tab]?.(s) ?? pOverview(s);
+    body = {a:pOverview,b:pFeedback,c:pSchedule,d:s=>profilePage(s,{hideEmpty:true}),e:pMonthly,f:sCheck}[S.tab]?.(s) ?? pOverview(s);
   }
   // 电脑上菜单在左侧（和教务一样），手机上在底部（大拇指好点）
   return `<div class="layout pl"><nav class="side pside" aria-label="菜单">${tabs.map(([k,t,n])=>`<button class="nav ${S.tab===k?'on':''}" data-act="tab" data-v="${k}"><span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')}</nav>
@@ -948,7 +948,7 @@ document.addEventListener('keydown', e => { if (e.key==='Escape' && mroot.innerH
 /* ───────── 启动 ───────── */
 document.addEventListener('app-ready', async function start(){
   if (!(await readShort())){ try{ localStorage.removeItem('jw_k'); }catch(_){} app.innerHTML = `<div class="center"><h2>这个链接已失效</h2><p class="muted">链接可能已经停用或更换。请联系教务老师重新发一条链接。</p></div>`; return; }
-  if (!KEY){ app.innerHTML = `<div class="center"><h2>一对一教务台</h2><p class="muted">请用教务老师发给你的专属链接打开。</p></div>`; return; }
+  if (!KEY){ app.innerHTML = `<div class="center"><h2>学生教务管理系统</h2><p class="muted">请用教务老师发给你的专属链接打开。</p></div>`; return; }
   try { await load(); render(); }
   catch(e){
     const bad = /无效|停用/.test(e.message);

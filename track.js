@@ -261,7 +261,9 @@ function sMonthly(s){
 }
 function pMonthly(s){
   const rs = reviewsOf(s.id).slice().reverse();
-  return `<h2 style="font-size:19px">月度回访</h2><div class="muted xs">教务老师整理完成后显示在这里，包括孩子的自我评价和老师评价。</div><div class="card">${boardView(s.id)}</div>${rs.map(r=>reviewCard(r)).join('') || '<div class="empty">还没有月度回访</div>'}`;
+  // 家长：只显示有内容的月份（不再放 12 个月的大表格，手机上大半是空行）
+  const shown = rs.filter(r => r.content || r.self_eval || r.teacher_eval || r.conclusion || r.next_focus);
+  return `<h2 style="font-size:19px">月度回访</h2><div class="muted xs">教务老师整理完成后显示在这里，包括孩子的自我评价和老师评价。</div>${shown.map(r=>reviewCard(r)).join('') || '<div class="empty">还没有月度回访</div>'}`;
 }
 
 /* ═════════════ 老师：学生详情里的升学信息（只读） ═════════════ */

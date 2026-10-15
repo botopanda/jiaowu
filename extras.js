@@ -122,3 +122,36 @@ document.addEventListener('click', async e => {
     }
   } catch(err) { /* act() 已经提示过 */ }
 });
+
+/* ───────── 数据备份：把能看到的全部数据下载成一个文件 ───────── */
+function pgBackup(){
+  let last = ''; try { last = localStorage.getItem('jw_backup') || ''; } catch(e) {}
+  const all = DB_ALL || DB;
+  return `<div class="ph"><h2>数据备份</h2></div>
+  <div class="note">数据库（Supabase 免费版）<b>没有自动备份</b>。建议<b>每周点一次</b>下面的按钮，把备份文件存到电脑或网盘里。万一数据被误删，可以拿这个文件找我恢复。</div>
+  <section class="card" style="display:flex;flex-direction:column;gap:10px">
+    <div class="stats"><div class="stat"><small>学生</small><b>${all.students.length}</b></div><div class="stat"><small>老师</small><b>${all.teachers.length}</b></div>
+      <div class="stat"><small>课次</small><b>${all.lessons.length}</b></div><div class="stat"><small>课后反馈</small><b>${all.feedbacks.length}</b></div></div>
+    <div class="row"><button class="btn pri" data-act="backup">导出全部数据（下载备份文件）</button>
+      <span class="muted small">${last ? `上次导出：${esc(last)}` : '还没有导出过'}</span></div>
+    <div class="muted xs">包括：学生、老师、课程、课表、反馈、作业、请假申请、月计划、成绩、出愿目标、月度回访、跟进记录、通关点检表、院校库、链接。<br>
+      上传的照片和 PDF 本身不在这个文件里（文件里只记录它们的地址），照片仍然保存在服务器上。${isOwner() && S.book !== 'all' ? '<br><b>注意：</b>现在是「' + (S.book === 'mine' ? 'Panda' : 'Project K') + '」视图，导出的仍然是全部数据。' : ''}</div>
+  </section>`;
+}
+document.addEventListener('click', async e => {
+  const a = e.target.closest('[data-act="backup"]'); if (!a) return;
+  document.body.classList.add('busy');
+  try {
+    let schools = []; try { schools = await rpc('programs_load') || []; } catch(err) {}
+    let checks = CK; try { checks = await rpc('checks_load'); } catch(err) {}
+    const data = {exported_at: new Date().toISOString(), by: ME().name, system: '学生教务管理系统', data: DB_ALL || DB, checklists: checks, schools};
+    const blob = new Blob([JSON.stringify(data, null, 1)], {type: 'application/json'});
+    const day = TODAY || new Date().toISOString().slice(0, 10);
+    const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `教务系统备份_${day}.json`;
+    document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(link.href), 5000);
+    const stamp = `${day} ${new Date().toTimeString().slice(0, 5)}`;
+    try { localStorage.setItem('jw_backup', stamp); } catch(err) {}
+    toast('备份文件已下载，请存到电脑或网盘'); render();
+  } catch(err) { toast('导出没成功：' + err.message, true); }
+  finally { document.body.classList.remove('busy'); }
+});

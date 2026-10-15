@@ -153,6 +153,14 @@ document.addEventListener('click', async e => {
     if (k === 'ck-rename') { const l = CK.lists.find(x => x.id === v), t = prompt('表名', l.title); if (!t) return; await rpc('check_list_update', {lid: v, title: t}); await redraw(); }
     if (k === 'ck-del') { if (!confirm('删除整张通关点检表？打过的档都会一起删掉，不能恢复。')) return; await rpc('check_list_delete', {lid: v}); toast('已删除'); await redraw(); }
     if (k === 'ck-tpl-save') { const l = CK.lists.find(x => x.id === v), n = prompt('模板名称（同名会覆盖）', l.title); if (!n) return; await rpc('check_template_save', {lid: v, name: n}); toast('已存成模板'); await redraw(); }
-    if (k === 'ck-tpl-del') { if (!confirm('删除这个模板？已经建好的学生点检表不受影响。')) return; await rpc('check_template_delete', {tid: v}); await redraw(); }
+    if (k === 'ck-tpl-del') {   // 防误删：要把模板名字打一遍才删
+      const t = (CK.templates || []).find(x => x.id === v); if (!t) return;
+      const typed = prompt(`删除模板「${t.name}」？
+已经建好的学生点检表不受影响。
+
+确认删除的话，请把模板名字打一遍：`, '');
+      if (typed === null) return;
+      if (typed.trim() !== t.name) { toast('名字不对，没有删除', true); return; }
+      await rpc('check_template_delete', {tid: v}); toast('模板已删除'); await redraw(); }
   } catch(err) { toast(err.message, true); }
 });

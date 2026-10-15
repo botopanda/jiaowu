@@ -81,7 +81,7 @@ function profilePage(s, opt = {}){
     ${kv('大学类型', s.uni_type)}${kv('第一优先', s.pref1)}${kv('第二优先', s.pref2)}${kv('地区', s.region)}${kv('学费 / 奖学金', s.fee)}
     ${kv('专业方向 1', s.major1)}${kv('专业方向 2', s.major2)}${kv('专业方向 3', s.major3)}${s.major_other ? kv('其他专业', s.major_other) : ''}</div></section>
   <section><h3 class="pf-h">大学分层</h3>${tierTable}</section>
-  <footer class="pf-foot">数据更新至 ${fmtMD(TODAY)} · 一对一教务台</footer>
+  <footer class="pf-foot">数据更新至 ${fmtMD(TODAY)} · 学生教务管理系统</footer>
   </article>`;
 }
 
