@@ -479,3 +479,8 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 @media (min-width:761px){.pside{display:flex;flex-direction:column}}
 /* 链接做成的按钮不要下划线（导出图片的「下载图片」） */
 a.btn{text-decoration:none;display:inline-flex;align-items:center}
+/* 本节内容（第 22 步） */
+.les-topic{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.45}
+.nx-topic{font-size:13px;color:var(--ink);background:var(--sunk);border-radius:var(--r);padding:6px 10px;margin-top:6px;line-height:1.5}
+.wk-topic{display:block;font-size:12px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk-row .grow{min-width:0}
