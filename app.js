@@ -526,7 +526,7 @@ function pdayOpen(d){
   const all = lsOfT(ME().teacher_id).filter(l => l.date===d), can = all.filter(l => l.status==='scheduled' && !fbOf(l));
   if (!all.length) return addLessonModal();
   if (all.length===1 && can.length===1) return lessonModal(can[0].id);
-  document.getElementById('pday-list')?.scrollIntoView({behavior:'smooth', block:'start'});
+  document.getElementById('pday-list')?.scrollIntoView({block:'start'});
 }
 function tSchedule(t){
   const miss = needFb();
