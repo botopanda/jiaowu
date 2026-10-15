@@ -21,7 +21,7 @@ async function sxCanvas(sid, ym){
   const ls = lsOfS(sid).filter(l => l.date.startsWith(ym) && l.status === 'scheduled').sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
   const byD = {}; ls.forEach(l => (byD[+l.date.slice(8)] ??= []).push(l));
   const lead = (new Date(y, m - 1, 1).getDay() + 6) % 7, last = new Date(y, m, 0).getDate(), rows = Math.ceil((lead + last) / 7);
-  const W = 1000, P = 36, CW = (W - P * 2) / 7, CH = 46, GAP = 6, DN = 32, HEAD = 128, WK = 40, FOOT = 70;
+  const W = 860, P = 24, CW = (W - P * 2) / 7, CH = 50, GAP = 6, DN = 32, HEAD = 128, WK = 40, FOOT = 70;
   const rowH = Array.from({length: rows}, (_, r) => { let mx = 0; for (let c = 0; c < 7; c++){ const d = r * 7 + c - lead + 1; if (d >= 1 && d <= last) mx = Math.max(mx, (byD[d] || []).length); } return Math.max(100, DN + mx * (CH + GAP) + 6); });
   const H = HEAD + WK + rowH.reduce((a, b) => a + b, 0) + FOOT;
   const F = getComputedStyle(document.body).fontFamily || 'sans-serif', font = (px, b) => `${b ? 600 : 400} ${px}px ${F}`;
@@ -33,7 +33,7 @@ async function sxCanvas(sid, ym){
   const logo = await sxLogo();
   if (logo) { g.save(); sxRound(g, W - P - 26, 34, 26, 26, 6); g.clip(); g.drawImage(logo, W - P - 26, 34, 26, 26); g.restore(); }
   g.textAlign = 'right'; g.fillStyle = SX_C.muted; g.font = font(14); g.fillText('学生教务管理系统', W - P - (logo ? 34 : 0), 52);
-  g.textAlign = 'left'; g.fillStyle = SX_C.ink; g.font = font(30, true); g.fillText(`${s.name}　${y}年${m}月课表`, P, 62);
+  g.textAlign = 'left'; g.fillStyle = SX_C.ink; g.font = font(28, true); g.fillText(`${s.name}　${y}年${m}月课表`, P, 62);
   const hrs = ls.reduce((a, l) => a + dur(l), 0);
   g.fillStyle = SX_C.muted; g.font = font(15); g.fillText(ls.length ? `北京时间 · 共 ${ls.length} 节课 · ${+hrs.toFixed(1)} 小时` : '北京时间 · 这个月还没有排课', P, 94);
 
@@ -52,15 +52,15 @@ async function sxCanvas(sid, ym){
         const cy = yy + DN + i * (CH + GAP), cx = x + 5, cw = CW - 10, sl = sxSlot(l.start), co = course(l.course_id);
         g.fillStyle = SX_TINT[sl]; sxRound(g, cx, cy, cw, CH, 6); g.fill();
         g.fillStyle = SX_C[sl]; sxRound(g, cx, cy, 4, CH, 2); g.fill();
-        g.fillStyle = SX_C.ink; g.font = font(13, true); g.fillText(`${l.start}–${l.end}`, cx + 10, cy + 19);
-        if (l.makeup) { g.fillStyle = SX_C.seal; g.font = font(11, true); g.textAlign = 'right'; g.fillText('补', cx + cw - 6, cy + 18); g.textAlign = 'left'; }
-        const who = tea(co.teacher_id).name || '', avail = cw - 16;
-        g.font = font(12); const ww = g.measureText(who).width;
+        g.fillStyle = SX_C.ink; g.font = font(14, true); g.fillText(`${l.start}–${l.end}`, cx + 9, cy + 21);
+        if (l.makeup) { g.fillStyle = SX_C.seal; g.font = font(11, true); g.textAlign = 'right'; g.fillText('补', cx + cw - 5, cy + 20); g.textAlign = 'left'; }
+        const who = tea(co.teacher_id).name || '', avail = cw - 14;
+        g.font = font(12.5); const ww = g.measureText(who).width;
         let what = co.subject + (l.kind ? '·' + l.kind : '');
-        g.font = font(12, true); if (g.measureText(what).width + ww + 6 > avail) what = co.subject;
+        g.font = font(12.5, true); if (g.measureText(what).width + ww + 6 > avail) what = co.subject;
         what = sxFit(g, what, Math.max(30, avail - ww - 6));
-        g.fillStyle = SX_C[sl]; g.fillText(what, cx + 10, cy + 37);
-        g.fillStyle = SX_C.muted; g.font = font(12); g.textAlign = 'right'; g.fillText(sxFit(g, who, Math.max(0, avail - g.measureText(what).width - 6)), cx + cw - 6, cy + 37); g.textAlign = 'left';
+        g.fillStyle = SX_C[sl]; g.fillText(what, cx + 9, cy + 40);
+        const wl = g.measureText(what).width; g.fillStyle = SX_C.muted; g.font = font(12.5); g.textAlign = 'right'; g.fillText(sxFit(g, who, Math.max(0, avail - wl - 6)), cx + cw - 5, cy + 40); g.textAlign = 'left';
       });
     }
     yy += rowH[r];
