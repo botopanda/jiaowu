@@ -516,10 +516,17 @@ function schedule(ls, tz, whoFn, canReq=false, canEdit=false, extra=''){
     <div class="row" style="justify-content:space-between;margin-bottom:6px"><button class="btn sm" data-act="pmonth" data-v="-1" aria-label="上个月">‹</button>
       <b class="num" style="font-size:16px">${y}.${pad(m)}</b><span class="row"><button class="btn sm" data-act="pmonth" data-v="0">本月</button><button class="btn sm" data-act="pmonth" data-v="1" aria-label="下个月">›</button></span></div>
     <div class="ph-grid">${cells}</div>
-    <div class="muted xs" style="margin-top:6px">这个月共 ${mine.filter(l=>l.status==='scheduled').length} 节课 · 点日期看当天的课 · ${slotLegend()}</div>
+    <div class="muted xs" style="margin-top:6px">这个月共 ${mine.filter(l=>l.status==='scheduled').length} 节课 · 点日期看当天的课${canEdit ? '，<b>再点一下</b>就能排课 / 调课' : ''} · ${slotLegend()}</div>
   </div>
-  <div class="dg ${sel===TODAY?'today':''}">${sel===TODAY?'今天 · ':''}${fmtMD(sel)}</div>
-  ${day.length ? day.map(l=>lessonItem(l,tz,whoFn,canReq,canEdit)).join('') : '<div class="empty" style="padding:10px">这天没有课</div>'}`;
+  <div class="dg ${sel===TODAY?'today':''}" id="pday-list">${sel===TODAY?'今天 · ':''}${fmtMD(sel)}</div>
+  ${day.length ? day.map(l=>lessonItem(l,tz,whoFn,canReq,canEdit)).join('') : `<div class="empty" style="padding:10px">这天没有课${canEdit ? '<div style="margin-top:8px"><button class="btn pri sm" data-act="add-lesson">＋ 申请这天排课</button></div>' : ''}</div>`}`;
+}
+// 老师在月历上再点一下已选中的日期：这天没课 → 申请排课；只有一节能调的课 → 调课；有好几节 → 滑到下面当天的课
+function pdayOpen(d){
+  const all = lsOfT(ME().teacher_id).filter(l => l.date===d), can = all.filter(l => l.status==='scheduled' && !fbOf(l));
+  if (!all.length) return addLessonModal();
+  if (all.length===1 && can.length===1) return lessonModal(can[0].id);
+  document.getElementById('pday-list')?.scrollIntoView({behavior:'smooth', block:'start'});
 }
 function tSchedule(t){
   const miss = needFb();
@@ -838,7 +845,11 @@ document.addEventListener('click', async e => {
     case 'page': if (v==='feedback-missing'){ S.page='feedback'; S.fbTab='missing'; } else { S.page=v; if (v==='feedback') S.fbTab='pending'; } render(); window.scrollTo(0,0); refresh(); break;
     case 'tab': S.tab=v; render(); window.scrollTo(0,0); refresh(); break;
     case 'pview': PV=v; try{ localStorage.setItem('jw_view', v); }catch(_){} render(); break;
-    case 'pday': S.pDay=v; render(); break;
+    case 'pday': {
+      const ym = S.pMonth || TODAY.slice(0,7), cur = S.pDay && S.pDay.startsWith(ym) ? S.pDay : (TODAY.startsWith(ym) ? TODAY : `${ym}-01`);
+      S.pDay = v;
+      if (v === cur && ME().role === 'teacher') { pdayOpen(v); break; }   // 老师再点一下已选中的那天
+      render(); break; }
     case 'pmonth': S.pMonth = v==='0' ? TODAY.slice(0,7) : ymShift(S.pMonth || TODAY.slice(0,7), Number(v)); S.pDay = S.pMonth===TODAY.slice(0,7) ? TODAY : S.pMonth+'-01'; render(); break;
     case 'month': S.month = v==='0' ? TODAY.slice(0,7) : ymShift(S.month, Number(v)); render(); break;
     case 'caltype': S.calType=v; S.calId=''; render(); break;
