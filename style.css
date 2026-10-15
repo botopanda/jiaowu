@@ -524,3 +524,11 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   .cv-ph.big{width:84px;height:105px}
   .cv-i{grid-template-columns:1fr;gap:2px}
 }
+/* 手机上「本周课程」一行放不下：第一行 日子 · 时间 · 老师，第二行 科目 · 课程 · 本节内容 */
+.wk-row .num,.wk-row>span:last-child{white-space:nowrap}
+@media (max-width:760px){
+  .wk-row{flex-wrap:wrap;row-gap:2px}
+  .wk-d{min-width:0}
+  .wk-row>span:last-child{margin-left:auto}
+  .wk-row .grow{order:3;flex:1 1 100%;min-width:0}
+}
