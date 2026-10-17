@@ -560,3 +560,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .layout.pl .xs{font-size:12.5px}
 .layout.pl .small{font-size:13.5px}
 @media (prefers-color-scheme: light){ .layout.pl{--muted:#726c62} }
+
+/* 老师申请撞课：标红写出来 */
+.li.li-clash{background:color-mix(in srgb,var(--seal) 6%,transparent);border-radius:6px}
+.ch-clash{color:var(--seal);font-size:13px;font-weight:600;margin-top:3px}
