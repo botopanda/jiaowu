@@ -43,6 +43,7 @@ function bookView(all){
   };
 }
 function bookSwitch(){
+  ownerSync();
   return `<div class="seg book-seg" role="group" aria-label="账本">${[['all','全部'],['K','Project K'],['mine','Panda']].map(([k, t]) =>
     `<button class="${S.book===k?'on':''}" data-act="book" data-v="${k}">${t}</button>`).join('')}</div>`;
 }
@@ -101,8 +102,13 @@ function ownerTeacherWarn(){
 document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a || a.dataset.act !== 'book') return;
   S.book = a.dataset.v; try { localStorage.setItem('jw_book', S.book); } catch(err) {}
-  DB = bookView(DB_ALL); render();
+  DB = bookView(DB_ALL); render(); ownerSync(true);
 });
+// 告诉数据库总管理现在在哪一边：在 Panda 视图做的事记成「Panda」，其余记成「潘老师」（第 28 步）
+function ownerSync(force){
+  if (!(DB_ALL && DB_ALL.me && DB_ALL.me.owner) || (ownerSync.done && !force)) return;
+  ownerSync.done = true; rpc('owner_set_view', {b: S.book}).catch(() => {});
+}
 
 /* ───────── 老师链接：一位老师一行（总管理在「全部 / Panda」里看） ─────────
    两边都教的老师有两条链接：老师自己用的完整链接，和一条只给潘、金看的普通链接（总管理这边不显示）。

@@ -578,7 +578,8 @@ function tSchedule(t){
   return `<h2 style="font-size:19px">${esc(t.name)}</h2>
   ${miss.length?`<div class="note warn row" style="justify-content:space-between">有 ${miss.length} 节课还没写反馈 <button class="btn sm" data-act="tab" data-v="c">去写</button></div>`:''}
   ${(() => { const mine = (DB.changes||[]).filter(x => x.status==='pending' || (x.status!=='withdrawn' && x.handled_at && dBetween(x.handled_at.slice(0,10), TODAY) <= 7 && !chSeen().includes(x.id)));
-    return mine.length ? `<section class="card"><h3 style="font-size:15px">我的排课 / 调课申请</h3><div class="muted xs">教务批准后才会改到课表上。</div><div class="list">${mine.map(x => chCard(x, false)).join('')}</div></section>` : ''; })()}
+    const done = mine.filter(x => x.status!=='pending').map(x => x.id);
+    return mine.length ? `<section class="card"><div class="row"><h3 style="font-size:15px;margin-right:auto">我的排课 / 调课申请</h3>${done.length>1?`<button class="btn sm" data-act="ch-seen-all" data-v="${done.join(',')}">全部知道了（${done.length} 条）</button>`:''}</div><div class="muted xs">教务批准后才会改到课表上。</div><div class="list">${mine.map(x => chCard(x, false)).join('')}</div></section>` : ''; })()}
   <div class="row" style="justify-content:flex-end"><span class="muted xs" style="margin-right:auto">排课、调课提交后要教务批准</span><button class="btn pri sm" data-act="add-lesson">＋ 申请排课</button></div>
   ${schedule(lsOfT(t.id),t.tz,c=>stu(c.student_id).name,false,true)}`;
 }
@@ -967,6 +968,7 @@ document.addEventListener('click', async e => {
     case 'logout': if (!confirm('退出后，这台设备要重新点专属链接才能进来。确定退出吗？')) break;
       try { localStorage.removeItem('jw_k'); } catch(e) {}
       location.href = location.origin + location.pathname; break;
+    case 'ch-seen-all': { const ids = chSeen().concat(v.split(',')).slice(-500); try { localStorage.setItem('jw_chseen', JSON.stringify(ids)); } catch(e) {} render(); break; }
     case 'ch-seen': { const ids = chSeen().concat(v).slice(-200); try { localStorage.setItem('jw_chseen', JSON.stringify(ids)); } catch(e) {} render(); break; }
     case 'ch-withdraw': if (!confirm('撤回这条申请？')) break; await act('change_withdraw', {cid:v}, '已撤回'); break;
     case 'save-lesson': { const d=val('al-d'), s=toJST(val('al-s')), en=toJST(val('al-e'));
