@@ -14,6 +14,8 @@ async function ckLoad(force){
   return CK;
 }
 const ckCanEdit = () => ['admin','teacher'].includes(ME().role);
+// 模板一览：写上谁存的；教务什么模板都能删，老师只能删自己存的（教务的模板老师能用，删不了）
+const ckTplList = ts => ts.length ? `<div class="muted xs">模板：${ts.map(t => `${esc(t.name)}${t.by ? `（${esc(t.by)}）` : ''}${isAdmin() || t.mine ? ` <button class="link-btn" data-act="ck-tpl-del" data-v="${t.id}">删除</button>` : ''}`).join('　')}<br>点开一张表的「编辑关卡」，可以加减关卡、改表名、另存为模板或删除整张表。</div>` : '';
 const ckListsOf = sid => (CK ? CK.lists : []).filter(l => l.student_id === sid);
 const ckStat = l => {
   const n = l.items.length, pass = l.items.filter(i => i.level >= 3).length;
@@ -72,7 +74,7 @@ function ckList(l, edit){
         ${ckFiles(i, l.student_id)}
         ${edit && CK_EDIT ? `<span class="ck-ops"><button class="btn sm" data-act="ck-item-edit" data-v="${i.id}">改</button><button class="btn sm" data-act="ck-item-add" data-v="${l.id}|${i.id}">＋</button><button class="btn sm danger" data-act="ck-item-del" data-v="${i.id}">删</button></span>` : ''}</div>`; }).join('')}</div>`; }).join('')}
     ${edit && CK_EDIT ? `<div class="row" style="margin-top:8px"><button class="btn sm" data-act="ck-item-add" data-v="${l.id}|">＋ 在最后加一关</button><button class="btn sm" data-act="ck-rename" data-v="${l.id}">改表名</button>
-      ${isAdmin() ? `<button class="btn sm" data-act="ck-tpl-save" data-v="${l.id}">另存为模板</button><button class="btn sm danger" style="margin-left:auto" data-act="ck-del" data-v="${l.id}">删除整张表</button>` : ''}</div>` : ''}
+      <button class="btn sm" data-act="ck-tpl-save" data-v="${l.id}">另存为模板</button><button class="btn sm danger" style="margin-left:auto" data-act="ck-del" data-v="${l.id}">删除整张表</button></div>` : ''}
   </section>`;
 }
 function ckNewForm(sid, has){
@@ -81,7 +83,7 @@ function ckNewForm(sid, has){
     <div class="row"><select id="ck-tpl-${sid}">${ts.map(t => `<option value="${t.id}">模板：${esc(t.name)}（${t.n} 关）</option>`).join('')}<option value="">空白表（自己加关卡）</option></select>
       <input type="text" id="ck-title-${sid}" placeholder="表名，例：通关点检表" style="flex:1;min-width:140px">
       <button class="btn pri sm" data-act="ck-new" data-v="${sid}">建立</button></div>
-    ${isAdmin() && ts.length ? `<div class="muted xs">模板：${ts.map(t => `${esc(t.name)} <button class="link-btn" data-act="ck-tpl-del" data-v="${t.id}">删除</button>`).join('　')}</div>` : ''}</section>`;
+    ${ckTplList(ts)}</section>`;
 }
 
 /* ───────── 单独的页面 ───────── */
@@ -102,7 +104,7 @@ function ckPage(students, sub){
       <select id="ck-sid-page"><option value="">选择学生…</option>${without.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>
       <select id="ck-tpl-page">${(CK.templates || []).map(t => `<option value="${t.id}">模板：${esc(t.name)}（${t.n} 关）</option>`).join('')}<option value="">空白表（自己加关卡）</option></select>
       <input type="text" id="ck-title-page" placeholder="表名，例：通关点检表" style="flex:1;min-width:140px"><button class="btn pri sm" data-act="ck-new" data-v="page">建立</button></div>
-      ${isAdmin() && (CK.templates || []).length ? `<div class="muted xs">模板：${CK.templates.map(t => `${esc(t.name)} <button class="link-btn" data-act="ck-tpl-del" data-v="${t.id}">删除</button>`).join('　')}</div>` : ''}</section>` : ''}
+      ${ckTplList(CK.templates || [])}</section>` : ''}
   ${S.ckSid ? `<div class="dg">${esc(stu(S.ckSid).name)} 的通关点检表</div>${ckListsOf(S.ckSid).map(l => ckList(l, edit)).join('')}
      ${edit ? `<div class="row"><button class="btn sm" data-act="ck-more" data-v="${S.ckSid}">再给 ${esc(stu(S.ckSid).name)} 建一张表</button></div><div id="ck-more-box"></div>` : ''}` : ''}`;
 }
@@ -152,7 +154,7 @@ document.addEventListener('click', async e => {
     if (k === 'ck-item-del') { if (!confirm('删掉这一关？')) return; await rpc('check_item_delete', {iid: v}); await redraw(); }
     if (k === 'ck-rename') { const l = CK.lists.find(x => x.id === v), t = prompt('表名', l.title); if (!t) return; await rpc('check_list_update', {lid: v, title: t}); await redraw(); }
     if (k === 'ck-del') { if (!confirm('删除整张通关点检表？打过的档都会一起删掉，不能恢复。')) return; await rpc('check_list_delete', {lid: v}); toast('已删除'); await redraw(); }
-    if (k === 'ck-tpl-save') { const l = CK.lists.find(x => x.id === v), n = prompt('模板名称（同名会覆盖）', l.title); if (!n) return; await rpc('check_template_save', {lid: v, name: n}); toast('已存成模板'); await redraw(); }
+    if (k === 'ck-tpl-save') { const l = CK.lists.find(x => x.id === v), n = prompt(isAdmin() ? '模板名称（同名会覆盖）' : '模板名称（和自己存过的同名会覆盖；别人的模板不会被改）', l.title); if (!n) return; await rpc('check_template_save', {lid: v, name: n}); toast('已存成模板'); await redraw(); }
     if (k === 'ck-tpl-del') {   // 防误删：要把模板名字打一遍才删
       const t = (CK.templates || []).find(x => x.id === v); if (!t) return;
       const typed = prompt(`删除模板「${t.name}」？
