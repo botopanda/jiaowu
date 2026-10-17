@@ -65,10 +65,11 @@ const mins = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
 const tstr = m => `${pad(Math.floor(m/60))}:${pad(m%60)}`;
 const dBetween = (a,b) => Math.round((pd(b)-pd(a))/86400000);
 const yen = n => '¥' + Math.round(n||0).toLocaleString('ja-JP');
-// 单价规则：3 位数以内是人民币，4 位数以上是日元
-const curOf = rate => (rate||0) >= 1000 ? 'JPY' : 'CNY';
+// 币种：课程上写明（人民币 / 日元）；老数据没写时按老规则（4 位数以上算日元）
+const curOf = c => (c && c.cur) || ((c && c.rate || 0) >= 1000 ? 'JPY' : 'CNY');
+const curSel = (id, cur) => `<select id="${id}" aria-label="币种"><option value="CNY" ${cur!=='JPY'?'selected':''}>人民币</option><option value="JPY" ${cur==='JPY'?'selected':''}>日元</option></select>`;
 const money = (n, cur) => cur==='JPY' ? '¥' + Math.round(n||0).toLocaleString('ja-JP') : Math.round(n||0).toLocaleString('zh-CN') + ' 元';
-const rateTxt = rate => (rate ? money(rate, curOf(rate)) : '未设') + '/小时';
+const rateTxt = c => (c && c.rate ? money(c.rate, curOf(c)) : '未设') + '/小时';
 // 多种币种分开合计，比如「3,400 元 + ¥12,000」
 const sumMoney = ls => { const t = {}; ls.forEach(([amt, cur]) => t[cur] = (t[cur]||0) + amt); return Object.keys(t).length ? Object.entries(t).sort().map(([c,v]) => money(v,c)).join(' + ') : money(0,'CNY'); };
 const ymLabel = ym => `${+ym.slice(0,4)}年${+ym.slice(5)}月`;
@@ -261,8 +262,8 @@ function chCard(x, forAdmin){
 // 待确认：按老师数一下「X 老师 3 节」
 const pendByT = ls => { const n = {}; ls.forEach(l => { const t = tea(course(l.course_id).teacher_id).name; n[t] = (n[t]||0) + 1; });
   return Object.entries(n).map(([t,k]) => `<b>${esc(t)}</b> ${k} 节`).join('、'); };
-const pendRow = l => { const c=course(l.course_id); return `<div class="li"><span class="tag warn">待确认</span><div class="grow">${esc(tea(c.teacher_id).name)} · ${esc(stu(c.student_id).name)} ${subjTag(c.subject)}<br><span class="muted xs">${fmtMD(l.date)} ${l.start}–${l.end} · ${dBetween(l.date,TODAY)} 天没写反馈</span></div>
-  <span class="row"><button class="btn sm" data-act="copy-remind" data-v="${l.id}">复制提醒</button><button class="btn sm" data-act="lesson" data-v="${l.id}">改时长 / 取消</button><button class="btn pri sm" data-act="lstate" data-v="${l.id}|done|q">已上课</button></span></div>`; };
+const pendRow = l => { const c=course(l.course_id); return `<div class="li li-pend"><span class="tag warn">待确认</span><div class="grow">${esc(tea(c.teacher_id).name)} · ${esc(stu(c.student_id).name)} ${subjTag(c.subject)}<br><span class="muted xs">${fmtMD(l.date)} ${l.start}–${l.end} · ${dBetween(l.date,TODAY)} 天没写反馈</span></div>
+  <span class="row li-acts"><button class="btn sm" data-act="copy-remind" data-v="${l.id}">复制提醒</button><button class="btn sm" data-act="lesson" data-v="${l.id}">改时长 / 取消</button><button class="btn pri sm" data-act="lstate" data-v="${l.id}|done|q">已上课</button></span></div>`; };
 function pgOverview(){
   const today = DB.lessons.filter(l => l.date===TODAY);
   const pend = DB.feedbacks.filter(f => f.status==='pending');
@@ -289,7 +290,7 @@ function pgOverview(){
       ${bad.map(f => { const l=L(f.lesson_id), c=course(l.course_id); return `<div class="li"><span class="tag seal">不满意</span><div class="grow">${esc(stu(c.student_id).name)} 对 ${sMD(l.date)} ${esc(tea(c.teacher_id).name)} 的课评价「不满意」</div></div>`}).join('')}
       ${chPend().map(x => chCard(x, true)).join('')}
       ${miss.length ? `<div class="li"><span class="tag warn">待确认</span><div class="grow">${pendByT(miss)}<br><span class="muted xs">上课时间过了、老师还没写反馈的课，暂时不计课时和工资。</span></div>${miss.length>1?`<button class="btn sm" data-act="done-all">全部标为已上课</button>`:''}</div>` : ''}
-      ${miss.slice(0,8).map(pendRow).join('')}${miss.length>8?`<div class="muted xs" style="padding:4px 2px">还有 ${miss.length-8} 节${isTop()?'，在「反馈审批 → 待确认」里看全部':''}</div>`:''}
+      ${miss.length ? `<details class="ov-more"><summary>逐条处理（${miss.length} 节）</summary>${miss.slice(0,8).map(pendRow).join('')}${miss.length>8?`<div class="muted xs" style="padding:4px 2px">还有 ${miss.length-8} 节${isTop()?'，在「反馈审批 → 待确认」里看全部':''}</div>`:''}</details>` : ''}
       ${upcomingEvents(14).map(e=>`<div class="li"><span class="tag ${e.days<=7?'seal':'warn'}">${e.days===0?'今天':e.days+' 天'}</span><div class="grow">${esc(stu(e.t.student_id).name)} · ${esc(e.t.school)} ${e.label} ${sMD(e.date)}</div><button class="btn sm" data-act="page" data-v="apply">查看</button></div>`).join('')}
       ${(DB.followups||[]).filter(f=>f.next_date && f.confirm!=='已确认' && f.next_date<=TODAY).map(f=>`<div class="li"><span class="tag gold">跟进</span><div class="grow">${esc(stu(f.student_id).name)} · ${esc(f.next_action||f.task||'')}（${sMD(f.next_date)}）</div><button class="btn sm" data-act="fu-edit" data-v="${f.id}">更新</button></div>`).join('')}
       ${!chPend().length && !reqs.length && !pend.length && !bad.length && !miss.length && !upcomingEvents(14).length ? '<div class="empty">没有要处理的事</div>' : ''}
@@ -422,21 +423,31 @@ function pgTeachers(){
 function pgPayroll(){
   const ym = S.payMonth;
   const rows = DB.teachers.map(t => { const ls = lsOfT(t.id).filter(l => l.date.startsWith(ym) && paidH(l)>0);
-    const parts = ls.map(l => { const rt = course(l.course_id).rate||0; return [paidH(l)*rt, curOf(rt)]; });
+    const parts = ls.map(l => { const c = course(l.course_id); return [paidH(l)*(c.rate||0), curOf(c)]; });
     return {t, ls, h: +ls.reduce((a,l)=>a+paidH(l),0).toFixed(1), parts, amt: sumMoney(parts), pn: lsOfT(t.id).filter(l => l.date.startsWith(ym) && isPend(l)).length}; }).filter(r => r.ls.length || r.pn);
   const total = sumMoney(rows.flatMap(r => r.parts));
   const months = [...new Set(DB.lessons.map(l=>l.date.slice(0,7)).concat([TODAY.slice(0,7), ymShift(TODAY.slice(0,7),-1)]))].sort().reverse();
   return `<div class="ph"><h2>课时与工资</h2><select id="pay-m" data-change="paym">${months.map(v=>`<option value="${v}" ${v===ym?'selected':''}>${ymLabel(v)}</option>`).join('')}</select></div>
-  <div class="note">只有<b>教务 · 管理</b>能看到这一页。<b>老师写了反馈（或教务标为已上课）的课才计入课时</b>，按实际上课时长算；当天请假扣学生的课时，照样计入老师工资。单价在学生档案 → 课程里设置（3 位数以内按人民币算，4 位数以上按日元算）。每位老师每月：<b>核对课时 → 审核通过 → 结算完成</b>。</div>
+  <div class="note">只有<b>教务 · 管理</b>能看到这一页。<b>老师写了反馈（或教务标为已上课）的课才计入课时</b>，按实际上课时长算；当天请假扣学生的课时，照样计入老师工资。单价和币种（人民币 / 日元）在学生档案 → 课程里设置。每位老师每月：<b>核对课时 → 审核通过 → 结算完成</b>。</div>
   <div class="stats"><div class="stat"><small>计费课时</small><b>${+rows.reduce((a,r)=>a+r.h,0).toFixed(1)}</b></div><div class="stat"><small>工资合计</small><b style="font-size:18px">${total}</b></div>
     <div class="stat"><small>已审核</small><b>${rows.filter(r=>payOf(r.t.id,ym).reviewed_at).length}/${rows.length}</b></div><div class="stat"><small>已结算</small><b>${rows.filter(r=>payOf(r.t.id,ym).settled_at).length}/${rows.length}</b></div></div>
   ${rows.length ? '' : '<div class="card empty">这个月还没有上完的课</div>'}
   ${rows.map(r => `<details class="card"><summary class="row"><b style="margin-right:auto;font-family:var(--f-disp)">${esc(r.t.name)}</b><span class="num small">${r.ls.length} 节 · ${r.h} 小时</span>${r.pn?`<span class="tag warn">${r.pn} 节待确认未计入</span>`:''}<b class="num">${r.amt}</b>${payBadge(r.t.id, ym)}<span class="muted xs">展开明细</span></summary>
     <div class="tw" style="margin-top:8px"><table><thead><tr><th>日期</th><th>时间（北京）</th><th>学生</th><th>科目</th><th>计费</th><th>单价</th><th>金额</th><th>备注</th></tr></thead><tbody>
-    ${r.ls.map(l=>{const c=course(l.course_id);return `<tr><td class="num">${sMD(l.date)}</td><td class="num">${l.start}–${l.end}</td><td>${esc(stu(c.student_id).name)}</td><td>${subjTag(c.subject)}</td><td class="num">${paidH(l)}h</td><td class="num">${rateTxt(c.rate)}</td><td class="num">${money(paidH(l)*(c.rate||0), curOf(c.rate))}</td><td class="xs">${l.status==='leave'?'<span class="tag seal">当天请假</span> ':''}${l.done_manual&&!l.has_fb&&!fbOf(l)?'<span class="tag mute">教务确认</span> ':''}${hrsTag(l)} ${esc(l.actual_note||'')} ${esc(l.note)}</td></tr>`}).join('')}
+    ${r.ls.map(l=>{const c=course(l.course_id);return `<tr><td class="num">${sMD(l.date)}</td><td class="num">${l.start}–${l.end}</td><td>${esc(stu(c.student_id).name)}</td><td>${subjTag(c.subject)}</td><td class="num">${paidH(l)}h</td><td class="num">${rateTxt(c)}</td><td class="num">${money(paidH(l)*(c.rate||0), curOf(c))}</td><td class="xs">${l.status==='leave'?'<span class="tag seal">当天请假</span> ':''}${l.done_manual&&!l.has_fb&&!fbOf(l)?'<span class="tag mute">教务确认</span> ':''}${hrsTag(l)} ${esc(l.actual_note||'')} ${esc(l.note)}</td></tr>`}).join('')}
     </tbody></table></div><div class="row" style="margin-top:8px"><button class="btn sm" data-act="copy-pay" data-v="${r.t.id}">复制课时清单（发给老师核对）</button><span style="margin-left:auto" class="row">${payButtons(r.t.id, ym)}</span></div></details>`).join('')}`;
 }
 
+// 最近打开：今天 / 昨天 / 几天前 ＋ 用过哪些设备；学生、家长的链接在 3 类以上设备打开过，提醒可能被转发了
+function seenTxt(p){
+  if (p.last_seen === undefined) return '<span class="muted">—</span>';
+  if (!p.last_seen) return '<span class="muted">还没打开过</span>';
+  const bj = iso => new Date(iso).toLocaleString('sv-SE', {timeZone: 'Asia/Shanghai'}).slice(0, 16);
+  const t = bj(p.last_seen), d = t.slice(0, 10), n = dBetween(d, TODAY);
+  const when = n <= 0 ? `今天 ${t.slice(11)}` : n === 1 ? `昨天 ${t.slice(11)}` : n < 30 ? `${n} 天前` : d;
+  const dev = p.devices || [], many = ['student','parent'].includes(p.role) && dev.length >= 3;
+  return `${when}${n >= 14 ? ' <span class="tag warn">很久没打开</span>' : ''}${dev.length ? `<div class="muted xs">${dev.map(esc).join('、')}</div>` : ''}${many ? '<span class="tag warn">设备较多，可能被转发</span>' : ''}`;
+}
 function pgLinks(){
   const P = DB.people || [];
   const scopeTxt = p => p.role==='admin' ? (p.level==='top' ? '全部' : (p.scope||[]).map(id=>stu(id).name).join('、')||'（未分配学生）')
@@ -445,9 +456,10 @@ function pgLinks(){
   const grp = [['教务','admin'],['任课老师','teacher'],['学生','student'],['家长','parent']];
   return `<div class="ph"><h2>链接与权限</h2><button class="btn pri" data-act="link-new">＋ 新建链接</button></div>
   <div class="note">每个人一条专属链接，打开就能用。点「复制链接」发到对方微信。<b>链接被转发、老师离职、学生毕业</b>时，点「重新生成」或「停用」，旧链接马上失效。新增老师、学生时会自动生成链接。</div>
-  ${grp.map(([g,r]) => { const ps = P.filter(p=>p.role===r && !ownerShadow(p)); return ps.length ? `<section><h3 style="font-size:15px;margin:6px 0">${g}</h3><div class="tw"><table class="rt"><thead><tr><th>姓名</th><th>身份</th><th>能看到</th><th>状态</th><th></th></tr></thead><tbody>
+  ${grp.map(([g,r]) => { const ps = P.filter(p=>p.role===r && !ownerShadow(p)); return ps.length ? `<section><h3 style="font-size:15px;margin:6px 0">${g}</h3><div class="tw"><table class="rt"><thead><tr><th>姓名</th><th>身份</th><th>能看到</th><th>最近打开</th><th>状态</th><th></th></tr></thead><tbody>
     ${ps.map(p => `<tr><td><b>${esc(p.name)}</b>${p.id===ME().id?' <span class="tag gold">我</span>':''}${ownerLinkTag(p)}</td><td><span class="tag ${p.level==='top'?'seal':p.role==='admin'?'gold':'mute'}">${p.role==='admin'?(p.level==='top'?'教务 · 管理':'教务 · 普通'):g}</span></td>
       <td class="small">${esc(scopeTxt(p))}${p.role==='admin'&&p.level!=='top'?` <button class="btn sm" data-act="scope-edit" data-v="${p.id}">改范围</button>`:''}</td>
+      <td class="small">${seenTxt(p)}</td>
       <td>${p.active?'<span class="tag ok">启用</span>':'<span class="tag seal">已停用</span>'}</td>
       <td><div class="row"><button class="btn sm" data-act="copy-link" data-v="${p.key}" ${p.active?'':'disabled'}>复制链接</button><button class="btn sm" data-act="link-regen" data-v="${p.id}">重新生成</button>${ownerLinkToggle(p)}
         ${p.id===ME().id?'':`<button class="btn sm ${p.active?'danger':''}" data-act="link-toggle" data-v="${p.id}">${p.active?'停用':'恢复'}</button><button class="btn sm danger" data-act="link-del" data-v="${p.id}">删除</button>`}</div></td></tr>`).join('')}
@@ -566,12 +578,12 @@ function tWrite(t){
   const toGrade = DB.feedbacks.filter(f => f.hw_sub && !f.hw_fb);
   const grade = toGrade.length ? `<div class="dg">学生交上来的作业 · 待批改 ${toGrade.length}</div>` + toGrade.map(f=>{const l=L(f.lesson_id);return `<section class="card small" style="display:flex;flex-direction:column;gap:6px">
     <div class="row"><b>${esc(stu(course(l.course_id).student_id).name)}</b><span class="muted">${sMD(l.date)} 布置</span></div><div>${esc(f.hw)}</div>${f.hw_note?`<div class="note">学生说：${esc(f.hw_note)}</div>`:''}${fileList(f.id,'hw','学生交的作业')}${fileList(f.id,'grade','我的批改文件')}
-    <textarea id="gr-${f.id}" placeholder="批改意见（学生能看到）"></textarea><div class="row"><button class="btn pri sm" data-act="grade" data-v="${f.id}">批改完成</button>${uploadBtn('grade', f.id, '上传批改文件')}</div></section>`}).join('') : '';
+    <textarea id="gr-${f.id}" placeholder="批改意见（学生能看到）"></textarea><div class="row"><button class="btn pri sm" data-act="grade" data-v="${f.id}">批改完成</button>${uploadBtn('grade', f.id, '上传批改文件')}<button class="btn sm" style="margin-left:auto" data-act="grade-seen" data-v="${f.id}">看过了，不用批改</button></div></section>`}).join('') : '';
   const form = cand.length ? `<section class="card" style="display:flex;flex-direction:column;gap:8px">
     <h3 style="font-size:16px">课后反馈</h3>
     <div class="note warn">这条反馈学生会马上看到，<b>教务审核后家长也能看到</b>，请注意用词。不方便让家长看的内容，写到「我的学生 → 私下备注」。</div>
-    <label class="field"><span>哪一节课</span><select id="w-lesson">${cand.map(l=>`<option value="${l.id}">${sMD(l.date)} ${esc(stu(course(l.course_id).student_id).name)} ${esc(course(l.course_id).subject)}</option>`).join('')}</select></label>
-    <label class="field"><span>一、本节授课内容</span><textarea id="w-content" placeholder="例：听解练习，要求学生用日语复述听力内容"></textarea></label>
+    <label class="field"><span>哪一节课</span><select id="w-lesson" data-change="w-lesson">${cand.map(l=>`<option value="${l.id}">${sMD(l.date)} ${esc(stu(course(l.course_id).student_id).name)} ${esc(course(l.course_id).subject)}</option>`).join('')}</select></label>
+    <label class="field"><span>一、本节授课内容</span><textarea id="w-content" placeholder="例：听解练习，要求学生用日语复述听力内容" data-auto="${esc(cand[0].topic||'')}">${esc(cand[0].topic||'')}</textarea></label>
     <label class="field"><span>二、学生课堂表现</span><textarea id="w-perf" placeholder="例：课堂状态良好，能积极参与练习"></textarea></label>
     <div class="field"><span>学生状态（点选，可多选）</span><div class="chips">${[...TAGS_GOOD,...TAGS_WARN].map(x=>`<button class="chip ${wTags.has(x)?'on':''}" data-act="w-tag" data-v="${x}">${x}</button>`).join('')}</div></div>
     <label class="field"><span>三、课后作业安排</span><textarea id="w-hw" placeholder="例：1. 复习本节生词  2. 完成长文 1–10"></textarea></label>
@@ -580,7 +592,7 @@ function tWrite(t){
     <div class="muted xs">提前结束或者上超了，在这里改；工资按实际时长算。</div>
     <label class="field"><span>上次作业完成情况</span><select id="w-last"><option>已完成</option><option>部分完成</option><option>未完成</option><option>没有布置</option></select></label>
     <button class="btn pri" data-act="submit-fb">提交反馈</button></section>` : `<div class="card empty">上完的课都写好反馈了</div>`;
-  return grade + form + (allF.length ? fbBar + (mine.length ? '' : '<div class="card empty">这个月没有反馈</div>') + mine.map(f=>{const l=L(f.lesson_id);return `<div class="card small"><div class="row"><b>${sMD(l.date)} ${esc(stu(course(l.course_id).student_id).name)}</b>${hrsTag(l)}<span style="margin-left:auto">${confirmTag(f)}</span><span class="tag ${f.status==='approved'?'ok':'warn'}">${f.status==='approved'?'已审核·家长可见':'待教务审核'}</span></div><div class="muted">${esc(f.content)}</div>${fileList(f.id,'note','上课笔记')}<div class="row" style="margin-top:4px">${uploadBtn('note', f.id, '上传上课笔记')}</div></div>`}).join('') : '');
+  return form + grade + (allF.length ? fbBar + (mine.length ? '' : '<div class="card empty">这个月没有反馈</div>') + mine.map(f=>{const l=L(f.lesson_id);return `<div class="card small"><div class="row"><b>${sMD(l.date)} ${esc(stu(course(l.course_id).student_id).name)}</b>${hrsTag(l)}<span style="margin-left:auto">${confirmTag(f)}</span><span class="tag ${f.status==='approved'?'ok':'warn'}">${f.status==='approved'?'已审核·家长可见':'待教务审核'}</span></div><div class="muted">${esc(f.content)}</div>${fileList(f.id,'note','上课笔记')}<div class="row" style="margin-top:4px">${uploadBtn('note', f.id, '上传上课笔记')}</div></div>`}).join('') : '');
 }
 function tMe(t){
   const ls = lsOfT(t.id).filter(l=>l.date.startsWith(S.teaMonth) && paidH(l)>0), h = ls.reduce((a,l)=>a+paidH(l),0);
@@ -720,9 +732,9 @@ function alPick(){
   const c = alCourse();
   if (c){ box.innerHTML = `<div class="muted xs">${esc(stu(sid).name)} 跟 ${esc(tea(tid).name)} 已经有「${esc(subj)}」这门课${c.active?'':'（目前标为「停了」）'}</div>`; return; }
   if (ME().role==='teacher'){ box.innerHTML = `<div class="note warn">你和 ${esc(stu(sid).name)} 还没有「${esc(subj)}」这门课，请先联系教务老师建立。</div>`; return; }
-  const rates = DB.courses.filter(y => y.teacher_id===tid && y.rate).map(y => y.rate), guess = rates.length ? rates[rates.length-1] : '';
+  const prev = DB.courses.filter(y => y.teacher_id===tid && y.rate), last = prev[prev.length-1], guess = last ? last.rate : '';
   box.innerHTML = `<div class="note">${esc(stu(sid).name)} 跟 ${esc(tea(tid).name)} 还没有「${esc(subj)}」这门课，排课时会<b>自动建立</b>。
-    ${isTop() ? `<label class="field" style="margin-top:6px"><span>老师单价（每小时；3 位数＝人民币，4 位数＝日元）</span><input type="number" id="al-rate" min="0" step="10" value="${guess}"></label>` : '<div class="muted xs">单价由教务·管理在学生档案里设置。</div>'}</div>`;
+    ${isTop() ? `<label class="field" style="margin-top:6px"><span>老师单价（每小时）</span><div class="row" style="flex-wrap:nowrap"><input type="number" id="al-rate" min="0" step="10" value="${guess}" style="flex:1;min-width:0">${curSel('al-cur', last ? curOf(last) : 'CNY')}</div></label>` : '<div class="muted xs">单价由教务·管理在学生档案里设置。</div>'}</div>`;
 }
 function studentForm(id){
   const s = id ? stu(id) : {name:'', track:'', grad:false, loc:'', tz:'JP', staff:'', memo:'', active:true};
@@ -771,10 +783,10 @@ function studentModal(id, tab){
     body = `<div class="grid2"><dl class="kv">${s.code?`<dt>编号</dt><dd class="num">${esc(s.code)}</dd>`:''}<dt>方向</dt><dd>${esc(s.track||'—')}（${s.grad?'大学院':'学部'}）</dd><dt>所在地</dt><dd>${esc(s.loc||'—')}</dd><dt>负责教务</dt><dd>${esc(s.staff||'—')}</dd>${s.memo?`<dt>教务备注</dt><dd>${esc(s.memo)}</dd>`:''}</dl>
       <div class="row" style="align-content:flex-start">${isTop()?`<button class="btn sm" data-act="student-form" data-v="${id}">编辑资料</button>`:''}<button class="btn sm" data-act="stu-cal" data-v="${id}">看课表</button>
       ${ps?`<button class="btn sm" data-act="copy-link" data-v="${ps.key}">复制学生链接</button>`:''}${pp?`<button class="btn sm" data-act="copy-link" data-v="${pp.key}">复制家长链接</button>`:''}</div></div>
-      <b>课程</b><div class="list">${cs.map(c=>`<div class="li small"><span class="grow">${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}${c.active?'':' <span class="tag mute">已停</span>'}</span>${isTop()?`<span class="num">${rateTxt(c.rate)}</span>`:''}${isAdmin()?`<button class="btn sm" data-act="course-edit" data-v="${c.id}">改</button>`:''}</div>`).join('')||'<div class="muted small">还没有课程</div>'}</div>
+      <b>课程</b><div class="list">${cs.map(c=>`<div class="li small"><span class="grow">${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}${c.active?'':' <span class="tag mute">已停</span>'}</span>${isTop()?`<span class="num">${rateTxt(c)}</span>`:''}${isAdmin()?`<button class="btn sm" data-act="course-edit" data-v="${c.id}">改</button>`:''}</div>`).join('')||'<div class="muted small">还没有课程</div>'}</div>
       ${isAdmin()?`<details class="card" ${cs.length?'':'open'}><summary><b>＋ 添加课程</b> <span class="muted xs">（这位学生跟哪位老师上什么课）</span></summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
         ${DB.teachers.length?`<div class="fields"><label class="field"><span>老师</span><select id="cf-t">${DB.teachers.filter(t=>t.active).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
-        ${subjField('cf-subj', '')}${isTop()?'<label class="field"><span>老师单价（每小时；3 位数＝人民币，4 位数＝日元）</span><input type="number" id="cf-rate" step="500" min="0" value="0"></label>':''}</div>${isTop()?'':'<div class="muted xs">课时单价由教务·管理设置。</div>'}
+        ${subjField('cf-subj', '')}${isTop()?`<label class="field"><span>老师单价（每小时）</span><div class="row" style="flex-wrap:nowrap"><input type="number" id="cf-rate" step="10" min="0" value="0" style="flex:1;min-width:0">${curSel('cf-cur','CNY')}</div></label>`:''}</div>${isTop()?'':'<div class="muted xs">课时单价由教务·管理设置。</div>'}
         <div class="row"><button class="btn pri sm" data-act="add-course" data-v="${id}">添加课程</button></div>`:'<div class="muted small">先到「老师档案」里添加老师。</div>'}</div></details>`:''}
       ${isTop()?`<div class="row" id="stu-del-row" style="margin-top:6px"><button class="btn danger sm" data-act="stu-del-ask" data-v="${id}">删除这位学生</button></div>`:''}`;
   } else if (tab==='mp') {
@@ -792,7 +804,7 @@ function studentModal(id, tab){
 function courseEdit(cid){
   const c = course(cid);
   openModal(`${mHead(`${esc(stu(c.student_id).name)} · ${esc(tea(c.teacher_id).name)}`)}
-  <div class="fields">${subjField('ce-subj', c.subject)}${isTop()?`<label class="field"><span>老师单价（每小时；3 位数＝人民币，4 位数＝日元）</span><input type="number" id="ce-rate" step="500" min="0" value="${c.rate||0}"></label>`:''}
+  <div class="fields">${subjField('ce-subj', c.subject)}${isTop()?`<label class="field"><span>老师单价（每小时）</span><div class="row" style="flex-wrap:nowrap"><input type="number" id="ce-rate" step="10" min="0" value="${c.rate||0}" style="flex:1;min-width:0">${curSel('ce-cur', curOf(c))}</div></label>`:''}
   <label class="field"><span>状态</span><select id="ce-active"><option value="true" ${c.active?'selected':''}>在上</option><option value="false" ${c.active?'':'selected'}>停了</option></select></label></div>
   <div class="row"><button class="btn pri" data-act="save-course" data-v="${cid}">保存</button><button class="btn danger sm" style="margin-left:auto" data-act="course-del" data-v="${cid}">删除这门课</button></div>
   <div class="muted xs">填错了可以直接删除；已经上过、写过反馈的课不能删，不上了就把状态改成「停了」。</div>`);
@@ -905,9 +917,9 @@ document.addEventListener('click', async e => {
       const before = v ? tea(v).book : 'K';
       const tid = await act('admin_save_teacher', {d}, v?'已保存':'已添加，老师的专属链接也生成好了'); await ownerAfterSave('teacher', v || tid, before); closeModal(); break; }
     case 'add-course': { if(!subjVal('cf-subj')){toast('请选择科目',true);break;}
-      await act('admin_save_course', {d:{student_id:v, teacher_id:val('cf-t'), subject:subjVal('cf-subj'), rate:Number(val('cf-rate'))||0}}, '课程已添加，可以去排课了'); studentModal(v,'info'); break; }
+      await act('admin_save_course', {d:{student_id:v, teacher_id:val('cf-t'), subject:subjVal('cf-subj'), rate:Number(val('cf-rate'))||0, cur:val('cf-cur')||'CNY'}}, '课程已添加，可以去排课了'); studentModal(v,'info'); break; }
     case 'course-edit': courseEdit(v); break;
-    case 'save-course': { const c=course(v); await act('admin_save_course', {d:{id:v, subject:subjVal('ce-subj') || c.subject, rate: isTop() ? (Number(val('ce-rate'))||0) : undefined, active:val('ce-active')==='true'}}, '已保存'); studentModal(c.student_id,'info'); break; }
+    case 'save-course': { const c=course(v); await act('admin_save_course', {d:{id:v, subject:subjVal('ce-subj') || c.subject, rate: isTop() ? (Number(val('ce-rate'))||0) : undefined, cur: isTop() ? (val('ce-cur')||undefined) : undefined, active:val('ce-active')==='true'}}, '已保存'); studentModal(c.student_id,'info'); break; }
     case 'move': { const d=val('mv-date'), s=toJST(val('mv-s')), en=toJST(val('mv-e')); if(!d||!s||!en||mins(en)<=mins(s)){toast('请检查日期和时间（不能跨过半夜 12 点）',true);break;}
       await act('admin_update_lesson', {lid:v, d:{date:d, start:s, end:en, moved:true, note:val('mv-note')||'已调课'}}, isT()?'已提交调课申请，教务批准后课表才会更新':'已调课，各方的课表已更新'); closeModal(); break; }
     case 'leave': { const dd=Number(val('lv-d')); await act('admin_update_lesson', {lid:v, d:{status:'leave', deduct:dd, note:val('lv-note')||(dd?`当天请假，扣 ${dd} 小时`:'请假，不扣课时')}}, '已标记请假'); closeModal(); break; }
@@ -928,8 +940,8 @@ document.addEventListener('click', async e => {
       if(!d||!s||!en||mins(en)<=mins(s)){toast('请检查日期和时间（不能跨过半夜 12 点）',true);break;}
       let c = alCourse();
       if (!c){ if (ME().role==='teacher'){toast('你和这位学生还没有这门课，请先联系教务老师建立',true);break;}
-        const cid = await rpc('admin_save_course', {d:{student_id:val('al-stu'), teacher_id:alTeacher(), subject:alSubj(), rate:Number(val('al-rate'))||0}}); c = {id:cid}; }
-      await act('admin_add_lessons', {course:c.id, kind:val('al-kind'), ...(val('al-topic').trim()?{topic:val('al-topic').trim()}:{}), dates:lessonDates(d, val('al-rep')), st:s, et:en, ...(val('al-mk')==='1'?{makeup:true}:{})}, r=>r.pending?'已提交排课申请，教务批准后会出现在课表上':`已排 ${r.added} 节课`+(r.skipped?`，${r.skipped} 节和老师已有的课冲突，已跳过`:'')); S.month=d.slice(0,7); closeModal(); render(); break; }
+        const cid = await rpc('admin_save_course', {d:{student_id:val('al-stu'), teacher_id:alTeacher(), subject:alSubj(), rate:Number(val('al-rate'))||0, cur:val('al-cur')||'CNY'}}); c = {id:cid}; }
+      await act('admin_add_lessons', {course:c.id, kind:val('al-kind'), ...(val('al-topic').trim()?{topic:val('al-topic').trim()}:{}), dates:lessonDates(d, val('al-rep')), st:s, et:en, ...(val('al-mk')==='1'?{makeup:true}:{})}, r=>r.pending?'已提交排课申请，教务批准后会出现在课表上':`已排 ${r.added} 节课`+(r.skipped?`，${r.skipped} 节和老师或学生已有的课撞了，已跳过`:'')); S.month=d.slice(0,7); closeModal(); render(); break; }
     case 'req-ok': { const q=DB.requests.find(x=>x.id===v);
       const args = q.type==='改期' ? {rid:v, accept:true, reply:'', nd:val('rq-d-'+v), ns:val('rq-s-'+v), ne:val('rq-e-'+v), deduct:0} : {rid:v, accept:true, reply:'', deduct:Number(val('rq-dd-'+v))};
       await act('admin_handle_request', args, '已处理，学生和老师都能看到结果'); break; }
@@ -955,6 +967,7 @@ document.addEventListener('click', async e => {
       await act('admin_lesson_state', {lid:id, state, hours:hrs, why}, state==='done'?'已保存，按 '+hrs+' 小时计入课时':state==='cancelled'?'已标为取消':'已恢复'); lessonModal(id); break; }
     case 'done-all': { const ids = needFb().map(l=>l.id); if (!confirm(`把 ${ids.length} 节待确认的课全部标为已上课（按排课时长计入课时）？\n有提前结束、上超或者没上的，请先单独处理。`)) break;
       await act('admin_mark_done_many', {ids}, '已标为已上课'); break; }
+    case 'grade-seen': await act('teacher_grade', {fid:v, fb:'老师已看过'}, '已标记：看过了'); break;
     case 'grade': { const t=val('gr-'+v).trim(); if(!t){toast('先写批改意见',true);break;} await act('teacher_grade', {fid:v, fb:t}, '批改完成，学生能看到了'); break; }
     case 'confirm': { const [id,r]=v.split('|'); await act('student_confirm', {fid:id, rating:r}, r==='满意'?'已确认，谢谢':'已确认，教务老师会看到你的评价'); break; }
     case 'hw-done': await act('student_hw_done', {fid:v, note:val('hw-'+v)}, '已提交，老师会批改'); break;
@@ -988,6 +1001,8 @@ document.addEventListener('change', e => {
   if (k==='calwho'){ S.calId=el.value; render(); }
   else if (k==='paym'){ S.payMonth=el.value; render(); }
   else if (k==='al-pick'){ alPick(); }
+  else if (k==='w-lesson'){ const box = document.getElementById('w-content'), tp = L(el.value)?.topic || '';   // 换了哪节课：没自己改过的话，换成那节课的本节内容
+    if (box && box.value === (box.dataset.auto || '')){ box.value = tp; box.dataset.auto = tp; } }
   else if (k==='l-kind'){ act('admin_update_lesson', {lid:el.dataset.lid, d:{kind:el.value}}, ME().role==='teacher' ? '已提交修改申请，教务批准后生效' : '课程已改').then(() => lessonModal(el.dataset.lid)).catch(() => {}); }
   else if (k==='subj-sel'){ const x = document.getElementById(el.id + '-x'); if (x) { x.hidden = el.value !== '__other'; if (!x.hidden) x.focus(); } }
   else if (k==='tfb-m'){ S.tfbM=el.value; render(); }

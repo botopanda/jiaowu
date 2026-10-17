@@ -532,3 +532,31 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
   .wk-row>span:last-child{margin-left:auto}
   .wk-row .grow{order:3;flex:1 1 100%;min-width:0}
 }
+
+/* ══════ 2026-10-17 体检后的小改动 ══════ */
+/* 总览：待确认逐条处理收起来；每条的按钮放到文字下面，不再把文字挤成好几行 */
+.ov-more>summary{cursor:pointer;font-size:13px;color:var(--gold-text);padding:6px 2px;list-style:none}
+.ov-more>summary::-webkit-details-marker{display:none}
+.ov-more>summary::before{content:'▸ '}
+.ov-more[open]>summary::before{content:'▾ '}
+.li-pend{flex-wrap:wrap}
+.li-pend .li-acts{flex:1 1 100%;justify-content:flex-end;flex-wrap:wrap}
+/* 教务手机上的学生档案：每个学生压成三四行，不再是一张长卡片 */
+@media (max-width:760px){
+  table.stu-tbl tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:3px 10px;padding:10px 12px}
+  table.stu-tbl td{padding:0;min-height:0}
+  table.stu-tbl td::before{display:none}
+  table.stu-tbl td br{display:none}
+  table.stu-tbl td:nth-child(2){order:1;font-size:15px}
+  table.stu-tbl td:nth-child(1){order:2;color:var(--muted);font-size:12px}
+  table.stu-tbl td:nth-child(3){order:3;color:var(--muted);font-size:12.5px}
+  table.stu-tbl td:nth-child(3) .xs{margin-left:4px}
+  table.stu-tbl td:nth-child(4){order:4;flex:1 1 100%}
+  table.stu-tbl td:nth-child(5){display:none}
+  table.stu-tbl td:nth-child(6),table.stu-tbl td:nth-child(7),table.stu-tbl td:nth-child(8){order:5;font-size:12.5px}
+  table.stu-tbl td:nth-child(6)::before,table.stu-tbl td:nth-child(8)::before{display:inline;position:static;content:attr(data-label) ' ';width:auto;font-size:12px}
+}
+/* 老师 / 学生 / 家长端：小字大一号，灰字深一点（浅色模式） */
+.layout.pl .xs{font-size:12.5px}
+.layout.pl .small{font-size:13.5px}
+@media (prefers-color-scheme: light){ .layout.pl{--muted:#726c62} }

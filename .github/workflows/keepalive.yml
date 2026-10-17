@@ -1,0 +1,15 @@
+# 每天自动访问一次数据库，免得 Supabase 免费版「一周没人用」就自动暂停
+name: 每天叫醒数据库
+on:
+  schedule:
+    - cron: '17 1 * * *'   # 每天北京时间 9:17
+  workflow_dispatch:        # 也可以在 GitHub 上手动点一次
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 访问一次数据库
+        run: |
+          curl -s -X POST "https://euwsrpppykescwflgtgu.supabase.co/rest/v1/rpc/ping" \
+            -H "apikey: sb_publishable_Lgyp6nefs88z4X01-1v3wA_gPJNl8fW" -H "Content-Type: application/json" -d '{}'
+          echo
