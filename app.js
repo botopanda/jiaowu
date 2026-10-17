@@ -819,7 +819,7 @@ function studentModal(id, tab){
       ${isTop()?`<div class="row" id="stu-del-row" style="margin-top:6px"><button class="btn danger sm" data-act="stu-del-ask" data-v="${id}">删除这位学生</button></div>`:''}`;
   } else if (tab==='mp') {
     const editable = cs.filter(c=>c.active);
-    const edit = m => `<section class="card" style="display:flex;flex-direction:column;gap:8px"><b>${ymLabel(m)}计划</b>${editable.map(c=>`<label class="field"><span>${esc(c.subject)} · ${esc(tea(c.teacher_id).name)}${DB.plans.find(p=>p.course_id===c.id&&p.ym===m)?.updated_by?` <span class="xs">（${esc(DB.plans.find(p=>p.course_id===c.id&&p.ym===m).updated_by)} 写）</span>`:''}</span><textarea id="mp-${m}-${c.id}" style="min-height:52px" placeholder="这个月这门课要完成什么">${esc(planText(c.id,m))}</textarea></label>`).join('')||'<div class="muted small">还没有课程</div>'}
+    const edit = m => `<section class="card" style="display:flex;flex-direction:column;gap:8px"><b>${ymLabel(m)}计划</b>${editable.map(c=>`<label class="field"><span>${esc(c.subject)} · ${esc(tea(c.teacher_id).name)}${DB.plans.find(p=>p.course_id===c.id&&p.ym===m)?.updated_by?` <span class="xs">（${esc(DB.plans.find(p=>p.course_id===c.id&&p.ym===m).updated_by)} 写）</span>`:''}</span><textarea id="mp-${m}-${c.id}" style="min-height:52px" placeholder="这个月这门课要完成什么">${esc(planText(c.id,m))}</textarea></label>${typeof mpTools==='function' ? mpTools(m, c.id) : ''}`).join('')||'<div class="muted small">还没有课程</div>'}
       ${editable.length?`<div class="row"><button class="btn pri sm" data-act="mp-save" data-v="${id}|${m}">保存${+m.slice(5)}月计划</button></div>`:''}</section>`;
     body = `<div class="hint" style="margin:0">每门课每月写一句，学生和家长能看到。任课老师也可以在自己的链接里写。进度快了慢了，下个月重新写就行。</div>${edit(ym)}${edit(nx)}<section class="card"><b>${ymLabel(pv)}计划</b>${mpView(id,pv)}</section>`;
   } else if (tab==='fb') body = fbOfS(id).slice().reverse().slice(0,6).map(f=>fbCard(f)).join('') || '<div class="empty">还没有反馈</div>';
@@ -843,7 +843,7 @@ function tStuModal(cid){
   openModal(`${mHead(`${esc(s.name)} · ${esc(c.subject)}`)}
   ${teacherTrackBlock(s.id)}
   <b class="small">月计划 <span class="muted xs" style="font-weight:400">学生和家长能看到</span></b>
-  ${[ym,nx].map(m=>`<label class="field"><span>${ymLabel(m)}</span><textarea id="mp-${m}-${cid}" style="min-height:52px" placeholder="这个月要完成什么，例：日本史近代收尾，每周 1 篇记述">${esc(planText(cid,m))}</textarea></label>`).join('')}
+  ${[ym,nx].map(m=>`<label class="field"><span>${ymLabel(m)}</span><textarea id="mp-${m}-${cid}" style="min-height:52px" placeholder="这个月要完成什么，例：日本史近代收尾，每周 1 篇记述">${esc(planText(cid,m))}</textarea></label>${typeof mpTools==='function' ? mpTools(m, cid) : ''}`).join('')}
   <div class="row"><button class="btn pri sm" data-act="t-mp-save" data-v="${cid}">保存计划</button></div>
   <b class="small">私下备注 <span class="muted xs" style="font-weight:400">只有你和教务能看到</span></b>
   ${DB.notes.filter(n=>n.student_id===s.id).map(n=>`<div class="card small row"><span class="muted">${sMD(n.created_at.slice(0,10))}</span><span class="grow">${esc(n.text)}</span>${n.teacher_id===ME().teacher_id?`<button class="btn sm" data-act="note-del" data-v="${n.id}">删除</button>`:''}</div>`).join('')}
