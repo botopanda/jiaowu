@@ -342,7 +342,7 @@ function pgRequests(){
     </section>`; };
   const cp = chPend(), cd = (DB.changes||[]).filter(x => x.status==='approved' || x.status==='rejected').slice(0,10);
   return `<div class="ph"><h2>改期 · 请假</h2></div>
-  <section class="card"><h3>老师的排课 / 调课申请</h3><div class="muted xs" style="margin:2px 0 6px">老师自己排课、调课、删课，要你们批准后才会改到课表上。</div>
+  <section class="card"><div class="row"><h3 style="margin-right:auto">老师的排课 / 调课申请</h3>${cp.length>1?`<button class="btn pri sm" data-act="ch-ok-all">全部批准（${cp.length} 条）</button>`:''}</div><div class="muted xs" style="margin:2px 0 6px">老师自己排课、调课、删课，要你们批准后才会改到课表上。</div>
     <div class="list">${cp.length ? cp.map(x => chCard(x, true)).join('') : '<div class="empty">没有待审批的老师申请</div>'}</div>
     ${cd.length ? `<details style="margin-top:6px"><summary class="muted small">最近处理过的 ${cd.length} 条</summary><div class="list">${cd.map(x => chCard(x, true)).join('')}</div></details>` : ''}</section>
   <h3 style="font-size:15px">学生的改期 · 请假</h3>
@@ -927,6 +927,13 @@ document.addEventListener('click', async e => {
     case 'del-ask': document.getElementById('del-row').innerHTML=`<span class="small">${L(v) && fbOf(L(v)) ? '确定删除？<b>老师写的反馈也会一起删掉，不能恢复。</b>' : '确定删除这节课？'}</span><button class="btn danger sm" data-act="del" data-v="${v}">删除</button><button class="btn sm" data-act="close">算了</button>`; break;
     case 'del': await act('admin_delete_lesson', {lid:v}, isT()?'已提交删课申请，教务批准后才会删除':'已删除'); closeModal(); break;
     case 'ch-ok': await act('change_handle', {cid:v, accept:true, why:''}, r=>r.added!=null && (r.added||r.skipped) ? `已批准，排了 ${r.added} 节`+(r.skipped?`，${r.skipped} 节时间冲突跳过`:'') : '已批准，课表已更新'); break;
+    case 'ch-ok-all': {   // 一条一条批准；撞课的节数自动跳过，批不了的留着，最后报一个总数
+      const ids = chPend().map(x => x.id); if (!ids.length) break;
+      if (!confirm(`全部批准这 ${ids.length} 条老师申请？\n和老师、学生已有的课撞了的那几节会自动跳过。`)) break;
+      document.body.classList.add('busy'); let ok = 0, added = 0, skipped = 0; const bad = [];
+      for (const id of ids) { try { const r = await rpc('change_handle', {cid:id, accept:true, why:''}); ok++; added += r?.added || 0; skipped += r?.skipped || 0; } catch(err) { bad.push(err.message); } }
+      document.body.classList.remove('busy'); await load(); render();
+      toast(`已批准 ${ok} 条${added?`，排了 ${added} 节`:''}${skipped?`，${skipped} 节撞课跳过`:''}${bad.length?`；${bad.length} 条没批成：${bad[0]}`:''}`, bad.length > 0); break; }
     case 'ch-no': { const why = prompt('不批准的原因（老师能看到，可以不写）', ''); if (why===null) break;
       await act('change_handle', {cid:v, accept:false, why}, '已回复老师'); break; }
     case 'logout': if (!confirm('退出后，这台设备要重新点专属链接才能进来。确定退出吗？')) break;
