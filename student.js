@@ -20,7 +20,7 @@ function sView(s){ return ({a:sHome2, b:sSched, c:sHomework2, d:sFeedback2, e:sM
 /* ───────── 首页 ───────── */
 function sHome2(s){
   const h = +nowJST().slice(0,2), greet = h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 13 ? '中午好' : h < 18 ? '下午好' : '晚上好';
-  return `<div class="sh-hi"><h2>${greet}，${esc(s.name)}</h2><span class="muted small">${fmtMD(TODAY)}</span></div>
+  return `<div class="sh-hi"><h2>${greet}，${esc(s.name)}同学</h2><span class="muted small">${fmtMD(TODAY)}</span></div>
   <div class="grid2 sh-grid"><div class="sh-col">${sUp(s).length ? sNextCard(s) : ''}${sWeek(s)}${sTodo(s)}</div>
     <div class="sh-col">${sCkCard(s)}${sLastFb(s)}${sCountdown(s)}
       <section class="card"><h3 class="sh-h">${+TODAY.slice(5,7)} 月学习计划</h3>${mpView(s.id, TODAY.slice(0,7))}</section></div></div>`;
@@ -60,7 +60,7 @@ function sSide(s){
   cs.forEach(c => (by[c.teacher_id] ??= []).push(c.subject));
   const sub = [s.direction || s.track, s.target_ym ? `目标 ${tgtLabel(s.target_ym)}` : ''].filter(Boolean);
   return {
-    top: `<div class="side-me"><span class="side-av">${esc((s.name || '?').slice(-1))}</span><div><b>${esc(s.name)}</b>${sub.map(x => `<div class="muted xs">${esc(x)}</div>`).join('')}</div></div>`,
+    top: `<div class="side-me"><span class="side-av">${esc((s.name || '?').slice(-1))}</span><div><b>${esc(s.name)}同学</b>${sub.map(x => `<div class="muted xs">${esc(x)}</div>`).join('')}</div></div>`,
     bottom: `<div class="side-foot">${Object.keys(by).length ? `<div class="grp">我的老师</div>${Object.entries(by).map(([tid, subs]) => `<div class="side-tea"><b>${esc(tea(tid).name)}</b><span class="muted xs">${subs.map(esc).join('、')}</span></div>`).join('')}` : ''}
       <div class="muted xs side-help">有问题直接微信联系教务老师</div></div>`,
   };
