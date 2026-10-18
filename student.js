@@ -25,7 +25,7 @@ function sView(s){ return ({a:sHome2, b:sSched, c:sHomework2, d:sFeedback2, e:sM
 function sHome2(s){
   const h = +nowJST().slice(0,2), greet = h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 13 ? '中午好' : h < 18 ? '下午好' : '晚上好';
   return `<div class="sh-hi"><h2>${PRO() ? `${esc(s.name)}同学的学习情况` : `${greet}，${esc(s.name)}同学`}</h2><span class="muted small">${fmtMD(TODAY)}</span>${PRO() && typeof mrBtn==='function' ? `<span style="margin-left:auto">${mrBtn(s.id)}</span>` : ''}</div>
-  <div class="grid2 sh-grid"><div class="sh-col">${sUp(s).length ? sNextCard(s) : ''}${sWeek(s)}${sTodo(s)}</div>
+  <div class="grid2 sh-grid"><div class="sh-col">${sUp(s).length ? sNextCard(s) : ''}${sWeek(s)}${sTodo(s)}${typeof sWordCard==='function' ? sWordCard(s) : ''}</div>
     <div class="sh-col">${sCkCard(s)}${sLastFb(s)}${sCountdown(s)}
       <section class="card"><h3 class="sh-h">${+TODAY.slice(5,7)} 月学习计划</h3>${mpView(s.id, TODAY.slice(0,7))}</section></div></div>${typeof sMsgEntry==='function' ? sMsgEntry() : ''}`;
 }

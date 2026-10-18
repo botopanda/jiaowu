@@ -617,3 +617,14 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .cal .day.can-add{cursor:copy}
 .cal .day.can-add:hover{background:color-mix(in srgb,var(--gold) 5%,var(--surface))}
 .cal .day.can-add:hover .dn::after{content:' ＋';color:var(--gold-text);font-weight:600}
+
+/* 首页「今日单词」 */
+.wd-card{display:flex;flex-direction:column;gap:6px}
+.wd-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.wd-w{font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif CJK JP",var(--f-disp);font-size:26px;line-height:1.3;letter-spacing:.02em}
+.wd-r{color:var(--gold-text);font-size:14px}
+.wd-m{font-size:14px}
+.wd-ex{background:var(--sunk);border-radius:var(--r);padding:8px 12px;display:flex;flex-direction:column;gap:2px}
+.wd-ja{font-size:14.5px}
+.wd-ja b{color:var(--gold-text)}
+.wd-zh{color:var(--muted);font-size:13px}
