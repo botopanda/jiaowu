@@ -20,7 +20,7 @@ const msgShown = () => MSGS.filter(m => DB.students.some(s => s.id === m.student
 /* ───────── 学生 ───────── */
 function sMsgBox(s){
   return `<section class="card msg-box" id="m-msg"><h3 class="sh-h">想和老师说的话</h3>
-    <div class="muted small">上课的感受、遇到的困难、想调整的地方，都可以写在这里。<b>家长看不到。</b></div>
+    <div class="muted small">上课的感受、遇到的困难、想调整的地方，都可以写在这里。</div>
     <textarea id="msg-text" rows="4" maxlength="2000" placeholder="想说什么都可以，写完点「发送」"></textarea>
     <div class="msg-to">
       <label><input type="radio" name="msg-to" value="0" checked> 只有教务老师能看到</label>
@@ -32,7 +32,7 @@ function sMsgBox(s){
       <div class="msg-t">${esc(m.text)}</div></div>`).join('')}</details>` : ''}
   </section>`;
 }
-const sMsgEntry = () => `<button class="msg-entry" data-act="msg-go">有什么想和老师说的？写在这里，家长看不到 ›</button>`;
+const sMsgEntry = () => `<button class="msg-entry" data-act="msg-go">有什么想和老师说的？写在这里 ›</button>`;
 
 /* ───────── 教务：「学生留言」页 ───────── */
 function pgMsgs(){
