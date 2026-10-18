@@ -68,7 +68,7 @@ function profilePage(s, opt = {}){
 
   return `<article class="pf-page">
   <header class="pf-head"><div><small>学生个人档案与升学计划</small><h2>${esc(s.name)}</h2></div>
-    <div class="pf-tags">${s.code ? `<span class="tag mute">${esc(s.code)}</span>` : ''}${s.direction ? `<span class="tag gold">${esc(s.direction)}</span>` : ''}${s.target_ym ? `<span class="tag blue">目标入学 ${tgtLabel(s.target_ym)}</span>` : ''}
+    <div class="pf-tags">${s.direction ? `<span class="tag gold">${esc(s.direction)}</span>` : ''}${s.target_ym ? `<span class="tag blue">目标入学 ${tgtLabel(s.target_ym)}</span>` : ''}
       <button class="btn sm noprint" data-act="pf-print" data-v="${s.id}">打印 / 存 PDF</button></div></header>
   <section><h3 class="pf-h">基本信息</h3><div class="pf-grid">
     ${kv('姓名', s.name)}${kv('出生日期', birth)}${kv('学年', s.grade)}${kv('性别', s.gender)}

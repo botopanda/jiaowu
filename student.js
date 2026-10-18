@@ -166,7 +166,7 @@ function sMine(s){
   ${r.teacher_eval || r.next_focus ? reviewCard({...r, ym, student_id: s.id}) : ''}
   ${past.length ? `<details class="sh-more"><summary>以前的月度回访（${past.length}）</summary>${past.map(x => reviewCard(x)).join('')}</details>` : ''}
   <h3 class="sh-sec" id="m-profile">个人档案</h3>
-  <details class="card"><summary class="muted small">点开看我的档案（家长看到的也是这一份）</summary>${profilePage(s, {hideEmpty: true})}</details>`;
+  <details class="card"><summary class="muted small">点开看我的档案</summary>${profilePage(s, {hideEmpty: true})}</details>`;
 }
 
 document.addEventListener('click', e => {
