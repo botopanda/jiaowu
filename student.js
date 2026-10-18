@@ -120,7 +120,7 @@ function sHomework2(s){
       <div class="row xs">${subjTag(c.subject)}<span class="muted">${esc(tName(c.teacher_id))} · ${sMD(l.date)} 布置</span><span style="margin-left:auto" class="tag ${f.hw_fb?'ok':f.hw_sub?'blue':'warn'}">${f.hw_fb?'已批改':f.hw_sub?'已交':'未交'}</span></div>
       <div class="hw-t">${esc(f.hw)}</div>${fileList(f.id,'hwref','老师给的作业图片')}
       ${now && !f.hw_sub ? `<div class="row">${uploadBtn('hw', f.id, '上传作业照片 / PDF')}<button class="btn pri sm" data-act="hw-done" data-v="${f.id}">我完成了</button></div>` : ''}
-      ${now && f.hw_sub && !f.hw_fb ? `<div class="row">${uploadBtn('hw', f.id, '再传几张')}</div>` : ''}
+      ${now && f.hw_sub && !f.hw_fb ? `<div class="row">${uploadBtn('hw', f.id, '再传几张')}<button class="btn sm" style="margin-left:auto" data-act="hw-undo" data-v="${f.id}" title="点错了「我完成了」？老师批改前可以撤回">还没做完，撤回</button></div>` : ''}
       ${fileList(f.id,'hw',`${who}交的作业`)}${fileList(f.id,'grade','老师的批改')}
       ${f.hw_note?`<div class="muted xs">${who}说：${esc(f.hw_note)}</div>`:''}${f.hw_fb?`<div class="note"><b>老师批改：</b>${esc(f.hw_fb)}</div>`:''}</div></div>`; };
   return `${todo.length ? `<div class="dg">还没交 · ${todo.length} 份</div>${todo.map(f => item(f, true)).join('')}` : '<div class="card todo-ok"><b>作业都交了</b><span class="muted small">新作业会出现在这里</span></div>'}
@@ -180,5 +180,9 @@ function sMine(s){
 document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
   if (a.dataset.act === 'hw-open') { const p = document.getElementById('hwp-' + a.dataset.v); if (p) { p.hidden = !p.hidden; if (!p.hidden) p.querySelector('textarea')?.focus(); } }
+  if (a.dataset.act === 'hw-undo') {   // 点错「我完成了」：老师批改前可以撤回
+    if (!confirm('撤回「我完成了」？\n这份作业会回到「还没交」，已经传的照片会留着，做完了再点一次「我完成了」就行。')) return;
+    act('student_hw_undo', {fid: a.dataset.v}, '已撤回，这份作业回到「还没交」了').catch(() => {});
+  }
   if (a.dataset.act === 'jump') document.getElementById(a.dataset.v)?.scrollIntoView({behavior: 'smooth', block: 'start'});
 });
