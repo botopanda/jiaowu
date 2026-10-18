@@ -593,6 +593,6 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 
 /* 电脑上「本周课程」固定四栏：日子 · 时间 · 科目和内容 · 老师（老师靠右对齐）；手机上仍是两行 */
 @media (min-width:761px){
-  .wk-row{display:grid;grid-template-columns:104px 104px minmax(0,1fr) auto;align-items:center;column-gap:12px}
-  .wk-row>span:last-child{text-align:right}
+  .wk-row{display:grid;grid-template-columns:104px minmax(0,1fr) auto;grid-template-areas:"d t w" ". s s";align-items:baseline;column-gap:12px;row-gap:2px}
+  .wk-row .wk-d{grid-area:d} .wk-row .num{grid-area:t} .wk-row .grow{grid-area:s;min-width:0} .wk-row>span:last-child{grid-area:w;text-align:right}
 }
