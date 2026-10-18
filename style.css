@@ -608,3 +608,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .msg-entry{display:block;width:100%;margin-top:12px;padding:12px 14px;border:1px dashed var(--line);border-radius:var(--r);background:var(--surface);color:var(--gold-text);font-size:13.5px;text-align:left;cursor:pointer}
 .msg-a{display:flex;flex-direction:column;gap:6px}
 .msg-a.unread{border-color:var(--gold);box-shadow:inset 3px 0 0 var(--gold)}
+
+/* ══════ 2026-10-19 月历减色：颜色只表示上午 / 下午 / 晚上；「已写反馈」淡灰勾，「待写」橙色小字（不再是实心色块） ══════ */
+.cal .mk.ok,.agenda .mk.ok,.wk-l .mk.ok{background:none;color:var(--muted);padding:0 1px;font-weight:600}
+.cal .mk.q,.agenda .mk.q,.wk-l .mk.q{background:none;color:var(--warn);padding:0 1px}
