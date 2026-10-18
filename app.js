@@ -86,9 +86,12 @@ const KINDS = ['EJU','校内考','共通试验','面试','面谈','升学指导/
 // 艺术老师（老师档案里「类别」选艺术）排课时用这两组选项
 const ART_SUBJECTS = ['素描','色彩','速写','漫画','插画','角色设计','动画','摄影','影像','设计','不分科目'];
 const ART_KINDS = ['基础训练','作品集制作','实技对策','面试','面谈','研究计划书 / 志望理由书','升学指导/规划','进度反馈'];
-const tCat = tid => (typeof CVS !== 'undefined' && CVS[tid] && CVS[tid].cat) || '学科';   // 老师类别：学科 / 艺术
-const subjsOf = tid => tCat(tid)==='艺术' ? ART_SUBJECTS : SUBJECTS;
-const kindsOf = tid => tCat(tid)==='艺术' ? ART_KINDS : KINDS;
+// 教务老师（教务张老师、教务潘老师、教务金老师）：只用来排面谈、升学指导；不进老师档案、工资、链接
+const isStaffT = tid => !!(DB.teachers.find(t => t.id===tid) || {}).staff;
+const STAFF_KINDS = ['面谈','升学指导/规划','研究计划书 / 志望理由书','面试','进度反馈'];
+const tCat = tid => isStaffT(tid) ? '教务' : (typeof CVS !== 'undefined' && CVS[tid] && CVS[tid].cat) || '学科';   // 老师类别：学科 / 艺术 / 教务
+const subjsOf = tid => tCat(tid)==='艺术' ? ART_SUBJECTS : tCat(tid)==='教务' ? ['不分科目'] : SUBJECTS;
+const kindsOf = tid => tCat(tid)==='艺术' ? ART_KINDS : tCat(tid)==='教务' ? STAFF_KINDS : KINDS;
 const pyCmp = (() => { try { return new Intl.Collator('zh-Hans-CN-u-co-pinyin').compare; } catch(e) { return (a, b) => a.localeCompare(b, 'zh'); } })();   // 按拼音首字母排序
 function subjField(id, cur){
   const other = cur && !SUBJECTS.includes(cur);
@@ -145,7 +148,7 @@ const fbOf = l => DB.feedbacks.find(f => f.lesson_id===l.id);
 const cOfF = f => course(L(f.lesson_id).course_id);
 const dur = l => (mins(l.end)-mins(l.start))/60;
 // 「已上课」= 老师写了反馈，或者教务手动确认过；时间过了但两样都没有 = 「待确认」，不计课时
-const isDone = l => l.status==='scheduled' && (l.has_fb || l.done_manual || !!fbOf(l));
+const isDone = l => l.status==='scheduled' && (l.has_fb || l.done_manual || !!fbOf(l) || (l.date < TODAY && isStaffT(course(l.course_id)?.teacher_id)));
 const isPend = l => l.status==='scheduled' && l.date < TODAY && !isDone(l);
 const realH = l => l.actual_hours!=null ? Number(l.actual_hours) : dur(l);   // 实际上课时长（没改过就是排课时长）
 const paidH = l => isDone(l) ? realH(l) : l.status==='leave' ? Number(l.deduct) : 0;
@@ -437,7 +440,7 @@ function pgStudents(){
 function pgTeachers(){
   return `<div class="ph"><h2>老师档案</h2><button class="btn pri" data-act="teacher-form">＋ 新增老师</button></div>
   <div class="hint">点「履历」看、填老师的简历和资料（学生和家长看不到）；老师也可以在自己链接的「我的」里填。</div>
-  ${DB.teachers.length ? `<div class="grid2 cards-fix">${DB.teachers.map(t => { const cs = DB.courses.filter(c=>c.teacher_id===t.id), ym = TODAY.slice(0,7);
+  ${DB.teachers.some(t => !t.staff) ? `<div class="grid2 cards-fix">${DB.teachers.filter(t => !t.staff).map(t => { const cs = DB.courses.filter(c=>c.teacher_id===t.id), ym = TODAY.slice(0,7);
     const ms = lsOfT(t.id).filter(l=>l.date.startsWith(ym)), p = teacherRealLink(t);
     const done = ms.filter(l=>paidH(l)>0), plan = ms.filter(l=>l.status==='scheduled'), pn = ms.filter(isPend).length;
     const hDone = +done.reduce((a,l)=>a+paidH(l),0).toFixed(1), hPlan = +plan.reduce((a,l)=>a+dur(l),0).toFixed(1);
@@ -453,7 +456,7 @@ function pgTeachers(){
 
 function pgPayroll(){
   const ym = S.payMonth;
-  const rows = DB.teachers.map(t => { const ls = lsOfT(t.id).filter(l => l.date.startsWith(ym) && paidH(l)>0);
+  const rows = DB.teachers.filter(t => !t.staff).map(t => { const ls = lsOfT(t.id).filter(l => l.date.startsWith(ym) && paidH(l)>0);
     const parts = ls.map(l => { const c = course(l.course_id); return [paidH(l)*(c.rate||0), curOf(c)]; });
     return {t, ls, h: +ls.reduce((a,l)=>a+paidH(l),0).toFixed(1), parts, amt: sumMoney(parts), pn: lsOfT(t.id).filter(l => l.date.startsWith(ym) && isPend(l)).length}; }).filter(r => r.ls.length || r.pn);
   const total = sumMoney(rows.flatMap(r => r.parts));
@@ -687,12 +690,12 @@ const mHead = t => `<div class="mh"><h3>${t}</h3><button class="btn sm" data-act
 function lessonModal(id){
   lastModal = () => lessonModal(id);
   const l = L(id), c = course(l.course_id), s = stu(c.student_id), t = tea(c.teacher_id), f = fbOf(l), q = reqOf(l);
-  const st = isDone(l)?`<span class="tag ok">已上课</span>${!f&&!l.has_fb?' <span class="tag mute">教务确认</span>':''}${hrsTag(l)}`:l.status==='leave'?'<span class="tag seal">请假</span>':l.status==='cancelled'?'<span class="tag mute">已取消</span>':isPend(l)?'<span class="tag warn">待确认</span> <span class="muted xs">老师还没写反馈，暂不计课时</span>':'<span class="tag blue">待上课</span>';
+  const st = isDone(l)?`<span class="tag ok">已上课</span>${!f&&!l.has_fb&&!t.staff?' <span class="tag mute">教务确认</span>':''}${hrsTag(l)}`:l.status==='leave'?'<span class="tag seal">请假</span>':l.status==='cancelled'?'<span class="tag mute">已取消</span>':isPend(l)?'<span class="tag warn">待确认</span> <span class="muted xs">老师还没写反馈，暂不计课时</span>':'<span class="tag blue">待上课</span>';
   openModal(`${mHead(`${esc(s.name)} · ${esc(c.subject)}${l.kind?' · '+esc(l.kind):''}`)}
   <dl class="kv"><dt>课程</dt><dd>${canSched() && l.status==='scheduled' ? `<select data-change="l-kind" data-lid="${l.id}"><option value="">—</option>${kindsOf(t.id).map(x => `<option ${x===l.kind?'selected':''}>${x}</option>`).join('')}${l.kind && !kindsOf(t.id).includes(l.kind) ? `<option selected>${esc(l.kind)}</option>` : ''}<option value="__other">其他（自己填）…</option></select>` : esc(l.kind || '—')}</dd><dt>老师</dt><dd>${esc(t.name)}${t.loc?`（${esc(t.loc)}）`:''}</dd><dt>时间</dt><dd>${fmtMD(l.date)} ${l.start}–${l.end} <span class="muted">北京时间</span></dd>
   <dt>本节内容</dt><dd id="tp-view">${l.topic?esc(l.topic):'<span class="muted">还没写</span>'}${canSched()?` <button class="btn sm" data-act="topic" data-v="${l.id}">${l.topic?'修改':'填写'}</button>`:''}</dd>
   <dt>状态</dt><dd>${st} ${l.makeup?'<span class="tag blue">补课</span>':''} ${l.moved?'<span class="tag warn">调过课</span>':''}${l.moved && canSched() && (!f || isTop()) ? ` <button class="btn sm" data-act="unmove" data-v="${l.id}">取消调课标记</button>` : ''}${canSched() && (!f || isTop()) ? ` <button class="btn sm" data-act="makeup" data-v="${l.id}|${l.makeup?0:1}">${l.makeup?'取消补课标记':'标为补课'}</button>` : ''}</dd>${l.note?`<dt>备注</dt><dd>${esc(l.note)}</dd>`:''}
-  ${l.status==='leave'?`<dt>扣学生课时</dt><dd class="num">${l.deduct} 小时（老师照发）</dd>`:''}${l.actual_note?`<dt>时长说明</dt><dd>${esc(l.actual_note)}</dd>`:''}${isDone(l)||isPend(l)?`<dt>反馈</dt><dd>${f?(f.status==='approved'?'已审批':'待审批'):l.has_fb?'已写':'<span class="tag warn">老师未写</span>'}</dd>`:''}
+  ${l.status==='leave'?`<dt>扣学生课时</dt><dd class="num">${l.deduct} 小时（老师照发）</dd>`:''}${l.actual_note?`<dt>时长说明</dt><dd>${esc(l.actual_note)}</dd>`:''}${(isDone(l)||isPend(l)) && !t.staff?`<dt>反馈</dt><dd>${f?(f.status==='approved'?'已审批':'待审批'):l.has_fb?'已写':'<span class="tag warn">老师未写</span>'}</dd>`:''}
   ${q?`<dt>申请</dt><dd>${reqLine(q)}</dd>`:''}${chPendOf(l.id)?`<dt>老师申请</dt><dd><span class="tag warn">${chKind[chPendOf(l.id).kind]}待审批</span> <span class="small">${chText(chPendOf(l.id))}</span></dd>`:''}</dl>
   ${isAdmin() && l.date<=TODAY && l.status!=='leave' ? `<section class="card" style="display:flex;flex-direction:column;gap:8px"><b>上课确认</b>
     ${l.status==='cancelled' ? `<div class="row"><span class="muted small">这节课已取消，不计课时。</span><button class="btn sm" data-act="lstate" data-v="${l.id}|reset">恢复这节课</button></div>` : `
@@ -726,7 +729,8 @@ function addLessonModal(){
   openModal(`${mHead(isT ? '申请排课' : '排课')}
   <div class="fields">
     <label class="field"><span>学生</span><select id="al-stu" data-change="al-pick"><option value="">选择学生…</option>${studs.map(x => `<option value="${x.id}" ${x.id===preS?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
-    <label class="field"><span>老师</span><select id="al-tea" data-change="al-pick" ${isT?'disabled':''}>${isT?'':'<option value="">选择老师…</option>'}${teas.map(t => `<option value="${t.id}" ${t.id===preT?'selected':''}>${esc(t.name)}</option>`).join('')}</select></label>
+    <label class="field"><span>老师</span><select id="al-tea" data-change="al-pick" ${isT?'disabled':''}>${isT?'':'<option value="">选择老师…</option>'}${(() => { const o = t => `<option value="${t.id}" ${t.id===preT?'selected':''}>${esc(t.name)}</option>`, st = teas.filter(t => t.staff);
+      return st.length ? `<optgroup label="老师">${teas.filter(t => !t.staff).map(o).join('')}</optgroup><optgroup label="教务（面谈、升学指导）">${st.map(o).join('')}</optgroup>` : teas.map(o).join(''); })()}</select></label>
   </div>
   <div class="fields">
     <label class="field"><span>科目</span><select id="al-subj" data-change="al-pick">${alSubjOpts(preT)}</select>
@@ -749,6 +753,7 @@ const alCourse = () => DB.courses.find(c => c.student_id===val('al-stu') && c.te
 // 科目 / 课程下拉：学科老师和艺术老师用不同的选项
 function alSubjOpts(tid, cur=''){
   const list = subjsOf(tid), extra = [...new Set(DB.courses.filter(c => !tid || c.teacher_id===tid).map(c => c.subject))].filter(x => x && !list.includes(x));   // 现有课程里列表外的科目，比如「电影」
+  if (tCat(tid)==='教务' && cur!=='__other' && ![...list, ...extra].includes(cur)) cur = '不分科目';   // 教务老师默认「不分科目」
   return `<option value="">选择科目…</option>${[...list, ...extra].map(x => `<option ${x===cur?'selected':''}>${esc(x)}</option>`).join('')}<option value="__other" ${cur==='__other'?'selected':''}>其他（自己填）</option>`;
 }
 const alKindOpts = (tid, cur='') => `<option value="">选择课程…</option>${kindsOf(tid).map(x => `<option ${x===cur?'selected':''}>${x}</option>`).join('')}<option value="__other" ${cur==='__other'?'selected':''}>其他（自己填）</option>`;
@@ -1068,7 +1073,7 @@ document.addEventListener('change', e => {
   else if (k==='tfb-s'){ S.tfbS=el.value; render(); }
   else if (k==='team'){ S.teaMonth=el.value; render(); }
   else if (k==='rq-type'){ document.getElementById('rq-wish-f').hidden = el.value!=='改期'; }
-  else if (k==='ln-role'){ const r=el.value, adm=r==='normal'||r==='top', list = r==='teacher'?DB.teachers:DB.students;
+  else if (k==='ln-role'){ const r=el.value, adm=r==='normal'||r==='top', list = r==='teacher'?DB.teachers.filter(t => !t.staff):DB.students;
     const emptyBox=document.getElementById('ln-empty'), noOne = !adm && !list.length;
     document.getElementById('ln-target-f').hidden=adm||noOne; document.getElementById('ln-scope-f').hidden=r!=='normal';
     document.querySelector('[data-act="link-create"]').disabled = noOne;
