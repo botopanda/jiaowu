@@ -628,3 +628,8 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .wd-ja{font-size:14.5px}
 .wd-ja b{color:var(--gold-text)}
 .wd-zh{color:var(--muted);font-size:13px}
+.wd-ja{line-height:2.1}
+.wd-ja ruby rt{font-size:.58em;color:var(--muted);font-weight:400}
+.wd-ja b ruby rt{color:var(--gold-text)}
+.wd-btns{margin-top:2px}
+.wd-cnt{background:none;border:0;padding:2px 0;color:var(--gold-text);font-size:13px;cursor:pointer;text-align:left;font-family:inherit}

@@ -195,6 +195,7 @@ async function load(){
   try { CK = await rpc('checks_load') || {templates: [], lists: []}; } catch(e) { CK = {templates: [], lists: []}; }
   if (typeof cvLoad === 'function') await cvLoad();   // 老师履历（teacher_cv.js）
   if (typeof msgLoad === 'function') await msgLoad();   // 学生留言（msgs.js）
+  if (typeof wkLoad === 'function') await wkLoad();   // 今日单词记住的词（word.js）
   DB_ALL = DB; DB = bookView(DB_ALL);   // 总管理：按「全部 / Project K / Panda」筛选；其他人原样
 }
 // 点菜单、切回这个网页时：先马上显示，再在后台取最新数据（别人刚写的反馈、刚排的课）再画一遍
@@ -821,7 +822,7 @@ function studentModal(id, tab){
   else if (tab==='info'){
     const ps = personOf('student','student_id',id), pp = personOf('parent','student_id',id);
     body = `<div class="grid2"><dl class="kv">${s.code?`<dt>编号</dt><dd class="num">${esc(s.code)}</dd>`:''}<dt>方向</dt><dd>${esc(s.track||'—')}（${s.grad?'大学院':'学部'}）</dd><dt>所在地</dt><dd>${esc(s.loc||'—')}</dd><dt>负责教务</dt><dd>${esc(s.staff||'—')}</dd>${s.memo?`<dt>教务备注</dt><dd>${esc(s.memo)}</dd>`:''}</dl>
-      <div class="row" style="align-content:flex-start">${isTop()?`<button class="btn sm" data-act="student-form" data-v="${id}">编辑资料</button>`:''}<button class="btn sm" data-act="stu-cal" data-v="${id}">看课表</button>${typeof mrBtn==='function' ? mrBtn(id) : ''}
+      <div class="row" style="align-content:flex-start">${isTop()?`<button class="btn sm" data-act="student-form" data-v="${id}">编辑资料</button>`:''}<button class="btn sm" data-act="stu-cal" data-v="${id}">看课表</button>${typeof mrBtn==='function' ? mrBtn(id) : ''}${typeof wkBtn==='function' ? wkBtn(id) : ''}
       ${ps?`<button class="btn sm" data-act="copy-link" data-v="${ps.key}">复制学生链接</button>`:''}${pp?`<button class="btn sm" data-act="copy-link" data-v="${pp.key}">复制家长链接</button>`:''}</div></div>
       <b>课程</b><div class="list">${cs.map(c=>`<div class="li small"><span class="grow">${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}${c.active?'':' <span class="tag mute">已停</span>'}</span>${isTop()?`<span class="num">${rateTxt(c)}</span>`:''}${isAdmin()?`<button class="btn sm" data-act="course-edit" data-v="${c.id}">改</button>`:''}</div>`).join('')||'<div class="muted small">还没有课程</div>'}</div>
       ${isAdmin()?`<details class="card" ${cs.length?'':'open'}><summary><b>＋ 添加课程</b> <span class="muted xs">（这位学生跟哪位老师上什么课）</span></summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
