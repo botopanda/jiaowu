@@ -690,7 +690,7 @@ function lessonModal(id){
   const l = L(id), c = course(l.course_id), s = stu(c.student_id), t = tea(c.teacher_id), f = fbOf(l), q = reqOf(l);
   const st = isDone(l)?`<span class="tag ok">已上课</span>${!f&&!l.has_fb?' <span class="tag mute">教务确认</span>':''}${hrsTag(l)}`:l.status==='leave'?'<span class="tag seal">请假</span>':l.status==='cancelled'?'<span class="tag mute">已取消</span>':isPend(l)?'<span class="tag warn">待确认</span> <span class="muted xs">老师还没写反馈，暂不计课时</span>':'<span class="tag blue">待上课</span>';
   openModal(`${mHead(`${esc(s.name)} · ${esc(c.subject)}${l.kind?' · '+esc(l.kind):''}`)}
-  <dl class="kv"><dt>课程</dt><dd>${canSched() && l.status==='scheduled' ? `<select data-change="l-kind" data-lid="${l.id}"><option value="">—</option>${kindsOf(t.id).map(x => `<option ${x===l.kind?'selected':''}>${x}</option>`).join('')}${l.kind && !kindsOf(t.id).includes(l.kind) ? `<option selected>${esc(l.kind)}</option>` : ''}</select>` : esc(l.kind || '—')}</dd><dt>老师</dt><dd>${esc(t.name)}${t.loc?`（${esc(t.loc)}）`:''}</dd><dt>时间</dt><dd>${fmtMD(l.date)} ${l.start}–${l.end} <span class="muted">北京时间</span></dd>
+  <dl class="kv"><dt>课程</dt><dd>${canSched() && l.status==='scheduled' ? `<select data-change="l-kind" data-lid="${l.id}"><option value="">—</option>${kindsOf(t.id).map(x => `<option ${x===l.kind?'selected':''}>${x}</option>`).join('')}${l.kind && !kindsOf(t.id).includes(l.kind) ? `<option selected>${esc(l.kind)}</option>` : ''}<option value="__other">其他（自己填）…</option></select>` : esc(l.kind || '—')}</dd><dt>老师</dt><dd>${esc(t.name)}${t.loc?`（${esc(t.loc)}）`:''}</dd><dt>时间</dt><dd>${fmtMD(l.date)} ${l.start}–${l.end} <span class="muted">北京时间</span></dd>
   <dt>本节内容</dt><dd id="tp-view">${l.topic?esc(l.topic):'<span class="muted">还没写</span>'}${canSched()?` <button class="btn sm" data-act="topic" data-v="${l.id}">${l.topic?'修改':'填写'}</button>`:''}</dd>
   <dt>状态</dt><dd>${st} ${l.makeup?'<span class="tag blue">补课</span>':''} ${l.moved?'<span class="tag warn">调过课</span>':''}${l.moved && canSched() && (!f || isTop()) ? ` <button class="btn sm" data-act="unmove" data-v="${l.id}">取消调课标记</button>` : ''}${canSched() && (!f || isTop()) ? ` <button class="btn sm" data-act="makeup" data-v="${l.id}|${l.makeup?0:1}">${l.makeup?'取消补课标记':'标为补课'}</button>` : ''}</dd>${l.note?`<dt>备注</dt><dd>${esc(l.note)}</dd>`:''}
   ${l.status==='leave'?`<dt>扣学生课时</dt><dd class="num">${l.deduct} 小时（老师照发）</dd>`:''}${l.actual_note?`<dt>时长说明</dt><dd>${esc(l.actual_note)}</dd>`:''}${isDone(l)||isPend(l)?`<dt>反馈</dt><dd>${f?(f.status==='approved'?'已审批':'待审批'):l.has_fb?'已写':'<span class="tag warn">老师未写</span>'}</dd>`:''}
@@ -732,8 +732,8 @@ function addLessonModal(){
   <div class="fields">
     <label class="field"><span>科目</span><select id="al-subj" data-change="al-pick">${alSubjOpts(preT)}</select>
       <input type="text" id="al-subj-x" placeholder="写科目名称，例：电影" data-change="al-pick" hidden style="margin-top:4px"></label>
-    <div class="field"><span>课程</span><div class="row" style="flex-wrap:nowrap"><select id="al-kind" style="flex:1">${alKindOpts(preT)}</select>
-      <button type="button" class="mk-btn" data-act="al-mk" aria-pressed="false" title="补课：按一下变蓝，再按一下取消">补</button><input type="hidden" id="al-mk" value="0"></div></div>
+    <div class="field"><span>课程</span><div class="row" style="flex-wrap:nowrap"><select id="al-kind" style="flex:1" data-change="al-pick">${alKindOpts(preT)}</select>
+      <button type="button" class="mk-btn" data-act="al-mk" aria-pressed="false" title="补课：按一下变蓝，再按一下取消">补</button><input type="hidden" id="al-mk" value="0"></div><input type="text" id="al-kind-x" placeholder="写课程名称，例：色彩构成" maxlength="30" hidden style="margin-top:4px"></div>
   </div>
   <div id="al-note"></div>
   <div class="fields"><label class="field"><span>第一节日期</span><input type="date" id="al-d" value="${preD}"></label><label class="field"><span>开始（${tzName(myTz())}）</span><input type="time" id="al-s" value="${pre ? pre.s : '18:00'}"></label><label class="field"><span>结束</span><input type="time" id="al-e" value="${pre ? pre.e : '20:00'}"></label></div>
@@ -752,7 +752,8 @@ function alSubjOpts(tid, cur=''){
   const list = subjsOf(tid), extra = [...new Set(DB.courses.filter(c => !tid || c.teacher_id===tid).map(c => c.subject))].filter(x => x && !list.includes(x));   // 现有课程里列表外的科目，比如「电影」
   return `<option value="">选择科目…</option>${[...list, ...extra].map(x => `<option ${x===cur?'selected':''}>${esc(x)}</option>`).join('')}<option value="__other" ${cur==='__other'?'selected':''}>其他（自己填）</option>`;
 }
-const alKindOpts = (tid, cur='') => `<option value="">选择课程…</option>${kindsOf(tid).map(x => `<option ${x===cur?'selected':''}>${x}</option>`).join('')}`;
+const alKindOpts = (tid, cur='') => `<option value="">选择课程…</option>${kindsOf(tid).map(x => `<option ${x===cur?'selected':''}>${x}</option>`).join('')}<option value="__other" ${cur==='__other'?'selected':''}>其他（自己填）</option>`;
+const alKind = () => val('al-kind')==='__other' ? val('al-kind-x').trim() : val('al-kind');
 function alPick(){
   const sel = document.getElementById('al-subj'), tid0 = alTeacher();
   if (sel && sel.dataset.cat !== tCat(tid0)){   // 换了老师类别：重新列科目和课程
@@ -760,6 +761,7 @@ function alPick(){
     const k = document.getElementById('al-kind'); if (k) k.innerHTML = alKindOpts(tid0, val('al-kind'));
   }
   const x = document.getElementById('al-subj-x'); if (x) x.hidden = val('al-subj')!=='__other';
+  const kx = document.getElementById('al-kind-x'); if (kx) kx.hidden = val('al-kind')!=='__other';
   const box = document.getElementById('al-note'); if (!box) return;
   const sid = val('al-stu'), tid = alTeacher(), subj = alSubj();
   if (!sid || !tid || !subj){ box.innerHTML = ''; return; }
@@ -984,12 +986,12 @@ document.addEventListener('click', async e => {
     case 'ch-withdraw': if (!confirm('撤回这条申请？')) break; await act('change_withdraw', {cid:v}, '已撤回'); break;
     case 'save-lesson': { const d=val('al-d'), s=toJST(val('al-s')), en=toJST(val('al-e'));
       if(!val('al-stu')||!alTeacher()||!alSubj()){toast('请选择学生、老师和科目',true);break;}
-      if(!val('al-kind')){toast('请选择课程',true);break;}
+      if(!alKind()){toast(val('al-kind')==='__other' ? '请写上课程名称' : '请选择课程',true);break;}
       if(!d||!s||!en||mins(en)<=mins(s)){toast('请检查日期和时间（不能跨过半夜 12 点）',true);break;}
       let c = alCourse();
       if (!c){ if (ME().role==='teacher'){toast('你和这位学生还没有这门课，请先联系教务老师建立',true);break;}
         const cid = await rpc('admin_save_course', {d:{student_id:val('al-stu'), teacher_id:alTeacher(), subject:alSubj(), rate:Number(val('al-rate'))||0, cur:val('al-cur')||'CNY'}}); c = {id:cid}; }
-      await act('admin_add_lessons', {course:c.id, kind:val('al-kind'), ...(val('al-topic').trim()?{topic:val('al-topic').trim()}:{}), dates:lessonDates(d, val('al-rep')), st:s, et:en, ...(val('al-mk')==='1'?{makeup:true}:{})}, r=>r.pending?'已提交排课申请，教务批准后会出现在课表上':`已排 ${r.added} 节课`+(r.skipped?`，${r.skipped} 节和老师或学生已有的课撞了，已跳过`:'')); S.month=d.slice(0,7); closeModal(); render(); break; }
+      await act('admin_add_lessons', {course:c.id, kind:alKind(), ...(val('al-topic').trim()?{topic:val('al-topic').trim()}:{}), dates:lessonDates(d, val('al-rep')), st:s, et:en, ...(val('al-mk')==='1'?{makeup:true}:{})}, r=>r.pending?'已提交排课申请，教务批准后会出现在课表上':`已排 ${r.added} 节课`+(r.skipped?`，${r.skipped} 节和老师或学生已有的课撞了，已跳过`:'')); S.month=d.slice(0,7); closeModal(); render(); break; }
     case 'req-ok': { const q=DB.requests.find(x=>x.id===v);
       const args = q.type==='改期' ? {rid:v, accept:true, reply:'', nd:val('rq-d-'+v), ns:val('rq-s-'+v), ne:val('rq-e-'+v), deduct:0} : {rid:v, accept:true, reply:'', deduct:Number(val('rq-dd-'+v))};
       await act('admin_handle_request', args, '已处理，学生和老师都能看到结果'); break; }
@@ -1058,7 +1060,9 @@ document.addEventListener('change', e => {
   else if (k==='al-pick'){ alPick(); }
   else if (k==='w-lesson'){ const box = document.getElementById('w-content'), tp = L(el.value)?.topic || '';   // 换了哪节课：没自己改过的话，换成那节课的本节内容
     if (box && box.value === (box.dataset.auto || '')){ box.value = tp; box.dataset.auto = tp; } }
-  else if (k==='l-kind'){ act('admin_update_lesson', {lid:el.dataset.lid, d:{kind:el.value}}, ME().role==='teacher' ? '已提交修改申请，教务批准后生效' : '课程已改').then(() => lessonModal(el.dataset.lid)).catch(() => {}); }
+  else if (k==='l-kind'){ let kind = el.value;
+    if (kind==='__other'){ kind = (prompt('写课程名称（例：色彩构成）', '') || '').trim().slice(0, 30); if (!kind){ lessonModal(el.dataset.lid); return; } }
+    act('admin_update_lesson', {lid:el.dataset.lid, d:{kind}}, ME().role==='teacher' ? '已提交修改申请，教务批准后生效' : '课程已改').then(() => lessonModal(el.dataset.lid)).catch(() => {}); }
   else if (k==='subj-sel'){ const x = document.getElementById(el.id + '-x'); if (x) { x.hidden = el.value !== '__other'; if (!x.hidden) x.focus(); } }
   else if (k==='tfb-m'){ S.tfbM=el.value; render(); }
   else if (k==='tfb-s'){ S.tfbS=el.value; render(); }
