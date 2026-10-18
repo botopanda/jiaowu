@@ -387,7 +387,7 @@ function fbCard(f, o={}){
     <div class="row" style="padding-right:${f.status==='approved'?'64px':'0'}">
       ${o.check && f.status==='pending' ? `<input type="checkbox" class="chk" id="sel-${f.id}" data-act="sel" data-v="${f.id}" ${S.sel.has(f.id)?'checked':''} aria-label="选择这条">`:''}
       <b>${esc(stu(c.student_id).name)}</b>${subjTag(c.subject)}<span class="muted small">${esc(tea(c.teacher_id).name)} · ${fmtMD(l.date)} ${l.start}–${l.end}</span></div>
-    ${tagRow(f)}${sec('content','一、本节授课内容')}${sec('perf','二、学生课堂表现')}${sec('hw','三、课后作业')}${fileList(f.id,'note','上课笔记')}${fileList(f.id,'hw','学生交的作业')}${fileList(f.id,'grade','批改文件')}
+    ${tagRow(f)}${sec('content','一、本节授课内容')}${sec('perf','二、学生课堂表现')}${sec('hw','三、课后作业')}${fileList(f.id,'hwref','作业图片')}${fileList(f.id,'note','上课笔记')}${fileList(f.id,'hw','学生交的作业')}${fileList(f.id,'grade','批改文件')}
     <div class="row xs"><span class="muted">上次作业</span><span class="tag ${f.last_hw==='已完成'?'ok':f.last_hw==='未完成'?'seal':'warn'}">${esc(f.last_hw||'—')}</span>
       <span class="muted">本次作业</span><span class="tag ${f.hw_fb?'ok':f.hw_sub?'blue':'mute'}">${f.hw_fb?'已批改':f.hw_sub?'已交·待批改':'未交'}</span>
       <span class="muted">学生确认</span>${confirmTag(f)}<span class="muted">${f.status==='approved'?'家长可见':'家长暂不可见'}</span></div>
@@ -615,12 +615,13 @@ function tWrite(t){
     <label class="field"><span>二、学生课堂表现</span><textarea id="w-perf" placeholder="例：课堂状态良好，能积极参与练习"></textarea></label>
     <div class="field"><span>学生状态（点选，可多选）</span><div class="chips">${[...TAGS_GOOD,...TAGS_WARN].map(x=>`<button class="chip ${wTags.has(x)?'on':''}" data-act="w-tag" data-v="${x}">${x}</button>`).join('')}</div></div>
     <label class="field"><span>三、课后作业安排</span><textarea id="w-hw" placeholder="例：1. 复习本节生词  2. 完成长文 1–10"></textarea></label>
+    <label class="field"><span>作业图片 / PDF（可以不选；学生在「作业」里能看到，最多 9 个）</span><input type="file" id="w-hwfiles" accept="image/*,.pdf,application/pdf" multiple></label>
     <div class="fields"><label class="field"><span>实际上课时长</span><select id="w-hrs"><option value="">和排课一样</option>${[0.5,1,1.5,2,2.5,3,3.5,4].map(h=>`<option value="${h}">${h} 小时</option>`).join('')}</select></label>
     <label class="field"><span>时长不一样的原因</span><input type="text" id="w-why" placeholder="例：学生临时有事，提前半小时结束"></label></div>
     <div class="muted xs">提前结束或者上超了，在这里改；工资按实际时长算。</div>
     <label class="field"><span>上次作业完成情况</span><select id="w-last"><option>已完成</option><option>部分完成</option><option>未完成</option><option>没有布置</option></select></label>
     <button class="btn pri" data-act="submit-fb">提交反馈</button></section>` : `<div class="card empty">上完的课都写好反馈了</div>`;
-  return form + grade + (allF.length ? fbBar + (mine.length ? '' : '<div class="card empty">这个月没有反馈</div>') + mine.map(f=>{const l=L(f.lesson_id);return `<div class="card small"><div class="row"><b>${sMD(l.date)} ${esc(stu(course(l.course_id).student_id).name)}</b>${hrsTag(l)}<span style="margin-left:auto">${confirmTag(f)}</span><span class="tag ${f.status==='approved'?'ok':'warn'}">${f.status==='approved'?'已审核·家长可见':'待教务审核'}</span></div><div class="muted">${esc(f.content)}</div>${fileList(f.id,'note','上课笔记')}<div class="row" style="margin-top:4px">${uploadBtn('note', f.id, '上传上课笔记')}</div></div>`}).join('') : '');
+  return form + grade + (allF.length ? fbBar + (mine.length ? '' : '<div class="card empty">这个月没有反馈</div>') + mine.map(f=>{const l=L(f.lesson_id);return `<div class="card small"><div class="row"><b>${sMD(l.date)} ${esc(stu(course(l.course_id).student_id).name)}</b>${hrsTag(l)}<span style="margin-left:auto">${confirmTag(f)}</span><span class="tag ${f.status==='approved'?'ok':'warn'}">${f.status==='approved'?'已审核·家长可见':'待教务审核'}</span></div><div class="muted">${esc(f.content)}</div>${fileList(f.id,'hwref','作业图片')}${fileList(f.id,'note','上课笔记')}<div class="row" style="margin-top:4px">${uploadBtn('hwref', f.id, '补传作业图片')}${uploadBtn('note', f.id, '上传上课笔记')}</div></div>`}).join('') : '');
 }
 function tMe(t){
   const ls = lsOfT(t.id).filter(l=>l.date.startsWith(S.teaMonth) && paidH(l)>0), h = ls.reduce((a,l)=>a+paidH(l),0);
@@ -656,7 +657,7 @@ function sHomework(s){
 function fbMini(f, student){
   const l=L(f.lesson_id), c=course(l.course_id);
   return `<article class="card fb small"><div class="row">${subjTag(c.subject)}<span class="muted">${esc(tea(c.teacher_id).name)} · ${fmtMD(l.date)}</span>${student&&f.confirm?`<span style="margin-left:auto">${confirmTag(f)}</span>`:''}</div>${tagRow(f)}
-  <div class="sec"><b>本节授课内容</b><p>${esc(f.content)}</p></div><div class="sec"><b>课堂表现</b><p>${esc(f.perf)}</p></div><div class="sec"><b>课后作业</b><p>${esc(f.hw)}</p></div>${fileList(f.id,'note','老师的上课笔记')}
+  <div class="sec"><b>本节授课内容</b><p>${esc(f.content)}</p></div><div class="sec"><b>课堂表现</b><p>${esc(f.perf)}</p></div><div class="sec"><b>课后作业</b><p>${esc(f.hw)}</p></div>${fileList(f.id,'hwref','老师给的作业图片')}${fileList(f.id,'note','老师的上课笔记')}
   ${student && !f.confirm ? `<div class="row" style="border-top:1px solid var(--line-2);padding-top:6px"><span class="muted xs">确认上了这节课：</span><button class="btn pri sm" data-act="confirm" data-v="${f.id}|满意">满意</button><button class="btn sm" data-act="confirm" data-v="${f.id}|不满意">不满意</button></div>`:''}</article>`;
 }
 const sFeedback = s => fbOfS(s.id).slice().reverse().slice(0,20).map(f=>fbMini(f,true)).join('') || '<div class="empty">还没有上课记录</div>';
@@ -999,7 +1000,14 @@ document.addEventListener('click', async e => {
     case 'submit-fb': { const c=val('w-content').trim(), p=val('w-perf').trim(), h=val('w-hw').trim(); if(!c||!p||!h){toast('三项内容都要填',true);break;}
       const hrs = val('w-hrs') ? Number(val('w-hrs')) : null, why = val('w-why').trim(), lid = val('w-lesson');
       if (hrs!=null && hrs!==dur(L(lid)) && !why){ toast('实际时长和排课不一样，请写一句原因',true); break; }
-      await act('feedback_submit', {lid, content:c, perf:p, hw:h, tags:[...wTags], last_hw:val('w-last'), actual:hrs, why}, '已提交，学生已经能看到了'); wTags.clear(); render(); break; }
+      const hwFiles = [...(document.getElementById('w-hwfiles')?.files || [])].slice(0, 9);   // 先记下选的作业图片（提交后页面会重画）
+      await act('feedback_submit', {lid, content:c, perf:p, hw:h, tags:[...wTags], last_hw:val('w-last'), actual:hrs, why}, '已提交，学生已经能看到了'); wTags.clear(); render();
+      const nf = DB.feedbacks.find(x => x.lesson_id===lid);
+      if (nf && hwFiles.length){ document.body.classList.add('busy'); toast(`正在上传 ${hwFiles.length} 个作业图片…`);
+        try { for (const fl of hwFiles) await uploadOne(fl, 'hwref', nf.id); await load(); render(); toast('反馈和作业图片都提交好了，学生已经能看到了'); }
+        catch(err) { toast('反馈已提交，但作业图片没传上去：' + err.message + '。可以在下面「我写过的反馈」里补传', true); }
+        finally { document.body.classList.remove('busy'); } }
+      break; }
     case 'lstate': { const [id,state,from]=v.split('|'); const l=L(id);
       if (state==='done' && from==='q'){ await act('admin_lesson_state', {lid:id, state:'done'}, '已标为已上课，计入课时'); break; }
       const hrs = state==='done' ? Number(val('ls-h')) : null, why = (document.getElementById('ls-why')?.value||'').trim();

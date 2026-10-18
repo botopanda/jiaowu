@@ -112,7 +112,7 @@ function sHomework2(s){
   const item = (f, now) => { const l = L(f.lesson_id), c = course(l.course_id);
     return `<div class="les hw-i" style="--hc:${hue(c.subject)}"><div style="min-width:0;flex:1">
       <div class="row xs">${subjTag(c.subject)}<span class="muted">${esc(tea(c.teacher_id).name)} · ${sMD(l.date)} 布置</span><span style="margin-left:auto" class="tag ${f.hw_fb?'ok':f.hw_sub?'blue':'warn'}">${f.hw_fb?'已批改':f.hw_sub?'已交':'未交'}</span></div>
-      <div class="hw-t">${esc(f.hw)}</div>
+      <div class="hw-t">${esc(f.hw)}</div>${fileList(f.id,'hwref','老师给的作业图片')}
       ${now && !f.hw_sub ? `<div class="row">${uploadBtn('hw', f.id, '上传作业照片 / PDF')}<button class="btn pri sm" data-act="hw-done" data-v="${f.id}">我完成了</button></div>` : ''}
       ${now && f.hw_sub && !f.hw_fb ? `<div class="row">${uploadBtn('hw', f.id, '再传几张')}</div>` : ''}
       ${fileList(f.id,'hw','我交的作业')}${fileList(f.id,'grade','老师的批改')}
@@ -124,7 +124,7 @@ function sHomework2(s){
 
 /* ───────── 上课记录：一行一节，点开看全文；没确认的放最上面 ───────── */
 function sFbBody(f){
-  return `${tagRow(f)}<div class="sec"><b>本节授课内容</b><p>${esc(f.content)}</p></div><div class="sec"><b>课堂表现</b><p>${esc(f.perf)}</p></div><div class="sec"><b>课后作业</b><p>${esc(f.hw)}</p></div>${fileList(f.id,'note','老师的上课笔记')}`;
+  return `${tagRow(f)}<div class="sec"><b>本节授课内容</b><p>${esc(f.content)}</p></div><div class="sec"><b>课堂表现</b><p>${esc(f.perf)}</p></div><div class="sec"><b>课后作业</b><p>${esc(f.hw)}</p></div>${fileList(f.id,'hwref','老师给的作业图片')}${fileList(f.id,'note','老师的上课笔记')}`;
 }
 function sFbRow(f){
   const l = L(f.lesson_id), c = course(l.course_id), snip = String(f.content || '').slice(0, 26) + (String(f.content || '').length > 26 ? '…' : '');

@@ -2,7 +2,7 @@
    文件上传（作业照片、上课笔记、批改文件）和工资审核 / 结算
    依赖 app.js 里的工具和数据。
    ══════════════════════════════════════════════════════════════ */
-const PURPOSE_LABEL = {hw: '作业', note: '上课笔记', grade: '批改'};
+const PURPOSE_LABEL = {hw: '作业', note: '上课笔记', grade: '批改', hwref: '作业图片'};
 const fileUrl = f => `${SB_URL}/storage/v1/object/public/files/${f.path}`;
 const filesOf = (ref, purpose) => (DB.files || []).filter(f => f.ref === ref && (!purpose || f.purpose === purpose));
 const isImg = f => /^image\//.test(f.mime || '') || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.path);
@@ -58,7 +58,7 @@ document.addEventListener('change', async e => {
   try {
     for (const f of files) await uploadOne(f, purpose, ref);
     await load(); render(); reopenModal();
-    toast({hw: '作业已上传，老师能看到了', ck: '作品已上传', cv: '简历已上传', cvp: '照片已更新', cvw: '作品已上传'}[purpose] || '已上传，学生能看到了');
+    toast({hw: '作业已上传，老师能看到了', hwref: '作业图片已上传，学生能看到了', ck: '作品已上传', cv: '简历已上传', cvp: '照片已更新', cvw: '作品已上传'}[purpose] || '已上传，学生能看到了');
   } catch(err) { toast(err.message, true); }
   finally { document.body.classList.remove('busy'); el.value = ''; }
 });
