@@ -82,10 +82,10 @@ const slotHue = t => { const h = +String(t).slice(0, 2); return h < 12 ? 'var(--
 const slotLegend = () => '<span class="slot-lg"><i style="--hc:var(--am)"></i>上午<i style="--hc:var(--pm)"></i>下午<i style="--hc:var(--ev)"></i>晚上</span>';
 // 固定科目（下拉选；不在里面的选「其他」自己填）
 const SUBJECTS = ['日语','文综','数学','物理','化学','生物','不分科目'];
-const KINDS = ['EJU','校内考','共通试验','面试','升学指导/规划','进度反馈'];   // 每节课的「课程」
+const KINDS = ['EJU','校内考','共通试验','面试','面谈','升学指导/规划','进度反馈'];   // 每节课的「课程」
 // 艺术老师（老师档案里「类别」选艺术）排课时用这两组选项
 const ART_SUBJECTS = ['素描','色彩','速写','漫画','插画','角色设计','动画','摄影','影像','设计','不分科目'];
-const ART_KINDS = ['基础训练','作品集制作','实技对策','面试','研究计划书 / 志望理由书','升学指导/规划','进度反馈'];
+const ART_KINDS = ['基础训练','作品集制作','实技对策','面试','面谈','研究计划书 / 志望理由书','升学指导/规划','进度反馈'];
 const tCat = tid => (typeof CVS !== 'undefined' && CVS[tid] && CVS[tid].cat) || '学科';   // 老师类别：学科 / 艺术
 const subjsOf = tid => tCat(tid)==='艺术' ? ART_SUBJECTS : SUBJECTS;
 const kindsOf = tid => tCat(tid)==='艺术' ? ART_KINDS : KINDS;
