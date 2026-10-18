@@ -590,3 +590,9 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .wk-l .s{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .wk-l.leave{background:color-mix(in srgb,var(--seal) 10%,var(--surface));border-left-color:var(--seal);text-decoration:line-through;text-decoration-color:var(--seal)}
 .wk-l.pend{border-left-style:dashed}
+
+/* 电脑上「本周课程」固定四栏：日子 · 时间 · 科目和内容 · 老师（老师靠右对齐）；手机上仍是两行 */
+@media (min-width:761px){
+  .wk-row{display:grid;grid-template-columns:104px 104px minmax(0,1fr) auto;align-items:center;column-gap:12px}
+  .wk-row>span:last-child{text-align:right}
+}

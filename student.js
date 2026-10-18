@@ -8,6 +8,7 @@
    ══════════════════════════════════════════════════════════════ */
 const nowJST = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16);   // 现在几点（北京时间）
 const addDay = (d, n) => { const x = pd(d); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`; };
+const tName = id => { const n = tea(id).name || ''; return /老师$/.test(n) ? n : n + '老师'; };   // 「陈伟健」→「陈伟健老师」
 const dayWord = d => { const n = dBetween(TODAY, d); return n === 0 ? '今天' : n === 1 ? '明天' : n === 2 ? '后天' : fmtMD(d); };
 const sUnHw = s => latestHw(s.id).filter(f => !f.hw_sub);
 const sUnConfirm = s => fbOfS(s.id).filter(f => !f.confirm);
@@ -32,7 +33,7 @@ function sWeek(s){
   const ls = lsOfS(s.id).filter(l => l.status === 'scheduled' && l.date >= TODAY && l.date <= end);
   return `<section class="card"><div class="row"><h3 class="sh-h" style="margin-right:auto">本周课程</h3><button class="btn sm" data-act="tab" data-v="b">看课表 ›</button></div>
     ${ls.length ? `<div class="wk">${ls.map(l => { const c = course(l.course_id);
-      return `<div class="wk-row ${l.date === TODAY ? 'today' : ''} ${l.date === TODAY && l.end <= nowJST() ? 'past' : ''}"><span class="wk-d">${dayWord(l.date)}</span><span class="num">${timeFor(l, s.tz)}</span><span class="grow">${subjTag(c.subject)}${l.kind ? `<span class="muted xs"> · ${esc(l.kind)}</span>` : ''}${l.topic ? `<span class="wk-topic">${esc(l.topic)}</span>` : ''}</span><span class="muted small">${esc(tea(c.teacher_id).name)}</span></div>`; }).join('')}</div>`
+      return `<div class="wk-row ${l.date === TODAY ? 'today' : ''} ${l.date === TODAY && l.end <= nowJST() ? 'past' : ''}"><span class="wk-d">${dayWord(l.date)}</span><span class="num">${timeFor(l, s.tz)}</span><span class="grow">${subjTag(c.subject)}${l.kind ? `<span class="muted xs"> · ${esc(l.kind)}</span>` : ''}${l.topic ? `<span class="wk-topic">${esc(l.topic)}</span>` : ''}</span><span class="muted small">${esc(tName(c.teacher_id))}</span></div>`; }).join('')}</div>`
       : `<div class="sh-empty">${sUp(s).length ? '这 7 天没有课。' : '还没有排课，老师排好后会显示在这里。'}</div>`}</section>`;
 }
 // 通关进度（有点检表才显示）
@@ -50,7 +51,7 @@ function sLastFb(s){
   if (!f) return `<section class="card"><h3 class="sh-h">最近的老师反馈</h3><div class="sh-empty">上完第一节课后，老师写的反馈会出现在这里。</div></section>`;
   const l = L(f.lesson_id), c = course(l.course_id), txt = String(f.content || '');
   return `<section class="card"><div class="row"><h3 class="sh-h" style="margin-right:auto">最近的老师反馈</h3><button class="btn sm" data-act="tab" data-v="d">全部 ›</button></div>
-    <div class="small"><span class="muted">${fmtMD(l.date)}</span> ${subjTag(c.subject)} <span class="muted">${esc(tea(c.teacher_id).name)}</span></div>
+    <div class="small"><span class="muted">${fmtMD(l.date)}</span> ${subjTag(c.subject)} <span class="muted">${esc(tName(c.teacher_id))}</span></div>
     <div style="margin-top:4px">${esc(txt.slice(0, 70))}${txt.length > 70 ? '…' : ''}</div>
     ${f.hw ? `<div class="small" style="margin-top:4px"><span class="muted">作业：</span>${esc(f.hw)}</div>` : ''}</section>`;
 }
@@ -61,7 +62,7 @@ function sSide(s){
   const sub = [s.direction || s.track, s.target_ym ? `目标 ${tgtLabel(s.target_ym)}` : ''].filter(Boolean);
   return {
     top: `<div class="side-me"><span class="side-av">${esc((s.name || '?').slice(-1))}</span><div><b>${esc(s.name)}同学</b>${sub.map(x => `<div class="muted xs">${esc(x)}</div>`).join('')}</div></div>`,
-    bottom: `<div class="side-foot">${Object.keys(by).length ? `<div class="grp">我的老师</div>${Object.entries(by).map(([tid, subs]) => `<div class="side-tea"><b>${esc(tea(tid).name)}</b><span class="muted xs">${subs.map(esc).join('、')}</span></div>`).join('')}` : ''}
+    bottom: `<div class="side-foot">${Object.keys(by).length ? `<div class="grp">我的老师</div>${Object.entries(by).map(([tid, subs]) => `<div class="side-tea"><b>${esc(tName(tid))}</b><span class="muted xs">${subs.map(esc).join('、')}</span></div>`).join('')}` : ''}
       <div class="muted xs side-help">有问题直接微信联系教务老师</div></div>`,
   };
 }
@@ -77,7 +78,7 @@ function sNextCard(s){
   return `<section class="card nx-card" style="--hc:${hue(c.subject)}">
     <div class="nx-top"><span class="nx-label">下一节课</span><span class="tag ${l.date===TODAY?'seal':'blue'}">${cd}</span></div>
     <div class="nx-when"><b>${dayWord(l.date)}</b> <span class="num">${t}</span></div>
-    <div class="nx-what">${subjTag(c.subject)} <span>${esc(tea(c.teacher_id).name)} 老师</span>${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调过课</span>':''}</div>
+    <div class="nx-what">${subjTag(c.subject)} <span>${esc(tName(c.teacher_id))}</span>${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调过课</span>':''}</div>
     ${l.topic ? `<div class="nx-topic">本节：${esc(l.topic)}</div>` : ''}
     ${q ? reqLine(q) : ''}
     ${!(q && q.status==='pending') ? `<div class="row"><button class="btn sm" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button><span class="muted xs">北京时间</span></div>` : ''}
@@ -111,7 +112,7 @@ function sHomework2(s){
   const older = fbOfS(s.id).filter(f => !cur.includes(f)).slice(-8).reverse();
   const item = (f, now) => { const l = L(f.lesson_id), c = course(l.course_id);
     return `<div class="les hw-i" style="--hc:${hue(c.subject)}"><div style="min-width:0;flex:1">
-      <div class="row xs">${subjTag(c.subject)}<span class="muted">${esc(tea(c.teacher_id).name)} · ${sMD(l.date)} 布置</span><span style="margin-left:auto" class="tag ${f.hw_fb?'ok':f.hw_sub?'blue':'warn'}">${f.hw_fb?'已批改':f.hw_sub?'已交':'未交'}</span></div>
+      <div class="row xs">${subjTag(c.subject)}<span class="muted">${esc(tName(c.teacher_id))} · ${sMD(l.date)} 布置</span><span style="margin-left:auto" class="tag ${f.hw_fb?'ok':f.hw_sub?'blue':'warn'}">${f.hw_fb?'已批改':f.hw_sub?'已交':'未交'}</span></div>
       <div class="hw-t">${esc(f.hw)}</div>${fileList(f.id,'hwref','老师给的作业图片')}
       ${now && !f.hw_sub ? `<div class="row">${uploadBtn('hw', f.id, '上传作业照片 / PDF')}<button class="btn pri sm" data-act="hw-done" data-v="${f.id}">我完成了</button></div>` : ''}
       ${now && f.hw_sub && !f.hw_fb ? `<div class="row">${uploadBtn('hw', f.id, '再传几张')}</div>` : ''}
@@ -128,7 +129,7 @@ function sFbBody(f){
 }
 function sFbRow(f){
   const l = L(f.lesson_id), c = course(l.course_id), snip = String(f.content || '').slice(0, 26) + (String(f.content || '').length > 26 ? '…' : '');
-  return `<details class="card fbx" style="--hc:${hue(c.subject)}"><summary><div class="fbx-h"><span class="num fbx-d">${sMD(l.date)}</span>${subjTag(c.subject)}<span class="muted xs">${esc(tea(c.teacher_id).name)}</span>
+  return `<details class="card fbx" style="--hc:${hue(c.subject)}"><summary><div class="fbx-h"><span class="num fbx-d">${sMD(l.date)}</span>${subjTag(c.subject)}<span class="muted xs">${esc(tName(c.teacher_id))}</span>
     <span style="margin-left:auto">${f.confirm ? confirmTag(f) : '<span class="tag warn">待确认</span>'}</span></div><div class="fbx-s muted small">${esc(snip)}</div></summary>
     <div class="fb">${sFbBody(f)}</div></details>`;
 }
@@ -138,7 +139,7 @@ function sFeedback2(s){
   let out = '';
   if (pend.length) out += `<div class="dg">待确认 · ${pend.length} 节</div><div class="muted xs" style="margin-top:-4px">上完课点一下，告诉老师这节课上得怎么样。</div>` + pend.map(f => {
     const l = L(f.lesson_id), c = course(l.course_id);
-    return `<section class="card fbp" style="--hc:${hue(c.subject)}"><div class="fbx-h"><span class="num fbx-d">${sMD(l.date)}</span>${subjTag(c.subject)}<span class="muted xs">${esc(tea(c.teacher_id).name)}</span></div>
+    return `<section class="card fbp" style="--hc:${hue(c.subject)}"><div class="fbx-h"><span class="num fbx-d">${sMD(l.date)}</span>${subjTag(c.subject)}<span class="muted xs">${esc(tName(c.teacher_id))}</span></div>
       <details><summary class="muted small">看老师写的反馈</summary><div class="fb">${sFbBody(f)}</div></details>
       <div class="row"><span class="muted xs">这节课：</span><button class="btn pri sm" data-act="confirm" data-v="${f.id}|满意">满意</button><button class="btn sm" data-act="confirm" data-v="${f.id}|不满意">不满意</button></div></section>`; }).join('');
   let last = '';
