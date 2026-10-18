@@ -318,6 +318,7 @@ function pgOverview(){
 }
 
 function pgCalendar(){
+  if (S.calView==='week' && typeof pgWeek==='function') return pgWeek();   // 周视图在 week.js
   const [y,m] = S.month.split('-').map(Number);
   const first = new Date(y,m-1,1), last = new Date(y,m,0).getDate(), lead = (first.getDay()+6)%7;
   let ls = DB.lessons.filter(l => l.date.startsWith(S.month));
@@ -339,6 +340,7 @@ function pgCalendar(){
   <div class="cal-bar">
     <button class="btn sm" data-act="month" data-v="-1" aria-label="上个月">‹</button><span class="mon">${S.month.replace('-','.')}</span><button class="btn sm" data-act="month" data-v="1" aria-label="下个月">›</button>
     <button class="btn sm" data-act="month" data-v="0">本月</button>
+    ${typeof calViewSeg==='function' ? calViewSeg() : ''}
     <div class="seg">${[['all','全部'],['s','按学生'],['t','按老师']].map(([k,t])=>`<button class="${S.calType===k?'on':''}" data-act="caltype" data-v="${k}">${t}</button>`).join('')}</div>
     ${who.length ? `<select id="cal-who" data-change="calwho"><option value="">选择${S.calType==='s'?'学生':'老师'}…</option>${who.map(x=>`<option value="${x.id}" ${S.calId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`:''}
   </div>
@@ -718,7 +720,8 @@ function addLessonModal(){
   const teas = isT ? [tea(ME().teacher_id)] : DB.teachers.filter(t => t.active!==false).slice().sort((x, y) => pyCmp(x.name, y.name));
   const preS = S.calType==='s' ? S.calId : '', preT = isT ? ME().teacher_id : (S.calType==='t' ? S.calId : '');
   // 老师在月历上点了哪天，日期就默认填那天（和月历下面显示的那天一致）
-  const ym = S.pMonth || TODAY.slice(0,7), preD = isT && PV==='cal' ? (S.pDay && S.pDay.startsWith(ym) ? S.pDay : (TODAY.startsWith(ym) ? TODAY : `${ym}-01`)) : TODAY;
+  const pre = S.alPre; S.alPre = null;   // 周视图点空白处带来的 {日期, 开始, 结束}
+  const ym = S.pMonth || TODAY.slice(0,7), preD = pre ? pre.d : isT && PV==='cal' ? (S.pDay && S.pDay.startsWith(ym) ? S.pDay : (TODAY.startsWith(ym) ? TODAY : `${ym}-01`)) : TODAY;
   openModal(`${mHead(isT ? '申请排课' : '排课')}
   <div class="fields">
     <label class="field"><span>学生</span><select id="al-stu" data-change="al-pick"><option value="">选择学生…</option>${studs.map(x => `<option value="${x.id}" ${x.id===preS?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
@@ -731,7 +734,7 @@ function addLessonModal(){
       <button type="button" class="mk-btn" data-act="al-mk" aria-pressed="false" title="补课：按一下变蓝，再按一下取消">补</button><input type="hidden" id="al-mk" value="0"></div></div>
   </div>
   <div id="al-note"></div>
-  <div class="fields"><label class="field"><span>第一节日期</span><input type="date" id="al-d" value="${preD}"></label><label class="field"><span>开始（${tzName(myTz())}）</span><input type="time" id="al-s" value="${myTz()==='CN'?'18:00':'19:00'}"></label><label class="field"><span>结束</span><input type="time" id="al-e" value="${myTz()==='CN'?'20:00':'21:00'}"></label></div>
+  <div class="fields"><label class="field"><span>第一节日期</span><input type="date" id="al-d" value="${preD}"></label><label class="field"><span>开始（${tzName(myTz())}）</span><input type="time" id="al-s" value="${pre ? pre.s : '18:00'}"></label><label class="field"><span>结束</span><input type="time" id="al-e" value="${pre ? pre.e : '20:00'}"></label></div>
   <div class="fields"><label class="field"><span>重复</span><select id="al-rep"><option value="month">每周同一时间，到这个月底</option><option value="1">只排这一节</option><option value="4">每周同一时间，共 4 周</option><option value="8">每周同一时间，共 8 周</option></select></label></div>
   <label class="field"><span>本节内容（可以不填）</span><input type="text" id="al-topic" maxlength="200" placeholder="例：第3节｜两点透视"></label>
   <div class="muted xs">和这位老师已有的课时间重叠的，会自动跳过。每周重复排的课，本节内容只写进第一节，其他几节之后点开那节课再填。</div>
