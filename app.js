@@ -508,13 +508,12 @@ function phoneView(){
   } else if (me.role==='student'){
     const s = stu(me.student_id);
     tabs = sTabs(s); body = sView(s);   // 学生端在 student.js
-  } else {
+  } else {   // 家长：和学生端一样的页面，只能看（student.js 里按 PRO() 去掉按钮）
     const s = stu(me.student_id);
-    tabs = [['a','概况'],['b','老师反馈'],['c','课表'],...(ckListsOf(s.id).length ? [['f','通关']] : []),['d','档案'],['e','月度']];
-    body = {a:pOverview,b:pFeedback,c:pSchedule,d:s=>profilePage(s,{hideEmpty:true}),e:pMonthly,f:sCheck}[S.tab]?.(s) ?? pOverview(s);
+    tabs = sTabs(s); body = sView(s);
   }
   // 电脑上菜单在左侧（和教务一样），手机上在底部（大拇指好点）；学生的左侧菜单上下多一张名片和「我的老师」
-  const sd = me.role==='student' ? sSide(stu(me.student_id)) : {top:'', bottom:''};
+  const sd = ['student','parent'].includes(me.role) ? sSide(stu(me.student_id)) : {top:'', bottom:''};
   return `<div class="layout pl"><nav class="side pside" aria-label="菜单">${sd.top}${tabs.map(([k,t,n])=>`<button class="nav ${S.tab===k?'on':''}" data-act="tab" data-v="${k}">${navIcon(t)}<span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')}${sd.bottom}</nav>
     <div class="pw"><div class="phone"><div class="p-body">${body}</div></div></div></div>
     <nav class="tabbar" style="grid-template-columns:repeat(${tabs.length},1fr)">${tabs.map(([k,t,n])=>`<button class="${S.tab===k?'on':''}" data-act="tab" data-v="${k}">${navIcon(t)}<span>${t}</span>${n?`<span class="dot">${n}</span>`:''}</button>`).join('')}</nav>`;
