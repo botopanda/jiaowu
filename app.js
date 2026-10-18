@@ -106,6 +106,7 @@ const NAV_ICONS = (() => {
   return {
     '总览': '<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/>',
     '课表与排课': cal, '课表': cal,
+    '学生留言': '<path d="M4 5h16v11H8l-4 4z"/><path d="M12 13.5c-2-1.3-3-2.3-3-3.3a1.5 1.5 0 0 1 3-.4 1.5 1.5 0 0 1 3 .4c0 1-1 2-3 3.3z"/>',
     '改期 · 请假': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     '反馈审批': '<path d="M4 5h16v11H8l-4 4z"/><path d="M9 10l2 2 4-4"/>',
     '学生档案': '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5 6.5-5s5.5 1.5 6.5 5"/><path d="M16 6h5M16 10h5M18 14h3"/>',
@@ -190,6 +191,7 @@ async function load(){
   if (!S.teaMonth) S.teaMonth = TODAY.slice(0,7);
   try { CK = await rpc('checks_load') || {templates: [], lists: []}; } catch(e) { CK = {templates: [], lists: []}; }
   if (typeof cvLoad === 'function') await cvLoad();   // 老师履历（teacher_cv.js）
+  if (typeof msgLoad === 'function') await msgLoad();   // 学生留言（msgs.js）
   DB_ALL = DB; DB = bookView(DB_ALL);   // 总管理：按「全部 / Project K / Panda」筛选；其他人原样
 }
 // 点菜单、切回这个网页时：先马上显示，再在后台取最新数据（别人刚写的反馈、刚排的课）再画一遍
@@ -222,14 +224,14 @@ function render(){
 function adminView(){
   const pend = DB.feedbacks.filter(f => f.status==='pending').length, reqN = DB.requests.filter(q => q.status==='pending').length + chPend().length;
   const items = isTop()
-    ? [['日常',[['overview','总览'],['calendar','课表与排课'],['requests','改期 · 请假',reqN],['feedback','反馈审批',pend]]],
+    ? [['日常',[['overview','总览'],['calendar','课表与排课'],['requests','改期 · 请假',reqN],['feedback','反馈审批',pend],['msgs','学生留言',typeof msgUnread==='function'?msgUnread():0]]],
        ['学生',[['students','学生档案'],['checks','通关点检'],['apply','升学与出愿'],['schools','院校库'],['reviews','月度回访'],['followups','跟进记录']]],
        ['管理',[['teachers','老师档案'],['payroll','课时与工资'],['links','链接与权限'],['backup','数据备份']]]]
-    : [['日常',[['overview','总览'],['calendar','课表与排课']]],['学生',[['students','学生档案'],['checks','通关点检'],['apply','升学与出愿'],['schools','院校库'],['reviews','月度回访'],['followups','跟进记录']]]];
+    : [['日常',[['overview','总览'],['calendar','课表与排课'],['msgs','学生留言',typeof msgUnread==='function'?msgUnread():0]]],['学生',[['students','学生档案'],['checks','通关点检'],['apply','升学与出愿'],['schools','院校库'],['reviews','月度回访'],['followups','跟进记录']]]];
   const nav = items.map(([g,list]) => `<div class="grp">${g}</div>` + list.map(([k,t,n]) =>
     `<button class="nav ${S.page===k?'on':''}" data-act="page" data-v="${k}">${navIcon(t)}<span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')).join('');
-  const P = {backup:pgBackup, checks:pgChecks, overview:pgOverview, calendar:pgCalendar, requests:pgRequests, apply:pgApply2, reviews:pgReviews, followups:pgFollowups, feedback:pgFeedback, students:pgStudents, teachers:pgTeachers, payroll:pgPayroll, links:pgLinks, schools:pgSchools};
-  const page = (isTop() || ['overview','calendar','students','checks','apply','schools','reviews','followups'].includes(S.page)) ? (P[S.page]||pgOverview) : pgOverview;
+  const P = {msgs: typeof pgMsgs==='function' ? pgMsgs : pgOverview, backup:pgBackup, checks:pgChecks, overview:pgOverview, calendar:pgCalendar, requests:pgRequests, apply:pgApply2, reviews:pgReviews, followups:pgFollowups, feedback:pgFeedback, students:pgStudents, teachers:pgTeachers, payroll:pgPayroll, links:pgLinks, schools:pgSchools};
+  const page = (isTop() || ['overview','calendar','msgs','students','checks','apply','schools','reviews','followups'].includes(S.page)) ? (P[S.page]||pgOverview) : pgOverview;
   return `<div class="layout"><nav class="side" aria-label="教务导航">${nav}</nav><main class="main">${page()}</main></div>`;
 }
 const scopeNote = () => !isTop() ? `<div class="scope">你负责 ${DB.students.length} 位学生，只显示他们的资料。</div>` : '';
@@ -587,11 +589,11 @@ function tSchedule(t){
 }
 function tStudents(t){
   const cs = DB.courses.filter(c=>c.teacher_id===t.id && c.active);
-  return cs.length ? cs.map(c => { const s=stu(c.student_id), fs=DB.feedbacks.filter(f=>L(f.lesson_id).course_id===c.id), lastF=fs[fs.length-1], next=DB.lessons.find(l=>l.course_id===c.id && l.date>=TODAY && l.status!=='leave');
+  return (typeof msgTeacherBox==='function' ? msgTeacherBox() : '') + (cs.length ? cs.map(c => { const s=stu(c.student_id), fs=DB.feedbacks.filter(f=>L(f.lesson_id).course_id===c.id), lastF=fs[fs.length-1], next=DB.lessons.find(l=>l.course_id===c.id && l.date>=TODAY && l.status!=='leave');
     return `<section class="card" style="display:flex;flex-direction:column;gap:6px"><div class="row"><h3 style="font-size:16px;margin-right:auto">${esc(s.name)}</h3>${subjTag(c.subject)}</div>
     <dl class="kv small"><dt>方向</dt><dd>${esc(s.track||'—')}</dd><dt>下节课</dt><dd>${next?`${fmtMD(next.date)} ${timeFor(next,t.tz)}`:'—'}</dd>
     <dt>本月计划</dt><dd>${esc(planText(c.id, TODAY.slice(0,7))||'还没写')}</dd><dt>上次作业</dt><dd>${lastF?`${esc(lastF.hw)} ${lastF.hw_sub?'<span class="tag ok">已交</span>':'<span class="tag warn">未交</span>'}`:'—'}</dd></dl>
-    <button class="btn sm" data-act="t-stu" data-v="${c.id}">档案 · 月计划 · 私下备注</button></section>`}).join('') : '<div class="empty">还没有分配学生</div>';
+    <button class="btn sm" data-act="t-stu" data-v="${c.id}">档案 · 月计划 · 私下备注</button></section>`}).join('') : '<div class="empty">还没有分配学生</div>');
 }
 function tWrite(t){
   const cand = DB.lessons.filter(l => l.date<=TODAY && l.status==='scheduled' && !fbOf(l)).reverse();

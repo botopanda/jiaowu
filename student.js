@@ -24,7 +24,7 @@ function sHome2(s){
   return `<div class="sh-hi"><h2>${greet}，${esc(s.name)}同学</h2><span class="muted small">${fmtMD(TODAY)}</span></div>
   <div class="grid2 sh-grid"><div class="sh-col">${sUp(s).length ? sNextCard(s) : ''}${sWeek(s)}${sTodo(s)}</div>
     <div class="sh-col">${sCkCard(s)}${sLastFb(s)}${sCountdown(s)}
-      <section class="card"><h3 class="sh-h">${+TODAY.slice(5,7)} 月学习计划</h3>${mpView(s.id, TODAY.slice(0,7))}</section></div></div>`;
+      <section class="card"><h3 class="sh-h">${+TODAY.slice(5,7)} 月学习计划</h3>${mpView(s.id, TODAY.slice(0,7))}</section></div></div>${typeof sMsgEntry==='function' ? sMsgEntry() : ''}`;
 }
 const sUp = s => { const now = nowJST(); return lsOfS(s.id).filter(l => l.status === 'scheduled' && (l.date > TODAY || (l.date === TODAY && l.end > now))); };
 // 本周课程：今天起 7 天，一行一节
@@ -152,7 +152,7 @@ function sMine(s){
   const ym = TODAY.slice(0,7), r = reviewOf(s.id, ym) || {};
   const past = reviewsOf(s.id).filter(x => x.ym !== ym && (x.content || x.self_eval || x.teacher_eval || x.next_focus)).slice().reverse();
   const jump = [['m-target','目标大学'],['m-score','成绩'],['m-month','月度自评'],['m-profile','个人档案']];
-  return `<h2 style="font-size:19px">我的</h2>
+  return `<h2 style="font-size:19px">我的</h2>${typeof sMsgBox==='function' ? sMsgBox(s) : ''}
   <div class="chips">${jump.map(([id, t]) => `<button class="chip" data-act="jump" data-v="${id}">${t}</button>`).join('')}</div>
   <h3 class="sh-sec" id="m-target">目标大学与出愿日程</h3>
   ${s.target_ym || s.direction ? `<div class="card small">${s.direction?`<span class="tag gold">${esc(s.direction)}</span> `:''}${s.target_ym?`目标入学 <b>${tgtLabel(s.target_ym)}</b>`:''}</div>` : ''}
