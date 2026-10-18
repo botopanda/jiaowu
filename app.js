@@ -331,7 +331,7 @@ function pgCalendar(){
     return `<button class="lc ${l.status!=='scheduled'?'leave':''} ${isPend(l)?'pend':''} ${l.moved?'moved':''}" style="--hc:${slotHue(l.start)}" data-act="lesson" data-v="${l.id}" ${l.topic?`title="本节：${esc(l.topic)}"`:''}><span class="t">${l.start}</span>${l.makeup?'<b class="mk">补</b>':''}${fbMark(l)} ${esc(who)}<br>${esc(c.subject)}${l.kind?'·'+esc(l.kind):''}${l.status==='leave'?' 请假':l.status==='cancelled'?' 取消':''}</button>`; };
   let cells = ['一','二','三','四','五','六','日'].map((d,i) => `<div class="hd ${i>=5?'we':''}">${d}</div>`).join('');
   for (let i=0;i<lead;i++) cells += `<div class="day off"></div>`;
-  for (let d=1; d<=last; d++){ const dd=`${S.month}-${pad(d)}`; cells += `<div class="day ${dd===TODAY?'today':''}"><span class="dn">${d}</span>${ls.filter(l=>l.date===dd).map(chip).join('')}</div>`; }
+  for (let d=1; d<=last; d++){ const dd=`${S.month}-${pad(d)}`; cells += `<div class="day ${dd===TODAY?'today':''} ${isAdmin()?'can-add':''}" ${isAdmin()?`data-act="cal-day" data-v="${dd}" title="点空白处在这天排课"`:''}><span class="dn">${d}</span>${ls.filter(l=>l.date===dd).map(chip).join('')}</div>`; }
   for (let i=0;i<(7-(lead+last)%7)%7;i++) cells += `<div class="day off"></div>`;
   const byD = {}; ls.forEach(l => (byD[l.date] ??= []).push(l));
   const agenda = Object.keys(byD).sort().map(d => `<div class="dg ${d===TODAY?'today':''}">${fmtMD(d)}</div>` + byD[d].map(chip).join('')).join('') || '<div class="empty">这个月没有课</div>';
@@ -924,6 +924,7 @@ document.addEventListener('click', async e => {
       document.getElementById('tp-text').focus(); break; }
     case 'topic-save': await act('lesson_set_topic', {lid:v, t:val('tp-text')}, '本节内容已保存'); lessonModal(v); break;
     case 'add-lesson': addLessonModal(); break;
+    case 'cal-day': S.alPre = {d:v, s:'18:00', e:'20:00'}; addLessonModal(); break;   // 教务月历：点某天空白处直接排课
     case 'al-mk': { const on = val('al-mk')!=='1'; document.getElementById('al-mk').value = on ? '1' : '0'; a.classList.toggle('on', on); a.setAttribute('aria-pressed', on); break; }
     case 'close': case 'close-bg': closeModal(); break;
     case 'fbtab': S.fbTab=v; S.sel.clear(); S.editing=null; render(); break;
