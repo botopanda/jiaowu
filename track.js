@@ -220,6 +220,7 @@ function reviewForm(sid, ym){
   openModal(`${mHead(`${esc(stu(sid).name)} · ${ymLabel(ym)} 月度回访`)}
   <div class="muted small">这个月：上课 ${st.actual} 次${st.leave?`，请假 ${st.leave} 次`:''}，作业提交 ${st.hwOk}%</div>
   <div class="note"><b>学生自我评价：</b>${r.self_eval ? esc(r.self_eval) : '<span class="muted">学生还没写（学生在自己的链接「月度」里填）</span>'}</div>
+  ${typeof rvAiBox==='function' ? rvAiBox(sid, ym) : ''}
   ${ta('rv-content','本月课程内容',r.content || auto,'例：日语：N2长文、复合助词；数学：函数与数列')}
   ${ta('rv-teacher','老师评价',r.teacher_eval,'')}
   ${ta('rv-concl','任务 / 跟进结论',r.conclusion,'例：完成 8 次课程与两次阶段复盘')}
@@ -303,7 +304,7 @@ document.addEventListener('click', async e => {
     case 'rv-open': { const [sid,ym]=v.split('|'); reviewForm(sid, ym); break; }
     case 'rv-pick': reviewForm(v, val('rv-ym')); break;
     case 'rv-save': { const [sid,ym]=v.split('|'); const d={content:val('rv-content'), teacher_eval:val('rv-teacher'), conclusion:val('rv-concl'), next_focus:val('rv-next'), status:val('rv-status'), note:val('rv-note')};
-      await act('review_save', {sid, month:ym, d}, d.status==='已完成'?'已保存，家长现在能看到':'已保存'); if (S.page==='reviews') closeModal(); else studentModal(sid,'review'); break; }
+      await act('review_save', {sid, month:ym, d}, d.status==='已完成'?'已保存，家长现在能看到':'已保存'); if (S.page==='reviews') closeModal(); else studentModal(sid, S.rvFromTl ? 'tl' : 'review'); break; }
     case 'self-save': { const t=val('self-eval').trim(); if(!t){toast('先写一点自我评价',true);break;} await act('review_self', {month:v, txt:t}, '已提交，谢谢！'); break; }
     case 'fu-new': fuForm(v); break;
     case 'fu-new-pick': { const sid=val('fu-stu'); if(!sid){toast('先选择学生',true);break;} fuForm(sid); break; }

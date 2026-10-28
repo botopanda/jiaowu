@@ -73,3 +73,31 @@ async function planAI(cid, ym){
   if (!r.ok || !j.text) throw new Error(j.error || '请稍后再试');
   return j.text;
 }
+
+/* ───────── 每月给家长的反馈（月度回访）：AI 代写（数据库第 36 步 + 小程序 plan-draft 的 review）─────────
+   读这个月的课、老师反馈、作业、成绩、计划、学生自评和作业 / 作品图片，按四栏写草稿填进表里，教务看过改过再保存 */
+const rvAiBox = (sid, ym) => PLAN_AI && isAdmin() ? `<div class="rv-ai"><button class="btn sm" data-act="rv-ai" data-v="${sid}|${ym}">AI 代写</button>
+  <span class="muted xs">AI 会读这个月老师写的反馈、作业完成情况、成绩、学生上传的作业 / 作品图片，写一份草稿填进下面四个框；看过改过再保存</span></div>` : '';
+async function reviewAI(sid, ym){
+  let r;
+  try {
+    r = await fetch(`${SB_URL}/functions/v1/plan-draft`, {method: 'POST', headers: {'Content-Type': 'application/json', apikey: SB_KEY},
+      body: JSON.stringify({k: KEY, kind: 'review', sid, ym})});
+  } catch(e) { throw new Error('网络不太稳定，没连上，请稍后再试'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.review) throw new Error(j.error || '请稍后再试');
+  return j;
+}
+document.addEventListener('click', async e => {
+  const a = e.target.closest('[data-act="rv-ai"]'); if (!a) return;
+  const [sid, ym] = a.dataset.v.split('|'), ids = {content: 'rv-content', teacher_eval: 'rv-teacher', conclusion: 'rv-concl', next_focus: 'rv-next'};
+  const has = ['rv-teacher', 'rv-concl', 'rv-next'].some(id => (document.getElementById(id)?.value || '').trim());
+  if (has && !confirm('框里已经有内容了，用 AI 写的草稿替换吗？（替换后不保存的话，原来的内容不会丢）')) return;
+  a.disabled = true; const old = a.textContent; a.textContent = 'AI 正在看材料、写草稿…（大约半分钟）';
+  try {
+    const j = await reviewAI(sid, ym);
+    Object.entries(ids).forEach(([k, id]) => { const el = document.getElementById(id); if (el && j.review[k]) { el.value = j.review[k]; el.style.height = 'auto'; el.style.height = el.scrollHeight + 4 + 'px'; } });   // 框跟着内容变高，方便通读
+    toast(`AI 草稿填好了${j.images ? `（看了 ${j.images} 张作业图片）` : ''}，看过改过再点「保存」`);
+  } catch(err) { toast('AI 没写出来：' + err.message, true); }
+  finally { a.disabled = false; a.textContent = old; }
+});

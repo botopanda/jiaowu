@@ -809,14 +809,21 @@ function teacherForm(id){
 function studentModal(id, tab){
   lastModal = () => studentModal(id, tab);
   const s = stu(id), cs = DB.courses.filter(c=>c.student_id===id); tab = tab || 'info';
+  if (['fb','fu','note'].includes(tab) && typeof tlTab==='function') tab = 'tl';   // 反馈、跟进记录、私下备注 已并进「按时间看」
   const ym = TODAY.slice(0,7), nx = ymShift(ym,1), pv = ymShift(ym,-1);
   // 左侧菜单按用途分组
-  const groups = [['基本',[['info','概况与课程'],['profile','档案资料'],['note','私下备注']]],
-    ['学习',[['mp','月计划'],['fb','反馈'],['score','成绩']]],
-    ['升学',[['target','大学与出愿'],['fu','跟进记录'],['review','月度回访']]],
-    ['给家长看',[['pfview','家长看到的档案'],['board','跟进看板']]]];
+  const groups = typeof tlTab==='function'
+    ? [['学生',[['info','概况与课程'],['tl','按时间看'],['profile','档案资料']]],
+       ['学习',[['mp','月计划'],['score','成绩'],['review','月度回访']]],
+       ['升学',[['target','大学与出愿']]],
+       ['给家长看',[['pfview','家长看到的档案'],['board','跟进看板']]]]
+    : [['基本',[['info','概况与课程'],['profile','档案资料'],['note','私下备注']]],
+       ['学习',[['mp','月计划'],['fb','反馈'],['score','成绩']]],
+       ['升学',[['target','大学与出愿'],['fu','跟进记录'],['review','月度回访']]],
+       ['给家长看',[['pfview','家长看到的档案'],['board','跟进看板']]]];
   let body = '';
-  if (tab==='pfview') body = `<div class="hint" style="margin:0">这就是学生和家长在自己链接「档案」里看到的页面，照 Excel 第一页的顺序。</div>${profilePage(s)}`;
+  if (tab==='tl') body = tlTab(id);
+  else if (tab==='pfview') body = `<div class="hint" style="margin:0">这就是学生和家长在自己链接「档案」里看到的页面，照 Excel 第一页的顺序。</div>${profilePage(s)}`;
   else if (tab==='board') body = boardView(id);
   else if (['profile','score','target','review','fu'].includes(tab)) body = studentTrackTab(id, tab);
   else if (tab==='info'){
