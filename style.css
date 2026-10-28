@@ -565,7 +565,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .li.li-clash{background:color-mix(in srgb,var(--seal) 6%,transparent);border-radius:6px}
 .ch-clash{color:var(--seal);font-size:13px;font-weight:600;margin-top:3px}
 
-/* 月计划：自动整理 / AI 代写 */
+/* 月计划：自动整理 / AI 生成 */
 .mp-tools{display:flex;flex-direction:column;gap:6px;margin:-2px 0 6px}
 .mp-prev{border:1px dashed var(--gold);border-radius:var(--r);padding:8px 10px;display:flex;flex-direction:column;gap:6px;background:color-mix(in srgb,var(--gold) 5%,var(--surface))}
 .mp-draft{white-space:pre-line;font-size:13.5px;line-height:1.7}

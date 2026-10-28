@@ -104,7 +104,7 @@ function tlTab(sid){
     const me = evs.filter(e => e.d.startsWith(m)), mst = tlStats(all.filter(e => e.d.startsWith(m))), rr = rv(m);
     const days = [...new Set(me.map(e => e.d))];
     return `<section class="tl-m"><div class="tl-mh"><b>${ymLabel(m)}</b><span class="muted small">${tlStatTxt(mst).join(' · ') || '这个月没有课'}</span></div>
-      ${!rr && isAdmin() && m <= TODAY.slice(0, 7) && me.length ? `<div class="tl-mx"><button class="btn sm" data-act="rv-open" data-v="${sid}|${m}">＋ 写${+m.slice(5)}月给家长的反馈（月度回访，可以 AI 代写）</button></div>` : ''}
+      ${!rr && isAdmin() && m <= TODAY.slice(0, 7) && me.length ? `<div class="tl-mx"><button class="btn sm" data-act="rv-open" data-v="${sid}|${m}">＋ 写${+m.slice(5)}月给家长的反馈（月度回访，可以 AI 生成）</button></div>` : ''}
       ${plansIn(m) || rr ? `<div class="tl-mx">${plansIn(m) ? `<details><summary>这个月的计划</summary>${mpView(sid, m)}</details>` : ''}${rr ? `<details><summary>月度回访 <span class="tag ${rr.status === '已完成' ? 'ok' : rr.status === '需调整' ? 'seal' : 'mute'}">${esc(rr.status || '待跟进')}</span></summary>${reviewCard(rr, {edit: isAdmin()})}</details>` : ''}</div>` : ''}
       ${days.map(d => `<div class="tl-d"><div class="tl-dd ${d === TODAY ? 'today' : ''}">${tlMD(d)}</div><div class="tl-dl">${me.filter(e => e.d === d).map(tlItem).join('')}</div></div>`).join('') || '<div class="muted small tl-none">这个月没有要显示的记录（可能被上面的「显示」筛掉了）</div>'}</section>`;
   }).join('');

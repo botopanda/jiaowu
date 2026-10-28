@@ -1,11 +1,11 @@
 /* ══════════════════════════════════════════════════════════════
-   月学习计划：「自动整理」和「AI 代写」
+   月学习计划：「自动整理」和「AI 生成」
    · 自动整理（不花钱，马上出）：把这门课这个月每节课的「本节内容」
      （上完的课没写本节内容的，用课后反馈里的「本节授课内容」）按主题归好，排成一段草稿
-   · AI 代写：同样的材料交给 AI 写成一段学习计划（PLAN_AI 打开后才显示按钮）
+   · AI 生成：同样的材料交给 AI 写成一段学习计划（PLAN_AI 打开后才显示按钮）
    · 两种都先出预览，老师点「填进去」才放进输入框，最后还要点「保存计划」
    ══════════════════════════════════════════════════════════════ */
-const PLAN_AI = true;   // AI 代写（2026-10-25 接通：Supabase 小程序 plan-draft + API 额度）
+const PLAN_AI = true;   // AI 生成（2026-10-25 接通：Supabase 小程序 plan-draft + API 额度）
 
 // 这门课这个月每节课的内容（按日期），没写的记下几节
 function planLessons(cid, ym){
@@ -34,7 +34,7 @@ function planAuto(cid, ym){
 }
 
 // 输入框下面的小工具条
-const mpTools = (ym, cid) => `<div class="mp-tools" id="mpt-${ym}-${cid}"><span class="row"><button class="btn sm" data-act="mp-auto" data-v="${ym}|${cid}">自动整理</button>${PLAN_AI ? `<button class="btn sm" data-act="mp-ai" data-v="${ym}|${cid}">AI 代写</button>` : ''}<span class="muted xs">按这个月每节课的内容生成一段草稿，看过再填进去</span></span><div class="mp-prev" hidden></div></div>`;
+const mpTools = (ym, cid) => `<div class="mp-tools" id="mpt-${ym}-${cid}"><span class="row"><button class="btn sm" data-act="mp-auto" data-v="${ym}|${cid}">自动整理</button>${PLAN_AI ? `<button class="btn sm" data-act="mp-ai" data-v="${ym}|${cid}">AI 生成</button>` : ''}<span class="muted xs">按这个月每节课的内容生成一段草稿，看过再填进去</span></span><div class="mp-prev" hidden></div></div>`;
 function mpPreview(ym, cid, text, label){
   const box = document.querySelector(`#mpt-${ym}-${cid} .mp-prev`), ta = document.getElementById(`mp-${ym}-${cid}`); if (!box) return;
   box.hidden = false; box.dataset.text = text;
@@ -62,7 +62,7 @@ document.addEventListener('click', async e => {
   }
 });
 
-// AI 代写：交给 Supabase 上的小程序 plan-draft（它会先用链接核对身份，再去问 Claude）
+// AI 生成：交给 Supabase 上的小程序 plan-draft（它会先用链接核对身份，再去问 Claude）
 async function planAI(cid, ym){
   let r;
   try {
@@ -70,13 +70,13 @@ async function planAI(cid, ym){
       body: JSON.stringify({k: KEY, cid, ym})});
   } catch(e) { throw new Error('网络不太稳定，没连上，请稍后再试'); }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.text) throw new Error(j.error || '请稍后再试');
+  if (!r.ok || !j.text) throw new Error((j.error || '请稍后再试').replace('AI 代写', 'AI 生成'));   // 数据库的次数上限提示里还写着「AI 代写」
   return j.text;
 }
 
-/* ───────── 每月给家长的反馈（月度回访）：AI 代写（数据库第 36 步 + 小程序 plan-draft 的 review）─────────
+/* ───────── 每月给家长的反馈（月度回访）：AI 生成（数据库第 36 步 + 小程序 plan-draft 的 review）─────────
    读这个月的课、老师反馈、作业、成绩、计划、学生自评和作业 / 作品图片，按四栏写草稿填进表里，教务看过改过再保存 */
-const rvAiBox = (sid, ym) => PLAN_AI && isAdmin() ? `<div class="rv-ai"><button class="btn sm" data-act="rv-ai" data-v="${sid}|${ym}">AI 代写</button>
+const rvAiBox = (sid, ym) => PLAN_AI && isAdmin() ? `<div class="rv-ai"><button class="btn sm" data-act="rv-ai" data-v="${sid}|${ym}">AI 生成</button>
   <span class="muted xs">AI 会读这个月老师写的反馈、作业完成情况、成绩、学生上传的作业 / 作品图片，写一份草稿填进下面四个框；看过改过再保存</span></div>` : '';
 async function reviewAI(sid, ym){
   let r;
@@ -85,7 +85,7 @@ async function reviewAI(sid, ym){
       body: JSON.stringify({k: KEY, kind: 'review', sid, ym})});
   } catch(e) { throw new Error('网络不太稳定，没连上，请稍后再试'); }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.review) throw new Error(j.error || '请稍后再试');
+  if (!r.ok || !j.review) throw new Error((j.error || '请稍后再试').replace('AI 代写', 'AI 生成'));
   return j;
 }
 document.addEventListener('click', async e => {
