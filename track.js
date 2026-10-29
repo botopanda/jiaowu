@@ -137,7 +137,7 @@ function studentTrackTab(id, tab){
   if (tab==='review'){
     const ym = TODAY.slice(0,7), cur = reviewOf(id, ym), past = reviewsOf(id).filter(r=>r.ym!==ym).slice().reverse();
     return `<div class="hint" style="margin:0">每月一条：学生在自己的链接里写自我评价，教务填其余部分。状态改成「已完成」后家长才能看到。</div>
-      ${cur ? reviewCard(cur,{edit:canEdit}) : `<div class="card small">${ymLabel(ym)} 还没有月度回访。${canEdit?`<button class="btn pri sm" data-act="rv-open" data-v="${id}|${ym}">填写本月</button>`:''}</div>`}
+      ${cur ? reviewCard(cur,{edit:canEdit}) : `<div class="card small">${ymLabel(ym)} 还没有月度家长反馈。${canEdit?`<button class="btn pri sm" data-act="rv-open" data-v="${id}|${ym}">填写本月</button>`:''}</div>`}
       ${canEdit?`<div class="row"><select id="rv-ym">${[0,-1,-2,-3,1].map(n=>ymShift(ym,n)).map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join('')}</select><button class="btn sm" data-act="rv-pick" data-v="${id}">填写 / 修改这个月</button></div>`:''}
       ${past.map(r=>reviewCard(r,{edit:canEdit})).join('')}`;
   }
@@ -152,7 +152,7 @@ function pgApply2(){
   const ev = upcomingEvents(60);
   const all = (DB.targets||[]).slice().sort((a,b)=> (nextEventOf(a)?.date||'9999').localeCompare(nextEventOf(b)?.date||'9999'));
   return `<div class="ph"><h2>升学与出愿</h2></div>${scopeNote()}
-  <div class="hint">所有学生的大学目标和出愿日程。在学生档案 → 点学生 →「大学与出愿」里添加和修改。</div>
+  <div class="hint">所有学生的大学目标和出愿日程。在学生档案 → 点学生 →「升学」里添加和修改。</div>
   <section class="card"><h3>接下来 60 天的日程</h3>${ev.length ? `<div class="list">${ev.map(e=>`<div class="li"><span class="tag ${e.days<=7?'seal':e.days<=21?'warn':'mute'}">${e.days===0?'今天':e.days+' 天'}</span><div class="grow"><b>${esc(stu(e.t.student_id).name)}</b> · ${esc(e.t.school)} <span class="tag ${TIER_CLS[e.t.tier]}">${e.t.tier}</span><br><span class="small">${e.label} ${fmtMD(e.date)}</span></div><button class="btn sm" data-act="student-tab" data-v="${e.t.student_id}|target">查看</button></div>`).join('')}</div>` : '<div class="empty">60 天内没有出愿日程</div>'}</section>
   ${all.length ? `<div class="tw"><table class="rt"><thead><tr><th>学生</th><th>级别</th><th>大学 / 专业</th><th>入试方式</th><th>下一个日期</th><th>出愿截止</th><th>状态</th><th>资料</th></tr></thead><tbody>
     ${all.map(t => { const nx = nextEventOf(t); return `<tr class="click" data-act="student-tab" data-v="${t.student_id}|target"><td><b>${esc(stu(t.student_id).name)}</b></td><td><span class="tag ${TIER_CLS[t.tier]}">${t.tier} ${t.seq}</span></td><td>${esc(t.school)}</td><td class="small">${esc(t.exam_way||'')}</td>
@@ -161,7 +161,7 @@ function pgApply2(){
 }
 function pgReviews(){
   const ym = S.rvMonth || (S.rvMonth = TODAY.slice(0,7));
-  return `<div class="ph"><h2>月度回访</h2><select id="rv-month" data-change="rv-month">${[1,0,-1,-2,-3,-4,-5].map(n=>ymShift(TODAY.slice(0,7),n)).map(m=>`<option value="${m}" ${m===ym?'selected':''}>${ymLabel(m)}</option>`).join('')}</select></div>${scopeNote()}
+  return `<div class="ph"><h2>月度家长反馈</h2><select id="rv-month" data-change="rv-month">${[1,0,-1,-2,-3,-4,-5].map(n=>ymShift(TODAY.slice(0,7),n)).map(m=>`<option value="${m}" ${m===ym?'selected':''}>${ymLabel(m)}</option>`).join('')}</select></div>${scopeNote()}
   <div class="hint">每个学生每月一条。学生自评由学生在自己的链接里写；状态改成「已完成」后家长能看到。</div>
   <div class="tw"><table class="rt"><thead><tr><th>编号</th><th>学生</th><th>课次</th><th>学生自评</th><th>老师评价</th><th>下月重点</th><th>状态</th><th></th></tr></thead><tbody>
   ${DB.students.filter(s=>s.active!==false).map(s => { const r = reviewOf(s.id, ym), st = monthStats(s.id, ym);
@@ -217,7 +217,7 @@ function targetForm(sid, tid, pre){
 function reviewForm(sid, ym){
   const r = reviewOf(sid, ym) || {}, st = monthStats(sid, ym);
   const auto = DB.courses.filter(c=>c.student_id===sid).map(c=>planText(c.id, ym) ? `${c.subject}：${planText(c.id, ym)}` : '').filter(Boolean).join('；');
-  openModal(`${mHead(`${esc(stu(sid).name)} · ${ymLabel(ym)} 月度回访`)}
+  openModal(`${mHead(`${esc(stu(sid).name)} · ${ymLabel(ym)} 月度家长反馈`)}
   <div class="muted small">这个月：上课 ${st.actual} 次${st.leave?`，请假 ${st.leave} 次`:''}，作业提交 ${st.hwOk}%</div>
   <div class="note"><b>学生自我评价：</b>${r.self_eval ? esc(r.self_eval) : '<span class="muted">学生还没写（学生在自己的链接「月度」里填）</span>'}</div>
   ${typeof rvAiBox==='function' ? rvAiBox(sid, ym) : ''}
@@ -251,7 +251,7 @@ function sTrack(s){
 }
 function sMonthly(s){
   const ym = TODAY.slice(0,7), r = reviewOf(s.id, ym) || {}, past = reviewsOf(s.id).filter(x=>x.ym!==ym).slice().reverse();
-  return `<h2 style="font-size:19px">月度回访</h2>
+  return `<h2 style="font-size:19px">月度反馈</h2>
   <section class="card" style="display:flex;flex-direction:column;gap:8px"><b style="font-family:var(--f-disp)">${ymLabel(ym)} · 我的自我评价</b>
     <div class="muted xs">这个月学得怎么样？哪里进步了、哪里还觉得吃力、下个月想加强什么。老师和教务会看到。</div>
     <textarea id="self-eval" placeholder="例：词汇有进步，但有机反应链容易混淆">${esc(r.self_eval||'')}</textarea>
@@ -264,7 +264,7 @@ function pMonthly(s){
   const rs = reviewsOf(s.id).slice().reverse();
   // 家长：只显示有内容的月份（不再放 12 个月的大表格，手机上大半是空行）
   const shown = rs.filter(r => r.content || r.self_eval || r.teacher_eval || r.conclusion || r.next_focus);
-  return `<h2 style="font-size:19px">月度回访</h2><div class="muted xs">教务老师整理完成后显示在这里，包括孩子的自我评价和老师评价。</div>${shown.map(r=>reviewCard(r)).join('') || '<div class="empty">还没有月度回访</div>'}`;
+  return `<h2 style="font-size:19px">月度反馈</h2><div class="muted xs">教务老师整理完成后显示在这里，包括孩子的自我评价和老师评价。</div>${shown.map(r=>reviewCard(r)).join('') || '<div class="empty">还没有月度反馈</div>'}`;
 }
 
 /* ═════════════ 老师：学生详情里的升学信息（只读） ═════════════ */
@@ -304,16 +304,16 @@ document.addEventListener('click', async e => {
     case 'rv-open': { const [sid,ym]=v.split('|'); reviewForm(sid, ym); break; }
     case 'rv-pick': reviewForm(v, val('rv-ym')); break;
     case 'rv-save': { const [sid,ym]=v.split('|'); const d={content:val('rv-content'), teacher_eval:val('rv-teacher'), conclusion:val('rv-concl'), next_focus:val('rv-next'), status:val('rv-status'), note:val('rv-note')};
-      await act('review_save', {sid, month:ym, d}, d.status==='已完成'?'已保存，家长现在能看到':'已保存'); if (S.page==='reviews') closeModal(); else studentModal(sid, S.rvFromTl ? 'tl' : 'review'); break; }
+      await act('review_save', {sid, month:ym, d}, d.status==='已完成'?'已保存，家长现在能看到':'已保存'); if (S.page==='reviews') closeModal(); else studentModal(sid, S.page==='student' ? S.stuTab : 'review'); break; }
     case 'self-save': { const t=val('self-eval').trim(); if(!t){toast('先写一点自我评价',true);break;} await act('review_self', {month:v, txt:t}, '已提交，谢谢！'); break; }
     case 'fu-new': fuForm(v); break;
     case 'fu-new-pick': { const sid=val('fu-stu'); if(!sid){toast('先选择学生',true);break;} fuForm(sid); break; }
     case 'fu-edit': fuForm(null, v); break;
     case 'fu-save': { const [sid,fid]=v.split('|'); if(!val('fu-date')){toast('请填写日期',true);break;}
       const d={student_id:sid, date:val('fu-date'), time:val('fu-time'), type:val('fu-type'), subject:val('fu-subj'), task:val('fu-task'), result:val('fu-result'), student_fb:val('fu-sfb'), judgment:val('fu-judge'), next_action:val('fu-next'), next_date:val('fu-ndate'), confirm:val('fu-confirm'), note:val('fu-note')};
-      if(fid) d.id=fid; await act('followup_save', {d}, '跟进已保存'); if (S.page==='followups') closeModal(); else studentModal(sid,'fu'); break; }
+      if(fid) d.id=fid; await act('followup_save', {d}, '跟进已保存'); if (S.page==='student') studentModal(sid, S.stuTab); else closeModal(); break; }
     case 'fu-del-ask': document.getElementById('fu-del-row').innerHTML=`<span class="small">确定删除？</span><button class="btn danger sm" data-act="fu-del" data-v="${v}">删除</button>`; break;
-    case 'fu-del': { const f=(DB.followups||[]).find(x=>x.id===v); await act('followup_delete', {xid:v}, '已删除'); if (S.page==='followups') closeModal(); else studentModal(f.student_id,'fu'); break; }
+    case 'fu-del': { const f=(DB.followups||[]).find(x=>x.id===v); await act('followup_delete', {xid:v}, '已删除'); if (S.page==='student') studentModal(f.student_id, S.stuTab); else closeModal(); break; }
     case 'stu-del-ask': document.getElementById('stu-del-row').innerHTML=`<span class="small" style="color:var(--seal)">删除后，${esc(stu(v).name)} 的课程、课表、反馈、成绩、出愿和链接都会一起删掉，不能恢复。</span><button class="btn seal sm" data-act="stu-del" data-v="${v}">确定删除</button><button class="btn sm" data-act="close">算了</button>`; break;
     case 'stu-del': { await act('admin_delete_student', {sid:v}, r=>`已删除 ${r}`); closeModal(); break; }
   }

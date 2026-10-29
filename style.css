@@ -668,3 +668,42 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 @media (max-width:640px){.tl-d{grid-template-columns:1fr;gap:2px}.tl-dd{padding-top:4px}.tl-dl{padding-left:8px}.tl-b,.tl-more{padding-left:4px}.tl-none{padding-left:0}}
 .rv-ai{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--gold-soft);border-radius:var(--r);padding:8px 10px}
 .tl-mx .btn{align-self:flex-start}
+
+/* 学生页（整页，不再是弹窗） */
+.sp-head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 14px}
+.sp-back{border:0;background:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0;flex-basis:100%;text-align:left;font-family:inherit}
+.sp-back:hover{color:var(--ink)}
+.sp-title{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px;margin-right:auto;min-width:0}
+.sp-title h2{font-size:24px}
+.sp-acts{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.sp-more{position:relative}
+.sp-more>summary{list-style:none}.sp-more>summary::-webkit-details-marker{display:none}
+.sp-pop{position:absolute;right:0;top:calc(100% + 4px);z-index:20;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 6px 20px rgba(0,0,0,.08);padding:6px;display:flex;flex-direction:column;gap:4px;min-width:170px}
+.sp-pop .btn{width:100%;text-align:left;justify-content:flex-start;border-color:transparent}
+.sp-pop .btn:hover{background:var(--sunk)}
+.sp-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.sp-tabs::-webkit-scrollbar{display:none}
+.sp-tabs button{border:0;background:none;padding:8px 12px;font-size:14px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;font-family:inherit}
+.sp-tabs button:hover{color:var(--ink)}
+.sp-tabs button.on{color:var(--ink);border-bottom-color:var(--gold);font-weight:700}
+.sp-body{display:flex;flex-direction:column;gap:12px}
+.sp-h{font-size:15px;margin:6px 0 -4px}
+.sp-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px;align-items:start}
+.sp-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.sp-card{display:flex;flex-direction:column;gap:8px}
+.sp-todo{display:flex;flex-direction:column;gap:6px}
+.sp-ti{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:8px 10px;cursor:pointer;font-size:13.5px;font-family:inherit;color:var(--ink);border-left:3px solid var(--line)}
+.sp-ti span{flex:1}.sp-ti b{color:var(--muted)}
+.sp-ti.warn{border-left-color:var(--warn)}.sp-ti.seal{border-left-color:var(--seal)}
+.sp-ti:hover{background:var(--sunk)}
+.sp-les .sp-d{min-width:78px;color:var(--muted)}
+.sp-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sp-stats>div{background:var(--sunk);border-radius:var(--r);padding:8px 10px;display:flex;flex-direction:column}
+.sp-stats b{font-size:20px}.sp-stats small{color:var(--muted);font-size:12px}
+@media (max-width:860px){.sp-grid{grid-template-columns:1fr}}
+@media (max-width:640px){.sp-title h2{font-size:20px}.sp-acts{flex-basis:100%}}
+/* 待处理 / 链接与备份：上面一排页签，并进来的页面不再有自己的大标题 */
+.pg-tabs{margin-top:-4px}
+.pg-tabs .cnt{display:inline-block;min-width:18px;padding:0 5px;margin-left:2px;border-radius:9px;background:var(--seal);color:#fff;font-size:11.5px;line-height:18px;text-align:center;font-weight:700;font-family:var(--f-num)}
+.ph-sub{justify-content:flex-end}
+.ph-sub:empty{display:none}

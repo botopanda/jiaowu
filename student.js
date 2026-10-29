@@ -172,7 +172,7 @@ function sMine(s){
     <textarea id="self-eval" placeholder="例：词汇有进步，但有机反应链容易混淆">${esc(r.self_eval||'')}</textarea>
     <div class="row"><button class="btn pri" data-act="self-save" data-v="${ym}">${r.self_eval?'更新':'提交'}</button>${r.self_eval?'<span class="tag ok">已写</span>':''}</div></section>`}
   ${r.teacher_eval || r.next_focus ? reviewCard({...r, ym, student_id: s.id}) : ''}
-  ${past.length ? `<details class="sh-more"><summary>以前的月度回访（${past.length}）</summary>${past.map(x => reviewCard(x)).join('')}</details>` : ''}
+  ${past.length ? `<details class="sh-more"><summary>以前的月度反馈（${past.length}）</summary>${past.map(x => reviewCard(x)).join('')}</details>` : ''}
   <h3 class="sh-sec" id="m-profile">个人档案</h3>
   <details class="card"><summary class="muted small">${ro ? '点开看孩子的档案' : '点开看我的档案'}</summary>${profilePage(s, {hideEmpty: true})}</details>`;
 }

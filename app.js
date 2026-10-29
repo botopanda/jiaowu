@@ -112,15 +112,18 @@ const NAV_ICONS = (() => {
     '学生留言': '<path d="M4 5h16v11H8l-4 4z"/><path d="M12 13.5c-2-1.3-3-2.3-3-3.3a1.5 1.5 0 0 1 3-.4 1.5 1.5 0 0 1 3 .4c0 1-1 2-3 3.3z"/>',
     '改期 · 请假': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     '反馈审批': '<path d="M4 5h16v11H8l-4 4z"/><path d="M9 10l2 2 4-4"/>',
+    '待处理': '<path d="M4 13l2.5-8h11l2.5 8v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 13h5l1 2h4l1-2h5"/>',
     '学生档案': '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5 6.5-5s5.5 1.5 6.5 5"/><path d="M16 6h5M16 10h5M18 14h3"/>',
     '通关点检': flag, '通关': flag,
     '升学与出愿': '<path d="M3 9l9-5 9 5-9 5z"/><path d="M7 11v5c3 2 7 2 10 0v-5"/>',
     '院校库': '<path d="M3 21h18M5 21V10M19 21V10M9 21v-6h6v6M3 10l9-6 9 6"/>',
     '月度回访': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 13h8M8 17h5M8 3v4M16 3v4"/>',
+    '月度家长反馈': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 13h8M8 17h5M8 3v4M16 3v4"/>',
     '月度': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 13h8M8 17h5M8 3v4M16 3v4"/>',
     '跟进记录': '<path d="M4 6h16M4 12h16M4 18h10"/>',
     '老师档案': '<circle cx="12" cy="7" r="3.5"/><path d="M5 21c1-4 3.5-6 7-6s6 2 7 6"/>',
     '课时与工资': '<rect x="3" y="6" width="18" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/>',
+    '链接与备份': '<path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1"/><path d="M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/>',
     '链接与权限': '<path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1"/><path d="M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/>',
     '数据备份': '<path d="M12 3v12M7 10l5 5 5-5M4 19h16"/>',
     '首页': home, '概况': home,
@@ -226,16 +229,18 @@ function render(){
 
 /* ═════════════ 教务端 ═════════════ */
 function adminView(){
-  const pend = DB.feedbacks.filter(f => f.status==='pending').length, reqN = DB.requests.filter(q => q.status==='pending').length + chPend().length;
+  // 2026-10-29 菜单从 15 项并成 11 项：改期·请假、老师排课申请、反馈审批、学生留言、跟进记录 → 「待处理」的五个页签；
+  // 链接与权限、数据备份 → 「链接与备份」；月度回访 改名「月度家长反馈」。每页里面的功能原样搬过去
+  const todoN = todoTabs().reduce((a, t) => a + (t[2] || 0), 0);
+  const stuGrp = ['学生',[['students','学生档案'],['reviews','月度家长反馈'],['apply','升学与出愿'],['schools','院校库'],['checks','通关点检']]];
   const items = isTop()
-    ? [['日常',[['overview','总览'],['calendar','课表与排课'],['requests','改期 · 请假',reqN],['feedback','反馈审批',pend],['msgs','学生留言',typeof msgUnread==='function'?msgUnread():0]]],
-       ['学生',[['students','学生档案'],['checks','通关点检'],['apply','升学与出愿'],['schools','院校库'],['reviews','月度回访'],['followups','跟进记录']]],
-       ['管理',[['teachers','老师档案'],['payroll','课时与工资'],['links','链接与权限'],['backup','数据备份']]]]
-    : [['日常',[['overview','总览'],['calendar','课表与排课'],['msgs','学生留言',typeof msgUnread==='function'?msgUnread():0]]],['学生',[['students','学生档案'],['checks','通关点检'],['apply','升学与出愿'],['schools','院校库'],['reviews','月度回访'],['followups','跟进记录']]]];
+    ? [['日常',[['overview','总览'],['calendar','课表与排课'],['todo','待处理',todoN]]], stuGrp,
+       ['管理',[['teachers','老师档案'],['payroll','课时与工资'],['sys','链接与备份']]]]
+    : [['日常',[['overview','总览'],['calendar','课表与排课'],['todo','待处理',todoN]]], stuGrp];
   const nav = items.map(([g,list]) => `<div class="grp">${g}</div>` + list.map(([k,t,n]) =>
-    `<button class="nav ${S.page===k?'on':''}" data-act="page" data-v="${k}">${navIcon(t)}<span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')).join('');
-  const P = {msgs: typeof pgMsgs==='function' ? pgMsgs : pgOverview, backup:pgBackup, checks:pgChecks, overview:pgOverview, calendar:pgCalendar, requests:pgRequests, apply:pgApply2, reviews:pgReviews, followups:pgFollowups, feedback:pgFeedback, students:pgStudents, teachers:pgTeachers, payroll:pgPayroll, links:pgLinks, schools:pgSchools};
-  const page = (isTop() || ['overview','calendar','msgs','students','checks','apply','schools','reviews','followups'].includes(S.page)) ? (P[S.page]||pgOverview) : pgOverview;
+    `<button class="nav ${S.page===k || (k==='students' && S.page==='student')?'on':''}" data-act="page" data-v="${k}">${navIcon(t)}<span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')).join('');
+  const P = {todo:pgTodo, sys:pgSys, checks:pgChecks, overview:pgOverview, calendar:pgCalendar, apply:pgApply2, reviews:pgReviews, students:pgStudents, student:pgStudent, teachers:pgTeachers, payroll:pgPayroll, schools:pgSchools};
+  const page = (isTop() || ['overview','calendar','todo','students','student','checks','apply','schools','reviews'].includes(S.page)) ? (P[S.page]||pgOverview) : pgOverview;
   return `<div class="layout"><nav class="side" aria-label="教务导航">${nav}</nav><main class="main">${page()}</main></div>`;
 }
 const scopeNote = () => !isTop() ? `<div class="scope">你负责 ${DB.students.length} 位学生，只显示他们的资料。</div>` : '';
@@ -297,12 +302,12 @@ function pgOverview(){
   const bad = DB.feedbacks.filter(f => f.confirm==='不满意' && L(f.lesson_id).date >= ymShift(TODAY.slice(0,7),-1)+'-01');
   const empty = !DB.students.length;
   return `<div class="ph"><h2>总览</h2><span class="muted small">${fmtMD(TODAY)}</span></div>${scopeNote()}
-  ${empty && isTop() ? `<div class="note">系统是空的，按这个顺序开始：① <b>老师档案</b>里添加老师 → ② <b>学生档案</b>里添加学生，并在学生里添加课程（哪位老师、什么科目、单价）→ ③ <b>课表与排课</b>里排课 → ④ <b>链接与权限</b>里复制每个人的专属链接发给他们。</div>` : ''}
+  ${empty && isTop() ? `<div class="note">系统是空的，按这个顺序开始：① <b>老师档案</b>里添加老师 → ② <b>学生档案</b>里添加学生，并在学生里添加课程（哪位老师、什么科目、单价）→ ③ <b>课表与排课</b>里排课 → ④ <b>链接与备份</b>里复制每个人的专属链接发给他们。</div>` : ''}
   <div class="stats">
     <button class="stat" data-act="page" data-v="calendar"><small>今天的课</small><b>${today.length}</b></button>
     ${isTop() ? `<button class="stat ${reqs.length?'al':''}" data-act="page" data-v="requests"><small>待处理申请</small><b>${reqs.length}</b></button>
     <button class="stat ${pend.length?'al':''}" data-act="page" data-v="feedback"><small>待审批反馈</small><b>${pend.length}</b></button>` : ''}
-    <button class="stat ${chPend().length?'al':''}" ${isTop()?'data-act="page" data-v="requests"':''}><small>老师排课申请</small><b>${chPend().length}</b></button>
+    <button class="stat ${chPend().length?'al':''}" ${isTop()?'data-act="page" data-v="requests-ch"':''}><small>老师排课申请</small><b>${chPend().length}</b></button>
     <button class="stat ${miss.length?'al':''}" ${isTop()?'data-act="page" data-v="feedback-missing"':''}><small>待确认的课</small><b>${miss.length}</b></button>
   </div>
   ${ownerClashBlock()}
@@ -315,7 +320,7 @@ function pgOverview(){
       ${bad.map(f => { const l=L(f.lesson_id), c=course(l.course_id); return `<div class="li"><span class="tag seal">不满意</span><div class="grow">${esc(stu(c.student_id).name)} 对 ${sMD(l.date)} ${esc(tea(c.teacher_id).name)} 的课评价「不满意」</div></div>`}).join('')}
       ${chPend().map(x => chCard(x, true)).join('')}
       ${miss.length ? `<div class="li"><span class="tag warn">待确认</span><div class="grow">${pendByT(miss)}<br><span class="muted xs">上课时间过了、老师还没写反馈的课，暂时不计课时和工资。</span></div>${miss.length>1?`<button class="btn sm" data-act="done-all">全部标为已上课</button>`:''}</div>` : ''}
-      ${miss.length ? `<details class="ov-more"><summary>逐条处理（${miss.length} 节）</summary>${miss.slice(0,8).map(pendRow).join('')}${miss.length>8?`<div class="muted xs" style="padding:4px 2px">还有 ${miss.length-8} 节${isTop()?'，在「反馈审批 → 待确认」里看全部':''}</div>`:''}</details>` : ''}
+      ${miss.length ? `<details class="ov-more"><summary>逐条处理（${miss.length} 节）</summary>${miss.slice(0,8).map(pendRow).join('')}${miss.length>8?`<div class="muted xs" style="padding:4px 2px">还有 ${miss.length-8} 节${isTop()?'，在「待处理 → 反馈审批 → 待确认」里看全部':''}</div>`:''}</details>` : ''}
       ${upcomingEvents(14).map(e=>`<div class="li"><span class="tag ${e.days<=7?'seal':'warn'}">${e.days===0?'今天':e.days+' 天'}</span><div class="grow">${esc(stu(e.t.student_id).name)} · ${esc(e.t.school)} ${e.label} ${sMD(e.date)}</div><button class="btn sm" data-act="page" data-v="apply">查看</button></div>`).join('')}
       ${(DB.followups||[]).filter(f=>f.next_date && f.confirm!=='已确认' && f.next_date<=TODAY).map(f=>`<div class="li"><span class="tag gold">跟进</span><div class="grow">${esc(stu(f.student_id).name)} · ${esc(f.next_action||f.task||'')}（${sMD(f.next_date)}）</div><button class="btn sm" data-act="fu-edit" data-v="${f.id}">更新</button></div>`).join('')}
       ${!chPend().length && !reqs.length && !pend.length && !bad.length && !miss.length && !upcomingEvents(14).length ? '<div class="empty">没有要处理的事</div>' : ''}
@@ -357,12 +362,46 @@ function pgCalendar(){
 // 「全部批准」后，列出撞课没批的申请
 function chClashModal(bad, ok){
   openModal(`${mHead(ok ? `已批准 ${ok} 条，下面 ${bad.length} 条撞课没批` : `这 ${bad.length} 条都撞课，没有批准`)}
-  <div class="note warn">这些申请还留在「改期 · 请假」里。可以先「不批准」请老师改时间，或者先把撞的那节课调开，再点「批准」。</div>
+  <div class="note warn">这些申请还留在「待处理 → 老师排课申请」里。可以先「不批准」请老师改时间，或者先把撞的那节课调开，再点「批准」。</div>
   <div class="list">${bad.map(([x, why]) => { const c = course(x.course_id) || {};
     return `<div class="li li-clash"><div class="grow"><b>${esc(x.by_name)}</b> · ${esc(stu(c.student_id).name)} ${c.subject?subjTag(c.subject):''}<br><span class="small">${chText(x)}</span><div class="ch-clash">撞课：${esc(why)}</div></div></div>`; }).join('')}</div>
   <div class="row" style="justify-content:flex-end"><button class="btn pri" data-act="close">知道了</button></div>`, true);
 }
-function pgRequests(){
+/* ───────── 待处理：改期·请假 / 老师排课申请 / 反馈审批 / 学生留言 / 跟进，一个页签一样（数字＝要处理的条数） ───────── */
+// 普通教务原来就看不到改期·请假、老师申请、反馈审批，这里也只有后两个页签
+function todoTabs(){
+  const fuDue = (DB.followups||[]).filter(f => f.next_date && f.confirm!=='已确认' && f.next_date<=TODAY).length;
+  return (isTop() ? [['req','改期 · 请假',DB.requests.filter(q=>q.status==='pending').length],['ch','老师排课申请',chPend().length],['fb','反馈审批',DB.feedbacks.filter(f=>f.status==='pending').length]] : [])
+    .concat([['msg','学生留言',typeof msgUnread==='function'?msgUnread():0],['fu','跟进记录',fuDue]]);
+}
+// 并进来的页面：去掉它自己的大标题，标题旁边的按钮留着
+const subPage = h => h.replace(/^\s*<div class="ph"><h2>[^<]*<\/h2>/, '<div class="ph ph-sub">');
+const tabBar = (list, cur, act) => `<div class="sp-tabs pg-tabs">${list.map(([k,t,n]) => `<button class="${cur===k?'on':''}" data-act="${act}" data-v="${k}">${t}${n?` <span class="cnt">${n}</span>`:''}</button>`).join('')}</div>`;
+function pgTodo(){
+  const ts = todoTabs(); if (!ts.some(t => t[0]===S.todoTab)) S.todoTab = ts[0][0];
+  const body = {req:reqStuBody, ch:reqChBody, fb:pgFeedback, msg:typeof pgMsgs==='function' ? pgMsgs : () => '', fu:pgFollowups}[S.todoTab];
+  return `<div class="ph"><h2>待处理</h2></div>${tabBar(ts, S.todoTab, 'todo-tab')}${subPage(body())}`;
+}
+function pgSys(){
+  const t = S.sysTab==='backup' ? 'backup' : 'links';
+  return `<div class="ph"><h2>链接与备份</h2></div>${tabBar([['links','链接与权限'],['backup','数据备份']], t, 'sys-tab')}${subPage(t==='backup' ? pgBackup() : pgLinks())}`;
+}
+// 旧的菜单名都能跳到新位置（总览、学生页里的「去处理」「去审批」按钮用的还是这些名字）
+const PAGE_OLD = {requests:['todo','req'], 'requests-ch':['todo','ch'], feedback:['todo','fb'], 'feedback-missing':['todo','fb'], msgs:['todo','msg'], followups:['todo','fu'], links:['sys','links'], backup:['sys','backup']};
+function goPage(v){
+  const o = PAGE_OLD[v];
+  if (o){ S.page = o[0]; if (o[0]==='todo') S.todoTab = o[1]; else S.sysTab = o[1]; if (v==='feedback') S.fbTab = 'pending'; if (v==='feedback-missing') S.fbTab = 'missing'; return; }
+  if (v==='todo'){ const ts = todoTabs(); S.todoTab = (ts.find(t => t[2]) || ts.find(t => t[0]===S.todoTab) || ts[0])[0]; if (S.todoTab==='fb') S.fbTab = 'pending'; }
+  S.page = v;
+}
+function reqChBody(){
+  const cp = chPend(), cd = (DB.changes||[]).filter(x => x.status==='approved' || x.status==='rejected').slice(0,10);
+  return `<div class="ph"><h2>老师排课申请</h2>${cp.length>1?`<button class="btn pri sm" data-act="ch-ok-all">全部批准（${cp.length} 条）</button>`:''}</div>
+  <div class="note">老师自己排课、调课、删课，要你们批准后才会改到课表上。</div>
+  <section class="card"><div class="list">${cp.length ? cp.map(x => chCard(x, true)).join('') : '<div class="empty">没有待审批的老师申请</div>'}</div>
+    ${cd.length ? `<details style="margin-top:6px"><summary class="muted small">最近处理过的 ${cd.length} 条</summary><div class="list">${cd.map(x => chCard(x, true)).join('')}</div></details>` : ''}</section>`;
+}
+function reqStuBody(){
   const pend = DB.requests.filter(q=>q.status==='pending'), done = DB.requests.filter(q=>q.status!=='pending').slice().reverse().slice(0,20);
   const card = q => { const l=L(q.lesson_id), c=course(l.course_id), same = q.created_at.slice(0,10)===l.date;
     return `<section class="card" style="display:flex;flex-direction:column;gap:8px">
@@ -375,12 +414,7 @@ function pgRequests(){
         <div class="row"><input type="text" id="rq-r-${q.id}" placeholder="不同意的话，写一句原因回复学生" style="flex:1;min-width:180px"><button class="btn sm" data-act="req-no" data-v="${q.id}">不同意</button></div>`
       : `<div class="small" style="color:${q.status==='accepted'?'var(--ok)':'var(--seal)'}">${q.status==='accepted'?'已同意':'未同意'}（${esc(q.handled_by)}）：${esc(q.reply)}</div>`}
     </section>`; };
-  const cp = chPend(), cd = (DB.changes||[]).filter(x => x.status==='approved' || x.status==='rejected').slice(0,10);
   return `<div class="ph"><h2>改期 · 请假</h2></div>
-  <section class="card"><div class="row"><h3 style="margin-right:auto">老师的排课 / 调课申请</h3>${cp.length>1?`<button class="btn pri sm" data-act="ch-ok-all">全部批准（${cp.length} 条）</button>`:''}</div><div class="muted xs" style="margin:2px 0 6px">老师自己排课、调课、删课，要你们批准后才会改到课表上。</div>
-    <div class="list">${cp.length ? cp.map(x => chCard(x, true)).join('') : '<div class="empty">没有待审批的老师申请</div>'}</div>
-    ${cd.length ? `<details style="margin-top:6px"><summary class="muted small">最近处理过的 ${cd.length} 条</summary><div class="list">${cd.map(x => chCard(x, true)).join('')}</div></details>` : ''}</section>
-  <h3 style="font-size:15px">学生的改期 · 请假</h3>
   <div class="note">学生在自己的链接里申请。你们在这里处理，<b>学生和任课老师同时看到结果</b>，课表自动更新。当天请假扣不扣课时由你们决定。</div>
   ${pend.length ? pend.map(card).join('') : '<div class="card empty">没有待处理的申请</div>'}
   ${done.length ? `<h3 style="font-size:15px">最近处理过的</h3>${done.map(card).join('')}` : ''}`;
@@ -802,42 +836,20 @@ function teacherForm(id){
   <label class="field"><span>类别</span><select id="tf-cat"><option value="学科" ${tCat(id)==='学科'?'selected':''}>学科老师（日语、文综、数理化生）</option><option value="艺术" ${tCat(id)==='艺术'?'selected':''}>艺术老师</option></select></label>
   ${id?`<label class="field"><span>状态</span><select id="tf-active"><option value="true" ${t.active?'selected':''}>在职</option><option value="false" ${t.active?'':'selected'}>离职</option></select></label>`:''}</div>
   ${id ? '<div class="muted xs">学历、工作经历、简历原件在老师卡片上的「履历」里填。</div>' : ''}
-  ${id?'<div class="muted xs">老师离职后，记得到「链接与权限」里停用他的链接。</div>':'<div class="muted xs">保存后会自动生成这位老师的专属链接。</div>'}
+  ${id?'<div class="muted xs">老师离职后，记得到「链接与备份」里停用他的链接。</div>':'<div class="muted xs">保存后会自动生成这位老师的专属链接。</div>'}
   ${ownerTeacherField(t)}
   <div class="row"><button class="btn pri" data-act="save-teacher" data-v="${id||''}">保存</button>${id && isTop()?`<button class="btn danger sm" style="margin-left:auto" data-act="teacher-del" data-v="${id}">删除这位老师</button>`:''}</div>`);
 }
-function studentModal(id, tab){
-  lastModal = () => studentModal(id, tab);
-  const s = stu(id), cs = DB.courses.filter(c=>c.student_id===id); tab = tab || 'info';
-  if (['fb','fu','note'].includes(tab) && typeof tlTab==='function') tab = 'tl';   // 反馈、跟进记录、私下备注 已并进「按时间看」
+// 学生页各页签的内容（学生页本身在 stupage.js）
+function stuTabBody(id, tab){
+  const s = stu(id), cs = DB.courses.filter(c=>c.student_id===id);
   const ym = TODAY.slice(0,7), nx = ymShift(ym,1), pv = ymShift(ym,-1);
-  // 左侧菜单按用途分组
-  const groups = typeof tlTab==='function'
-    ? [['学生',[['info','概况与课程'],['tl','按时间看'],['profile','档案资料']]],
-       ['学习',[['mp','月计划'],['score','成绩'],['review','月度回访']]],
-       ['升学',[['target','大学与出愿']]],
-       ['给家长看',[['pfview','家长看到的档案'],['board','跟进看板']]]]
-    : [['基本',[['info','概况与课程'],['profile','档案资料'],['note','私下备注']]],
-       ['学习',[['mp','月计划'],['fb','反馈'],['score','成绩']]],
-       ['升学',[['target','大学与出愿'],['fu','跟进记录'],['review','月度回访']]],
-       ['给家长看',[['pfview','家长看到的档案'],['board','跟进看板']]]];
   let body = '';
   if (tab==='tl') body = tlTab(id);
   else if (tab==='pfview') body = `<div class="hint" style="margin:0">这就是学生和家长在自己链接「档案」里看到的页面，照 Excel 第一页的顺序。</div>${profilePage(s)}`;
   else if (tab==='board') body = boardView(id);
   else if (['profile','score','target','review','fu'].includes(tab)) body = studentTrackTab(id, tab);
-  else if (tab==='info'){
-    const ps = personOf('student','student_id',id), pp = personOf('parent','student_id',id);
-    body = `<div class="grid2"><dl class="kv">${s.code?`<dt>编号</dt><dd class="num">${esc(s.code)}</dd>`:''}<dt>方向</dt><dd>${esc(s.track||'—')}（${s.grad?'大学院':'学部'}）</dd><dt>所在地</dt><dd>${esc(s.loc||'—')}</dd><dt>负责教务</dt><dd>${esc(s.staff||'—')}</dd>${s.memo?`<dt>教务备注</dt><dd>${esc(s.memo)}</dd>`:''}</dl>
-      <div class="row" style="align-content:flex-start">${isTop()?`<button class="btn sm" data-act="student-form" data-v="${id}">编辑资料</button>`:''}<button class="btn sm" data-act="stu-cal" data-v="${id}">看课表</button>${typeof mrBtn==='function' ? mrBtn(id) : ''}${typeof wkBtn==='function' ? wkBtn(id) : ''}
-      ${ps?`<button class="btn sm" data-act="copy-link" data-v="${ps.key}">复制学生链接</button>`:''}${pp?`<button class="btn sm" data-act="copy-link" data-v="${pp.key}">复制家长链接</button>`:''}</div></div>
-      <b>课程</b><div class="list">${cs.map(c=>`<div class="li small"><span class="grow">${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}${c.active?'':' <span class="tag mute">已停</span>'}</span>${isTop()?`<span class="num">${rateTxt(c)}</span>`:''}${isAdmin()?`<button class="btn sm" data-act="course-edit" data-v="${c.id}">改</button>`:''}</div>`).join('')||'<div class="muted small">还没有课程</div>'}</div>
-      ${isAdmin()?`<details class="card" ${cs.length?'':'open'}><summary><b>＋ 添加课程</b> <span class="muted xs">（这位学生跟哪位老师上什么课）</span></summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-        ${DB.teachers.length?`<div class="fields"><label class="field"><span>老师</span><select id="cf-t">${DB.teachers.filter(t=>t.active).map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
-        ${subjField('cf-subj', '')}${isTop()?`<label class="field"><span>老师单价（每小时）</span><div class="row" style="flex-wrap:nowrap"><input type="number" id="cf-rate" step="10" min="0" value="0" style="flex:1;min-width:0">${curSel('cf-cur','CNY')}</div></label>`:''}</div>${isTop()?'':'<div class="muted xs">课时单价由教务·管理设置。</div>'}
-        <div class="row"><button class="btn pri sm" data-act="add-course" data-v="${id}">添加课程</button></div>`:'<div class="muted small">先到「老师档案」里添加老师。</div>'}</div></details>`:''}
-      ${isTop()?`<div class="row" id="stu-del-row" style="margin-top:6px"><button class="btn danger sm" data-act="stu-del-ask" data-v="${id}">删除这位学生</button></div>`:''}`;
-  } else if (tab==='mp') {
+  else if (tab==='mp') {
     const editable = cs.filter(c=>c.active);
     const edit = m => `<section class="card" style="display:flex;flex-direction:column;gap:8px"><b>${ymLabel(m)}计划</b>${editable.map(c=>`<label class="field"><span>${esc(c.subject)} · ${esc(tea(c.teacher_id).name)}${DB.plans.find(p=>p.course_id===c.id&&p.ym===m)?.updated_by?` <span class="xs">（${esc(DB.plans.find(p=>p.course_id===c.id&&p.ym===m).updated_by)} 写）</span>`:''}</span><textarea id="mp-${m}-${c.id}" style="min-height:52px" placeholder="这个月这门课要完成什么">${esc(planText(c.id,m))}</textarea></label>${typeof mpTools==='function' ? mpTools(m, c.id) : ''}`).join('')||'<div class="muted small">还没有课程</div>'}
       ${editable.length?`<div class="row"><button class="btn pri sm" data-act="mp-save" data-v="${id}|${m}">保存${+m.slice(5)}月计划</button></div>`:''}</section>`;
@@ -845,9 +857,7 @@ function studentModal(id, tab){
   } else if (tab==='fb') body = fbOfS(id).slice().reverse().slice(0,6).map(f=>fbCard(f)).join('') || '<div class="empty">还没有反馈</div>';
   else body = `<div class="note">私下备注只有老师和教务能看到，学生和家长看不到。</div>${DB.notes.filter(n=>n.student_id===id).slice().reverse().map(n=>`<div class="card small"><div class="row"><b>${esc(n.author)}</b> <span class="muted">${sMD(n.created_at.slice(0,10))}</span><button class="btn sm" style="margin-left:auto" data-act="note-del" data-v="${n.id}">删除</button></div><p style="margin:4px 0 0;white-space:pre-wrap">${esc(n.text)}</p></div>`).join('')||'<div class="empty">暂无备注</div>'}
     <textarea id="note-new" placeholder="写一条备注"></textarea><div class="row"><button class="btn sm" data-act="note-add" data-v="${id}">添加备注</button></div>`;
-  openModal(`${mHead(`${esc(s.name)} <span class="muted small" style="font-family:var(--f-body)">${esc(s.track||'')}</span>`)}
-  <div class="sm-wrap"><nav class="sm-nav" aria-label="学生档案菜单">${groups.map(([g,items])=>`<div class="sm-grp">${g}</div>${items.map(([k,t])=>`<button class="nav ${tab===k?'on':''}" data-act="stu-tab" data-v="${id}|${k}">${t}</button>`).join('')}`).join('')}</nav>
-  <div class="sm-body">${body}</div></div>`, 'xl');
+  return body;
 }
 function courseEdit(cid){
   const c = course(cid);
@@ -920,7 +930,9 @@ document.addEventListener('click', async e => {
   if (k==='close-bg' && e.target!==a) return;
   try {
   switch(k){
-    case 'page': if (v==='feedback-missing'){ S.page='feedback'; S.fbTab='missing'; } else { S.page=v; if (v==='feedback') S.fbTab='pending'; } render(); window.scrollTo(0,0); refresh(); break;
+    case 'page': goPage(v); render(); window.scrollTo(0,0); refresh(); break;
+    case 'todo-tab': S.todoTab=v; if (v==='fb') S.fbTab='pending'; S.sel.clear(); S.editing=null; render(); break;
+    case 'sys-tab': S.sysTab=v; render(); break;
     case 'tab': S.tab=v; render(); window.scrollTo(0,0); refresh(); break;
     case 'pview': PV=v; try{ localStorage.setItem('jw_view', v); }catch(_){} render(); break;
     case 'pday': {
