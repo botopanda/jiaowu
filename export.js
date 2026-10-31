@@ -143,7 +143,7 @@ async function mrCanvas(sid, ym){
   let yy = 122;
 
   // 四个数字
-  const tiles = [[`${st.actual}/${st.req}`, '上课（节）'], [String(hrs), '上课时长（小时）'], [String(st.leave), '请假（次）'], [`${st.hwOk}%`, '作业完成']];
+  const tiles = [[`${st.actual}/${st.req}`, '上课（节）'], [String(hrs), '上课时长（小时）'], [String(st.leave), '请假（次）'], [st.fbN ? `${st.hwOk}%` : '—', '作业完成']];
   const tw = (W - P * 2 - 30) / 4;
   tiles.forEach(([n, lb], i) => { const x = P + i * (tw + 10); card(x, yy, tw, 84);
     g.textAlign = 'center'; g.fillStyle = i === 2 && st.leave ? SX_C.seal : SX_C.ink; g.font = font(28, true); g.fillText(n, x + tw / 2, yy + 44);

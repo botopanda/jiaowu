@@ -150,8 +150,11 @@ const L = id => DB.lessons.find(l => l.id===id);
 const fbOf = l => DB.feedbacks.find(f => f.lesson_id===l.id);
 const cOfF = f => course(L(f.lesson_id).course_id);
 const dur = l => (mins(l.end)-mins(l.start))/60;
+const bjHM = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16);   // 现在几点（北京时间）
+const lesEnded = l => l.date < TODAY || (l.date === TODAY && l.end <= bjHM());       // 这节课下课了吗
 // 「已上课」= 老师写了反馈，或者教务手动确认过；时间过了但两样都没有 = 「待确认」，不计课时
-const isDone = l => l.status==='scheduled' && (l.has_fb || l.done_manual || !!fbOf(l) || (l.date < TODAY && isStaffT(course(l.course_id)?.teacher_id)));
+// 教务老师的课（面谈、升学指导）下课时间一过就算已上
+const isDone = l => l.status==='scheduled' && (l.has_fb || l.done_manual || !!fbOf(l) || (lesEnded(l) && isStaffT(course(l.course_id)?.teacher_id)));
 const isPend = l => l.status==='scheduled' && l.date < TODAY && !isDone(l);
 const realH = l => l.actual_hours!=null ? Number(l.actual_hours) : dur(l);   // 实际上课时长（没改过就是排课时长）
 const paidH = l => isDone(l) ? realH(l) : l.status==='leave' ? Number(l.deduct) : 0;
@@ -176,10 +179,21 @@ const toJST = t => t;
 const planText = (cid, ym) => DB.plans.find(p => p.course_id===cid && p.ym===ym)?.text || '';
 const reqOf = l => DB.requests.filter(q => q.lesson_id===l.id).slice(-1)[0];
 const personOf = (role, field, id) => (DB.people||[]).find(p => p.role===role && p[field]===id && p.active);
+// 这条反馈有没有留作业（写「无」「没有」的不算）
+const hasHw = f => !/^(无|没有|暂无|—|-|\/)?$/.test((f.hw || '').trim());
+// 作业到该交的时候了吗：交了就算；没交的，等这门课下一节课开始才算该交（后面没课了就等 7 天）
+function hwDue(f){
+  if (f.hw_sub) return true;
+  const l = L(f.lesson_id); if (!l) return false;
+  const nx = DB.lessons.filter(x => x.course_id === l.course_id && x.status !== 'cancelled' && x.date + x.start > l.date + l.start)
+    .sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start))[0];
+  if (nx) return nx.date < TODAY || (nx.date === TODAY && nx.start <= bjHM());
+  return Date.parse(l.date) + 7 * 864e5 < Date.parse(TODAY);
+}
 function monthStats(sid, ym){
-  const ls = lsOfS(sid).filter(l => l.date.startsWith(ym) && l.date < TODAY);
+  const ls = lsOfS(sid).filter(l => l.date.startsWith(ym) && (l.date < TODAY || isDone(l)));
   const actual = ls.filter(isDone).length, leave = ls.filter(l => l.status==='leave').length;
-  const fs = fbOfS(sid).filter(f => L(f.lesson_id).date.startsWith(ym));
+  const fs = fbOfS(sid).filter(f => L(f.lesson_id).date.startsWith(ym) && hasHw(f) && hwDue(f));
   return {req: ls.length, actual, leave, hwOk: fs.length ? Math.round(fs.filter(f => f.hw_sub).length / fs.length * 100) : 0, fbN: fs.length};
 }
 const latestHw = sid => DB.courses.filter(c => c.student_id===sid).map(c => DB.feedbacks.filter(f => L(f.lesson_id).course_id===c.id).slice(-1)[0]).filter(Boolean);
@@ -705,7 +719,7 @@ const sFeedback = s => fbOfS(s.id).slice().reverse().slice(0,20).map(f=>fbMini(f
 function pOverview(s){
   const ym = TODAY.slice(0,7), prev = ymShift(ym,-1);
   const block = (m) => { const st = monthStats(s.id, m), leaves = lsOfS(s.id).filter(l=>l.date.startsWith(m) && l.status==='leave' && l.date<TODAY);
-    return `<div class="dg">${ymLabel(m)}</div>${!st.req ? '<div class="card small muted">这个月还没有上完的课</div>' : `<div class="bst"><div><b>${st.actual}/${st.req}</b><small>出勤</small></div><div><b style="${st.leave?'color:var(--seal)':''}">${st.leave}</b><small>请假</small></div><div><b>${st.hwOk}%</b><small>作业完成</small></div></div>`}
+    return `<div class="dg">${ymLabel(m)}</div>${!st.req ? '<div class="card small muted">这个月还没有上完的课</div>' : `<div class="bst"><div><b>${st.actual}/${st.req}</b><small>出勤</small></div><div><b style="${st.leave?'color:var(--seal)':''}">${st.leave}</b><small>请假</small></div><div><b>${st.fbN ? st.hwOk + '%' : '—'}</b><small>作业完成</small></div></div>`}
     ${leaves.map(l=>`<div class="card small"><span class="tag seal">请假</span> ${fmtMD(l.date)} ${esc(course(l.course_id).subject)} · ${esc(l.note)}</div>`).join('')}`; };
   return `<h2 style="font-size:19px">${esc(s.name)} 的学习情况</h2>${block(ym)}
   <div class="dg">${+ym.slice(5)} 月学习计划</div><div class="card">${mpView(s.id, ym)}</div>

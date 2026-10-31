@@ -41,7 +41,7 @@ function tlStats(evs){
   const fs = ls.map(fbOf).filter(Boolean);
   return {n: done.length, h: +done.reduce((s, l) => s + realH(l), 0).toFixed(1), leave: ls.filter(l => l.status === 'leave').length,
     plan: ls.filter(l => l.status === 'scheduled' && !isDone(l) && !isPend(l)).length,
-    hw: fs.filter(f => f.hw_sub).length, hwAll: fs.filter(f => (f.hw || '').trim()).length,
+    hw: fs.filter(f => hasHw(f) && f.hw_sub).length, hwAll: fs.filter(f => hasHw(f) && hwDue(f)).length,   // 还没到该交时候的作业不算
     score: evs.filter(e => e.k === 'score').length, fu: evs.filter(e => e.k === 'fu').length};
 }
 const tlStatTxt = st => [`上课 ${st.n} 节（${st.h} 小时）`, st.leave ? `请假 ${st.leave} 次` : '', st.hwAll ? `作业交了 ${st.hw}/${st.hwAll}` : '',
