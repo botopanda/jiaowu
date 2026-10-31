@@ -230,9 +230,10 @@ function rvRawBox(sid, ym){
 }
 function reviewForm(sid, ym){
   const r = reviewOf(sid, ym) || {}, st = monthStats(sid, ym);
+  const sN = lsOfS(sid).filter(l => l.date.startsWith(ym) && isDone(l) && isStaffT(course(l.course_id)?.teacher_id)).length;   // 面谈、升学指导不算上课
   const auto = DB.courses.filter(c=>c.student_id===sid).map(c=>planText(c.id, ym) ? `${c.subject}：${planText(c.id, ym)}` : '').filter(Boolean).join('；');
   openModal(`${mHead(`${esc(stu(sid).name)} · ${ymLabel(ym)} 月度家长反馈`)}
-  <div class="muted small">这个月：上课 ${st.actual} 次${st.leave?`，请假 ${st.leave} 次`:''}${st.fbN ? `，作业提交 ${st.hwOk}%` : ''}</div>
+  <div class="muted small">这个月：上课 ${st.actual - sN} 次${sN?`，面谈 / 升学指导 ${sN} 次`:''}${st.leave?`，请假 ${st.leave} 次`:''}${st.fbN ? `，作业提交 ${st.hwOk}%` : ''}</div>
   <div class="note"><b>学生自我评价：</b>${r.self_eval ? esc(r.self_eval) : '<span class="muted">学生还没写（学生在自己的链接「月度」里填）</span>'}</div>
   ${rvRawBox(sid, ym)}
   ${typeof rvAiBox==='function' ? rvAiBox(sid, ym) : ''}
