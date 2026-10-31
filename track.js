@@ -110,8 +110,8 @@ function reviewCard(r, opt={}){
   const sec = (l, v) => v ? `<div class="sec"><b>${l}</b><p>${esc(v)}</p></div>` : '';
   return `<article class="card fb small"><div class="row"><b style="font-family:var(--f-disp);font-size:15px;margin-right:auto">${ymLabel(r.ym)}</b>
     <span class="tag ${r.status==='已完成'?'ok':r.status==='需调整'?'seal':'mute'}">${esc(r.status||'待跟进')}</span>${opt.edit?`<button class="btn sm" data-act="rv-open" data-v="${r.student_id}|${r.ym}">编辑</button><button class="btn sm danger" data-act="rv-del" data-v="${r.student_id}|${r.ym}">删除</button>`:''}</div>
-    ${sec('本月课程内容', r.content)}${sec('学生自我评价', r.self_eval)}${sec('老师评价', r.teacher_eval)}${sec('任务 / 跟进结论', r.conclusion)}${sec('下月重点', r.next_focus)}
-    ${!r.content && !r.self_eval && !r.teacher_eval ? '<div class="muted">还没有内容</div>' : ''}</article>`;
+    ${sec('本月课程内容', r.content)}${sec('学生自我评价', r.self_eval)}${sec('老师评价', r.teacher_eval)}${sec('本月面谈', r.talk)}${sec('任务 / 跟进结论', r.conclusion)}${sec('下月重点', r.next_focus)}
+    ${!r.content && !r.self_eval && !r.teacher_eval && !r.talk ? '<div class="muted">还没有内容</div>' : ''}</article>`;
 }
 function fuCard(f, edit){
   return `<div class="li small"><div class="grow"><div class="row"><b>${fmtYMD(f.date)} ${esc(f.time||'')}</b><span class="tag gold">${esc(f.type||'跟进')}</span>${f.subject?subjTag(f.subject):''}
@@ -214,15 +214,31 @@ function targetForm(sid, tid, pre){
   <div class="fields">${sel_('tg-status','出愿状态',OPT.applyStatus,t.status)}${sel_('tg-doc','资料状态',OPT.docStatus,t.doc_status)}${fld('tg-next','下一步',t.next_step,'placeholder="例：整理志望理由书"')}</div>
   <div class="row"><button class="btn pri" data-act="tg-save" data-v="${sid}|${tid||''}">保存</button>${tid?`<span id="tg-del-row"><button class="btn danger sm" data-act="tg-del-ask" data-v="${tid}">删除这所</button></span>`:''}</div>`, true);
 }
+// 面谈原始纪要：只给 AI 看，家长、学生、任课老师都看不到（数据库第 38 步，单独一张表，网页另外取）
+let RVX = {raw: [], rules: ''};
+async function rvxLoad(){
+  RVX = {raw: [], rules: ''};
+  if (DB.me.role !== 'admin') return;
+  try { RVX = await rpc('review_raw_load') || RVX; } catch(e) { /* 第 38 步还没运行 */ }
+}
+const rawOf = (sid, ym) => (RVX.raw || []).find(x => x.student_id===sid && x.ym===ym)?.text || '';
+function rvRawBox(sid, ym){
+  const raw = rawOf(sid, ym);
+  return `<details class="rv-raw" ${raw?'open':''}><summary><b>面谈原始纪要</b> <span class="muted xs">只给 AI 看，家长、学生看不到</span>${raw?' <span class="tag ok">已贴</span>':''}</summary>
+    <div class="muted xs">把腾讯会议 AI 纪要、Plaud 总结或你自己的笔记原样贴在这里。点「AI 生成」时，AI 会读它，只挑能给家长看的写进下面的「本月面谈记录」。</div>
+    <textarea id="rv-raw" rows="6" placeholder="贴面谈纪要原文">${esc(raw)}</textarea></details>`;
+}
 function reviewForm(sid, ym){
   const r = reviewOf(sid, ym) || {}, st = monthStats(sid, ym);
   const auto = DB.courses.filter(c=>c.student_id===sid).map(c=>planText(c.id, ym) ? `${c.subject}：${planText(c.id, ym)}` : '').filter(Boolean).join('；');
   openModal(`${mHead(`${esc(stu(sid).name)} · ${ymLabel(ym)} 月度家长反馈`)}
   <div class="muted small">这个月：上课 ${st.actual} 次${st.leave?`，请假 ${st.leave} 次`:''}${st.fbN ? `，作业提交 ${st.hwOk}%` : ''}</div>
   <div class="note"><b>学生自我评价：</b>${r.self_eval ? esc(r.self_eval) : '<span class="muted">学生还没写（学生在自己的链接「月度」里填）</span>'}</div>
+  ${rvRawBox(sid, ym)}
   ${typeof rvAiBox==='function' ? rvAiBox(sid, ym) : ''}
   ${ta('rv-content','本月课程内容',r.content || auto,'例：日语：N2长文、复合助词；数学：函数与数列')}
   ${ta('rv-teacher','老师评价',r.teacher_eval,'')}
+  ${ta('rv-talk','本月面谈记录（家长能看到）',r.talk,'例：学生说这个月……；我建议……；说好下个月……')}
   ${ta('rv-concl','任务 / 跟进结论',r.conclusion,'例：完成 8 次课程与两次阶段复盘')}
   ${ta('rv-next','下月重点',r.next_focus,'')}
   <div class="fields">${sel_('rv-status','状态',OPT.reviewStatus,r.status||'待跟进')}${fld('rv-note','补充说明',r.note)}</div>
@@ -263,7 +279,7 @@ function sMonthly(s){
 function pMonthly(s){
   const rs = reviewsOf(s.id).slice().reverse();
   // 家长：只显示有内容的月份（不再放 12 个月的大表格，手机上大半是空行）
-  const shown = rs.filter(r => r.content || r.self_eval || r.teacher_eval || r.conclusion || r.next_focus);
+  const shown = rs.filter(r => r.content || r.self_eval || r.teacher_eval || r.talk || r.conclusion || r.next_focus);
   return `<h2 style="font-size:19px">月度反馈</h2><div class="muted xs">教务老师整理完成后显示在这里，包括孩子的自我评价和老师评价。</div>${shown.map(r=>reviewCard(r)).join('') || '<div class="empty">还没有月度反馈</div>'}`;
 }
 
@@ -303,7 +319,7 @@ document.addEventListener('click', async e => {
     case 'tg-del': { const t=(DB.targets||[]).find(x=>x.id===v); await act('target_delete', {xid:v}, '已删除'); studentModal(t.student_id,'target'); break; }
     case 'rv-open': { const [sid,ym]=v.split('|'); reviewForm(sid, ym); break; }
     case 'rv-pick': reviewForm(v, val('rv-ym')); break;
-    case 'rv-save': { const [sid,ym]=v.split('|'); const d={content:val('rv-content'), teacher_eval:val('rv-teacher'), conclusion:val('rv-concl'), next_focus:val('rv-next'), status:val('rv-status'), note:val('rv-note')};
+    case 'rv-save': { const [sid,ym]=v.split('|'); const d={content:val('rv-content'), teacher_eval:val('rv-teacher'), talk:val('rv-talk'), talk_raw:val('rv-raw'), conclusion:val('rv-concl'), next_focus:val('rv-next'), status:val('rv-status'), note:val('rv-note')};
       await act('review_save', {sid, month:ym, d}, d.status==='已完成'?'已保存，家长现在能看到':'已保存'); if (S.page==='reviews') closeModal(); else studentModal(sid, S.page==='student' ? S.stuTab : 'review'); break; }
     case 'self-save': { const t=val('self-eval').trim(); if(!t){toast('先写一点自我评价',true);break;} await act('review_self', {month:v, txt:t}, '已提交，谢谢！'); break; }
     case 'fu-new': fuForm(v); break;

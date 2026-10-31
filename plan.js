@@ -74,15 +74,15 @@ async function planAI(cid, ym){
   return j.text;
 }
 
-/* ───────── 每月给家长的反馈（月度回访）：AI 生成（数据库第 36 步 + 小程序 plan-draft 的 review）─────────
-   读这个月的课、老师反馈、作业、成绩、计划、学生自评和作业 / 作品图片，按四栏写草稿填进表里，教务看过改过再保存 */
+/* ───────── 月度家长反馈：AI 生成（数据库第 36、38 步 + 小程序 plan-draft 的 review）─────────
+   读这个月的课、老师反馈、作业、成绩、计划、学生自评、作业 / 作品图片和面谈纪要，按五栏写草稿填进表里，教务看过改过再保存 */
 const rvAiBox = (sid, ym) => PLAN_AI && isAdmin() ? `<div class="rv-ai"><button class="btn sm" data-act="rv-ai" data-v="${sid}|${ym}">AI 生成</button>
-  <span class="muted xs">AI 会读这个月老师写的反馈、作业完成情况、成绩、学生上传的作业 / 作品图片，写一份草稿填进下面四个框；看过改过再保存</span></div>` : '';
+  <span class="muted xs">AI 会读这个月老师写的反馈、作业完成情况、成绩、学生上传的作业 / 作品图片和上面的面谈纪要，写一份草稿填进下面五个框；看过改过再保存</span></div>` : '';
 async function reviewAI(sid, ym){
   let r;
   try {
     r = await fetch(`${SB_URL}/functions/v1/plan-draft`, {method: 'POST', headers: {'Content-Type': 'application/json', apikey: SB_KEY},
-      body: JSON.stringify({k: KEY, kind: 'review', sid, ym})});
+      body: JSON.stringify({k: KEY, kind: 'review', sid, ym, talk_raw: val('rv-raw'), talk: val('rv-talk')})});   // 面谈：表里现在填的，还没保存也算
   } catch(e) { throw new Error('网络不太稳定，没连上，请稍后再试'); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.review) throw new Error((j.error || '请稍后再试').replace('AI 代写', 'AI 生成'));
@@ -90,8 +90,8 @@ async function reviewAI(sid, ym){
 }
 document.addEventListener('click', async e => {
   const a = e.target.closest('[data-act="rv-ai"]'); if (!a) return;
-  const [sid, ym] = a.dataset.v.split('|'), ids = {content: 'rv-content', teacher_eval: 'rv-teacher', conclusion: 'rv-concl', next_focus: 'rv-next'};
-  const has = ['rv-teacher', 'rv-concl', 'rv-next'].some(id => (document.getElementById(id)?.value || '').trim());
+  const [sid, ym] = a.dataset.v.split('|'), ids = {content: 'rv-content', teacher_eval: 'rv-teacher', talk: 'rv-talk', conclusion: 'rv-concl', next_focus: 'rv-next'};
+  const has = ['rv-teacher', 'rv-talk', 'rv-concl', 'rv-next'].some(id => (document.getElementById(id)?.value || '').trim());
   if (has && !confirm('框里已经有内容了，用 AI 写的草稿替换吗？（替换后不保存的话，原来的内容不会丢）')) return;
   a.disabled = true; const old = a.textContent; a.textContent = 'AI 正在看材料、写草稿…（大约半分钟）';
   try {
@@ -100,4 +100,19 @@ document.addEventListener('click', async e => {
     toast(`AI 草稿填好了${j.images ? `（看了 ${j.images} 张作业图片）` : ''}，看过改过再点「保存」`);
   } catch(err) { toast('AI 没写出来：' + err.message, true); }
   finally { a.disabled = false; a.textContent = old; }
+});
+
+/* ───────── 「AI 写法要求」：链接与备份 → AI 写法要求（只有管理能改；数据库第 38 步）─────────
+   AI 写月度家长反馈时，把这里当长期要求、优先遵守。存在数据库 app.settings 的 ai_review_rules */
+function pgAiRules(){
+  return `<div class="ph"><h2>AI 写法要求</h2></div>
+  <div class="note">点「AI 生成」写月度家长反馈时，AI 会把这里的要求当成长期规矩，<b>优先遵守</b>。一行写一条，比如怎么称呼学生、哪些事不要写给家长、语气。</div>
+  <section class="card" style="display:flex;flex-direction:column;gap:8px">
+    <textarea id="ai-rules" rows="10" maxlength="4000" placeholder="例：称呼学生用名字（不带姓）">${esc(RVX.rules || '')}</textarea>
+    <div class="row"><button class="btn pri" data-act="ai-rules-save">保存</button><span class="muted xs">改完下次点「AI 生成」就按新的写</span></div>
+  </section>`;
+}
+document.addEventListener('click', async e => {
+  if (!e.target.closest('[data-act="ai-rules-save"]')) return;
+  try { await act('ai_rules_save', {txt: val('ai-rules')}, '已保存，下次 AI 生成就按这个写'); } catch(err) { /* act() 已经提示过 */ }
 });

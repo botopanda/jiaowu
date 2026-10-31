@@ -157,7 +157,7 @@ function sFeedback2(s){
 /* ───────── 我的 ───────── */
 function sMine(s){
   const ym = TODAY.slice(0,7), r = reviewOf(s.id, ym) || {};
-  const past = reviewsOf(s.id).filter(x => x.ym !== ym && (x.content || x.self_eval || x.teacher_eval || x.next_focus)).slice().reverse();
+  const past = reviewsOf(s.id).filter(x => x.ym !== ym && (x.content || x.self_eval || x.teacher_eval || x.talk || x.next_focus)).slice().reverse();
   const jump = [['m-target','目标大学'],['m-score','成绩'],['m-month','月度自评'],['m-profile','个人档案']], ro = PRO();
   return `<h2 style="font-size:19px">${ro ? `${esc(s.name)}同学的档案` : '我的'}</h2>${typeof sMsgBox==='function' ? sMsgBox(s) : ''}
   <div class="chips">${jump.map(([id, t]) => `<button class="chip" data-act="jump" data-v="${id}">${t}</button>`).join('')}</div>
@@ -171,7 +171,7 @@ function sMine(s){
     <div class="muted xs">这个月学得怎么样？哪里进步了、哪里还觉得吃力、下个月想加强什么。老师和教务会看到。</div>
     <textarea id="self-eval" placeholder="例：词汇有进步，但有机反应链容易混淆">${esc(r.self_eval||'')}</textarea>
     <div class="row"><button class="btn pri" data-act="self-save" data-v="${ym}">${r.self_eval?'更新':'提交'}</button>${r.self_eval?'<span class="tag ok">已写</span>':''}</div></section>`}
-  ${r.teacher_eval || r.next_focus ? reviewCard({...r, ym, student_id: s.id}) : ''}
+  ${r.teacher_eval || r.talk || r.next_focus ? reviewCard({...r, ym, student_id: s.id}) : ''}
   ${past.length ? `<details class="sh-more"><summary>以前的月度反馈（${past.length}）</summary>${past.map(x => reviewCard(x)).join('')}</details>` : ''}
   <h3 class="sh-sec" id="m-profile">个人档案</h3>
   <details class="card"><summary class="muted small">${ro ? '点开看孩子的档案' : '点开看我的档案'}</summary>${profilePage(s, {hideEmpty: true})}</details>`;

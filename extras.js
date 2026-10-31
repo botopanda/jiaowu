@@ -135,7 +135,7 @@ function pgBackup(){
       <div class="stat"><small>课次</small><b>${all.lessons.length}</b></div><div class="stat"><small>课后反馈</small><b>${all.feedbacks.length}</b></div></div>
     <div class="row"><button class="btn pri" data-act="backup">导出全部数据（下载备份文件）</button>
       <span class="muted small">${last ? `上次导出：${esc(last)}` : '还没有导出过'}</span></div>
-    <div class="muted xs">包括：学生、老师、课程、课表、反馈、作业、请假申请、月计划、成绩、出愿目标、月度家长反馈、跟进记录、通关点检表、院校库、链接。<br>
+    <div class="muted xs">包括：学生、老师、课程、课表、反馈、作业、请假申请、月计划、成绩、出愿目标、月度家长反馈（含面谈原始纪要）、跟进记录、通关点检表、院校库、链接、AI 写法要求。<br>
       上传的照片和 PDF 本身不在这个文件里（文件里只记录它们的地址），照片仍然保存在服务器上。${isOwner() && S.book !== 'all' ? '<br><b>注意：</b>现在是「' + (S.book === 'mine' ? 'Panda' : 'Project K') + '」视图，导出的仍然是全部数据。' : ''}</div>
   </section>`;
 }
@@ -145,7 +145,7 @@ document.addEventListener('click', async e => {
   try {
     let schools = []; try { schools = await rpc('programs_load') || []; } catch(err) {}
     let checks = CK; try { checks = await rpc('checks_load'); } catch(err) {}
-    const data = {exported_at: new Date().toISOString(), by: ME().name, system: '学生教务管理系统', data: DB_ALL || DB, checklists: checks, schools};
+    const data = {exported_at: new Date().toISOString(), by: ME().name, system: '学生教务管理系统', data: DB_ALL || DB, checklists: checks, schools, review_raw: RVX.raw || [], ai_review_rules: RVX.rules || ''};
     const blob = new Blob([JSON.stringify(data, null, 1)], {type: 'application/json'});
     const day = TODAY || new Date().toISOString().slice(0, 10);
     const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `教务系统备份_${day}.json`;

@@ -213,6 +213,7 @@ async function load(){
   if (typeof cvLoad === 'function') await cvLoad();   // 老师履历（teacher_cv.js）
   if (typeof msgLoad === 'function') await msgLoad();   // 学生留言（msgs.js）
   if (typeof wkLoad === 'function') await wkLoad();   // 今日单词记住的词（word.js）
+  if (typeof rvxLoad === 'function') await rvxLoad();   // 面谈原始纪要、AI 写法要求（track.js，只有教务）
   DB_ALL = DB; DB = bookView(DB_ALL);   // 总管理：按「全部 / Project K / Panda」筛选；其他人原样
 }
 // 点菜单、切回这个网页时：先马上显示，再在后台取最新数据（别人刚写的反馈、刚排的课）再画一遍
@@ -397,8 +398,8 @@ function pgTodo(){
   return `<div class="ph"><h2>待处理</h2></div>${tabBar(ts, S.todoTab, 'todo-tab')}${subPage(body())}`;
 }
 function pgSys(){
-  const t = S.sysTab==='backup' ? 'backup' : 'links';
-  return `<div class="ph"><h2>链接与备份</h2></div>${tabBar([['links','链接与权限'],['backup','数据备份']], t, 'sys-tab')}${subPage(t==='backup' ? pgBackup() : pgLinks())}`;
+  const t = ['backup','ai'].includes(S.sysTab) ? S.sysTab : 'links';
+  return `<div class="ph"><h2>链接与备份</h2></div>${tabBar([['links','链接与权限'],['backup','数据备份'],['ai','AI 写法要求']], t, 'sys-tab')}${subPage(t==='backup' ? pgBackup() : t==='ai' ? pgAiRules() : pgLinks())}`;
 }
 // 旧的菜单名都能跳到新位置（总览、学生页里的「去处理」「去审批」按钮用的还是这些名字）
 const PAGE_OLD = {requests:['todo','req'], 'requests-ch':['todo','ch'], feedback:['todo','fb'], 'feedback-missing':['todo','fb'], msgs:['todo','msg'], followups:['todo','fu'], links:['sys','links'], backup:['sys','backup']};

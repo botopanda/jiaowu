@@ -707,3 +707,8 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .pg-tabs .cnt{display:inline-block;min-width:18px;padding:0 5px;margin-left:2px;border-radius:9px;background:var(--seal);color:#fff;font-size:11.5px;line-height:18px;text-align:center;font-weight:700;font-family:var(--f-num)}
 .ph-sub{justify-content:flex-end}
 .ph-sub:empty{display:none}
+/* 月度家长反馈：面谈原始纪要（只给 AI 看） */
+.rv-raw{border:1px dashed var(--line);border-radius:var(--r);padding:8px 10px;background:var(--sunk)}
+.rv-raw summary{cursor:pointer}
+.rv-raw[open]{display:flex;flex-direction:column;gap:6px}
+.rv-raw textarea{width:100%;min-height:120px}
