@@ -23,7 +23,7 @@ function pgStudent(){
   const id = s.id, ym = TODAY.slice(0, 7), tab = S.stuTab || 'home';
   const ps = personOf('student', 'student_id', id), pp = personOf('parent', 'student_id', id);
   const sub = [s.code, s.direction || s.track, s.grad ? '大学院' : '', s.target_ym ? `目标 ${s.target_ym}` : '', s.loc, s.staff ? `负责教务 ${s.staff}` : ''].filter(Boolean);
-  const more = [isTop() ? `<button class="btn sm" data-act="student-form" data-v="${id}">编辑基本资料</button>` : '',
+  const more = [typeof tsBtn === 'function' ? tsBtn(id) : '', isTop() ? `<button class="btn sm" data-act="student-form" data-v="${id}">编辑基本资料</button>` : '',
     typeof mrBtn === 'function' ? mrBtn(id) : '', typeof wkBtn === 'function' ? wkBtn(id) : '',
     ps ? `<button class="btn sm" data-act="copy-link" data-v="${ps.key}">复制学生链接</button>` : '', pp ? `<button class="btn sm" data-act="copy-link" data-v="${pp.key}">复制家长链接</button>` : ''].filter(Boolean).join('');
   const head = `<div class="sp-head"><button class="sp-back" data-act="page" data-v="students">‹ 学生档案</button>

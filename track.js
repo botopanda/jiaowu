@@ -214,19 +214,34 @@ function targetForm(sid, tid, pre){
   <div class="fields">${sel_('tg-status','出愿状态',OPT.applyStatus,t.status)}${sel_('tg-doc','资料状态',OPT.docStatus,t.doc_status)}${fld('tg-next','下一步',t.next_step,'placeholder="例：整理志望理由书"')}</div>
   <div class="row"><button class="btn pri" data-act="tg-save" data-v="${sid}|${tid||''}">保存</button>${tid?`<span id="tg-del-row"><button class="btn danger sm" data-act="tg-del-ask" data-v="${tid}">删除这所</button></span>`:''}</div>`, true);
 }
-// 面谈原始纪要：只给 AI 看，家长、学生、任课老师都看不到（数据库第 38 步，单独一张表，网页另外取）
+// 只给 AI 看的材料：面谈原始纪要（第 38 步）、任课老师说的（第 39 步）
+// 家长、学生、任课老师都看不到（单独一张表，打开网站的大包里不带，教务网页另外取）
 let RVX = {raw: [], rules: ''};
 async function rvxLoad(){
   RVX = {raw: [], rules: ''};
   if (DB.me.role !== 'admin') return;
   try { RVX = await rpc('review_raw_load') || RVX; } catch(e) { /* 第 38 步还没运行 */ }
 }
-const rawOf = (sid, ym) => (RVX.raw || []).find(x => x.student_id===sid && x.ym===ym)?.text || '';
+const rawRow = (sid, ym) => (RVX.raw || []).find(x => x.student_id===sid && x.ym===ym) || {};
 function rvRawBox(sid, ym){
-  const raw = rawOf(sid, ym);
-  return `<details class="rv-raw" ${raw?'open':''}><summary><b>面谈原始纪要</b> <span class="muted xs">只给 AI 看，家长、学生看不到</span>${raw?' <span class="tag ok">已贴</span>':''}</summary>
-    <div class="muted xs">把腾讯会议 AI 纪要、Plaud 总结或你自己的笔记原样贴在这里。点「AI 生成」时，AI 会读它，只挑能给家长看的写进下面的「本月面谈记录」。</div>
-    <textarea id="rv-raw" rows="6" placeholder="贴面谈纪要原文">${esc(raw)}</textarea></details>`;
+  const x = rawRow(sid, ym), raw = x.text || '', tr = x.teacher || '', n = [raw, tr].filter(Boolean).length;
+  return `<details class="rv-raw" ${n?'open':''}><summary><b>只给 AI 看的材料</b> <span class="muted xs">家长、学生看不到</span>${n?` <span class="tag ok">已贴 ${n} 样</span>`:''}</summary>
+    <label class="field"><span>面谈原始纪要</span><textarea id="rv-raw" rows="5" placeholder="腾讯会议 AI 纪要、录音逐字稿、Plaud 总结或你自己的笔记，原样贴进来（几份可以贴在一起）">${esc(raw)}</textarea></label>
+    <div class="muted xs" style="margin-top:-4px">AI 只挑能给家长看的写进下面的「本月面谈记录」。</div>
+    <label class="field"><span>任课老师说的</span><textarea id="rv-traw" rows="4" placeholder="平时问老师「孩子最近怎么样」听到的，一条一行，写上日期和哪位老师">${esc(tr)}</textarea></label>
+    <div class="muted xs" style="margin-top:-4px">学生页「更多 → 记一条老师说的」记的会自动加到这里。AI 写「老师评价」时参考，转述时只挑能给家长看的。</div></details>`;
+}
+// 记一条老师说的：随时问老师「孩子最近怎么样」，按日期加到那个月的「任课老师说的」（数据库第 39 步，只给 AI 看）
+const tsBtn = sid => isAdmin() ? `<button class="btn sm" data-act="ts-open" data-v="${sid}">记一条老师说的</button>` : '';
+function tsForm(sid){
+  const ts = [...new Set(DB.courses.filter(c => c.student_id===sid && !isStaffT(c.teacher_id)).map(c => c.teacher_id))];
+  const had = rawRow(sid, TODAY.slice(0,7)).teacher || '';
+  openModal(`${mHead(`${esc(stu(sid).name)} · 记一条老师说的`)}
+  <div class="note">问老师「孩子最近怎么样」，把老师的话记在这里。<b>只给 AI 看，家长、学生、任课老师都看不到</b>；写这个月的家长反馈时，AI 会参考。</div>
+  <div class="fields">${dt('ts-date','日期',TODAY)}<label class="field"><span>哪位老师</span><select id="ts-t">${ts.map(t=>`<option value="${t}">${esc(tea(t).name)}</option>`).join('')}<option value="">不写</option></select></label></div>
+  ${ta('ts-text','老师说的','','例：最近透视进步挺快，就是课后练得少，三点透视还要再讲一节')}
+  <div class="row"><button class="btn pri" data-act="ts-save" data-v="${sid}">记下来</button></div>
+  ${had ? `<details><summary class="muted small">这个月已经记的</summary><div class="small" style="white-space:pre-wrap;margin-top:4px">${esc(had)}</div></details>` : ''}`, true);
 }
 function reviewForm(sid, ym){
   const r = reviewOf(sid, ym) || {}, st = monthStats(sid, ym);
@@ -320,8 +335,13 @@ document.addEventListener('click', async e => {
     case 'tg-del': { const t=(DB.targets||[]).find(x=>x.id===v); await act('target_delete', {xid:v}, '已删除'); studentModal(t.student_id,'target'); break; }
     case 'rv-open': { const [sid,ym]=v.split('|'); reviewForm(sid, ym); break; }
     case 'rv-pick': reviewForm(v, val('rv-ym')); break;
-    case 'rv-save': { const [sid,ym]=v.split('|'); const d={content:val('rv-content'), teacher_eval:val('rv-teacher'), talk:val('rv-talk'), talk_raw:val('rv-raw'), conclusion:val('rv-concl'), next_focus:val('rv-next'), status:val('rv-status'), note:val('rv-note')};
+    case 'rv-save': { const [sid,ym]=v.split('|'); const d={content:val('rv-content'), teacher_eval:val('rv-teacher'), talk:val('rv-talk'), talk_raw:val('rv-raw'), teacher_raw:val('rv-traw'), conclusion:val('rv-concl'), next_focus:val('rv-next'), status:val('rv-status'), note:val('rv-note')};
       await act('review_save', {sid, month:ym, d}, d.status==='已完成'?'已保存，家长现在能看到':'已保存'); if (S.page==='reviews') closeModal(); else studentModal(sid, S.page==='student' ? S.stuTab : 'review'); break; }
+    case 'ts-open': tsForm(v); break;
+    case 'ts-save': { const d=val('ts-date'), txt=val('ts-text').trim(), tid=val('ts-t');
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){toast('请填写日期',true);break;} if(!txt){toast('先写老师说了什么',true);break;}
+      const n = tid ? tea(tid).name : '', who = n ? (/老师$/.test(n) ? n : n + '老师') + '：' : '';
+      await act('review_teacher_add', {sid:v, month:d.slice(0,7), txt:`${+d.slice(5,7)}/${+d.slice(8,10)} ${who}${txt.replace(/\s*\n\s*/g,' ')}`}, '记下了，写这个月的家长反馈时 AI 会参考'); closeModal(); break; }
     case 'self-save': { const t=val('self-eval').trim(); if(!t){toast('先写一点自我评价',true);break;} await act('review_self', {month:v, txt:t}, '已提交，谢谢！'); break; }
     case 'fu-new': fuForm(v); break;
     case 'fu-new-pick': { const sid=val('fu-stu'); if(!sid){toast('先选择学生',true);break;} fuForm(sid); break; }

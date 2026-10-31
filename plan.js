@@ -77,12 +77,12 @@ async function planAI(cid, ym){
 /* ───────── 月度家长反馈：AI 生成（数据库第 36、38 步 + 小程序 plan-draft 的 review）─────────
    读这个月的课、老师反馈、作业、成绩、计划、学生自评、作业 / 作品图片和面谈纪要，按五栏写草稿填进表里，教务看过改过再保存 */
 const rvAiBox = (sid, ym) => PLAN_AI && isAdmin() ? `<div class="rv-ai"><button class="btn sm" data-act="rv-ai" data-v="${sid}|${ym}">AI 生成</button>
-  <span class="muted xs">AI 会读这个月老师写的反馈、作业完成情况、成绩、学生上传的作业 / 作品图片和上面的面谈纪要，写一份草稿填进下面五个框；看过改过再保存</span></div>` : '';
+  <span class="muted xs">AI 会读这个月老师写的反馈、作业完成情况、成绩、学生上传的作业 / 作品图片和上面只给 AI 看的材料，写一份草稿填进下面五个框；看过改过再保存</span></div>` : '';
 async function reviewAI(sid, ym){
   let r;
   try {
     r = await fetch(`${SB_URL}/functions/v1/plan-draft`, {method: 'POST', headers: {'Content-Type': 'application/json', apikey: SB_KEY},
-      body: JSON.stringify({k: KEY, kind: 'review', sid, ym, talk_raw: val('rv-raw'), talk: val('rv-talk')})});   // 面谈：表里现在填的，还没保存也算
+      body: JSON.stringify({k: KEY, kind: 'review', sid, ym, talk_raw: val('rv-raw'), teacher_raw: val('rv-traw'), talk: val('rv-talk')})});   // 面谈、任课老师说的：表里现在填的，还没保存也算
   } catch(e) { throw new Error('网络不太稳定，没连上，请稍后再试'); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.review) throw new Error((j.error || '请稍后再试').replace('AI 代写', 'AI 生成'));

@@ -135,7 +135,7 @@ function pgBackup(){
       <div class="stat"><small>课次</small><b>${all.lessons.length}</b></div><div class="stat"><small>课后反馈</small><b>${all.feedbacks.length}</b></div></div>
     <div class="row"><button class="btn pri" data-act="backup">导出全部数据（下载备份文件）</button>
       <span class="muted small">${last ? `上次导出：${esc(last)}` : '还没有导出过'}</span></div>
-    <div class="muted xs">包括：学生、老师、课程、课表、反馈、作业、请假申请、月计划、成绩、出愿目标、月度家长反馈（含面谈原始纪要）、跟进记录、通关点检表、院校库、链接、AI 写法要求。<br>
+    <div class="muted xs">包括：学生、老师、课程、课表、反馈、作业、请假申请、月计划、成绩、出愿目标、月度家长反馈（含面谈原始纪要、任课老师说的）、跟进记录、通关点检表、院校库、链接、AI 写法要求。<br>
       上传的照片和 PDF 本身不在这个文件里（文件里只记录它们的地址），照片仍然保存在服务器上。${isOwner() && S.book !== 'all' ? '<br><b>注意：</b>现在是「' + (S.book === 'mine' ? 'Panda' : 'Project K') + '」视图，导出的仍然是全部数据。' : ''}</div>
   </section>`;
 }
