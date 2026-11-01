@@ -84,7 +84,7 @@ async function ownerAfterSave(kind, id, before){
   if (!isOwner()) return;
   if (kind === 'teacher') {
     const bk = val('tf-book'); if ((before || 'K') === bk) return;
-    await rpc('owner_set_teacher_book', {tid: id, bk});
+    return ownerBookChange(id, bk);   // 和链接页同一套：要另发完整链接时先提醒、再复制（复查 R-02）
   } else {
     const want = val('sf-book') === 'mine'; if (!!before === want) return;
     await rpc('owner_set_private', {kind, xid: id, on_: want});
@@ -126,10 +126,10 @@ const ownerLinkTag = p => { if (!ownerUI() || p.role !== 'teacher') return ''; c
 const ownerLinkToggle = p => ownerUI() && p.role === 'teacher'
   ? `<select class="t-book-sel" data-tid="${p.teacher_id}" aria-label="老师归属">${[['K','只属于 Project K'],['mine','只属于 Panda'],['both','两边都教']].map(([k, l]) => `<option value="${k}" ${((tea(p.teacher_id) || {}).book || 'K') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>` : '';
 const ownerFullLinkBtn = t => '';
-document.addEventListener('change', async e => {
-  const el = e.target; if (!el.classList || !el.classList.contains('t-book-sel')) return;
-  const tid = el.dataset.tid, bk = el.value, t = tea(tid);
-  // 第 40 步起：改成「两边都教 / Panda」时如果还没有完整链接，数据库另生成一条（原来的链接不升级，只看 Project K）
+// 改老师归属（链接页的下拉、老师资料表单都走这里）。第 40 步起：改成「两边都教 / Panda」时如果还没有可用的完整链接，
+// 数据库另生成一条（原来的链接不升级，只看 Project K）——先提醒，生成后自动复制，要发给老师
+async function ownerBookChange(tid, bk){
+  const t = tea(tid);
   const fullOf = () => ((DB_ALL || DB).people || []).find(x => x.role === 'teacher' && x.teacher_id === tid && x.full_view && x.active);
   const newFull = bk !== 'K' && !fullOf();
   if (newFull && !confirm(`${t.name} 改成${bk === 'both' ? '两边都教' : '只属于 Panda'}：系统会另外生成一条完整链接（看得到 Panda 学生），要发给老师，请他以后用新链接。老师原来那条链接以后只看得到 Project K 的学生。确定吗？`)) { render(); return; }
@@ -140,7 +140,12 @@ document.addEventListener('change', async e => {
     await act('owner_set_teacher_book', {tid, bk}, newFull ? '' : msg);
     const f = newFull && fullOf();
     if (f) copyText(linkOf(f.key), `已生成 ${t.name} 的新完整链接并复制，发给老师时告诉他「以后用这条」`);
+    else if (newFull) toast(`归属已改好，但没找到 ${t.name} 的完整链接，请到「链接与备份」看一下`, true);
   } catch(err) { render(); }
+}
+document.addEventListener('change', async e => {
+  const el = e.target; if (!el.classList || !el.classList.contains('t-book-sel')) return;
+  await ownerBookChange(el.dataset.tid, el.value);
 });
 document.addEventListener('click', async e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
