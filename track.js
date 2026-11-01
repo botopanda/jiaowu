@@ -225,7 +225,7 @@ async function rvxLoad(){
 const rawRow = (sid, ym) => (RVX.raw || []).find(x => x.student_id===sid && x.ym===ym) || {};
 function rvRawBox(sid, ym){
   const x = rawRow(sid, ym), raw = x.text || '', tr = x.teacher || '', n = [raw, tr].filter(Boolean).length;
-  return `<details class="rv-raw" ${n?'open':''}><summary><b>只给 AI 看的材料</b> <span class="muted xs">家长、学生看不到</span>${n?` <span class="tag ok">已贴 ${n} 样</span>`:''}</summary>
+  return `<details class="rv-raw" ${n?'open':''}><summary><b>只给 AI 看的材料</b> <span class="muted xs">家长、学生看不到；点「AI 生成」时会原样发给 AI 写草稿</span>${n?` <span class="tag ok">已贴 ${n} 样</span>`:''}</summary>
     <label class="field"><span>面谈原始纪要</span><textarea id="rv-raw" rows="5" placeholder="腾讯会议 AI 纪要、录音逐字稿、Plaud 总结或你自己的笔记，原样贴进来（几份可以贴在一起）">${esc(raw)}</textarea></label>
     <div class="muted xs" style="margin-top:-4px">AI 只挑能给家长看的写进下面的「本月面谈记录」。</div>
     <label class="field"><span>任课老师说的</span><textarea id="rv-traw" rows="4" placeholder="平时问老师「孩子最近怎么样」听到的，一条一行，写上日期和哪位老师">${esc(tr)}</textarea></label>

@@ -12,6 +12,8 @@ const R_DATES = SF_R.filter(f => f.t === 'date').map(f => f.k);
 const P_GROUPS = [...new Set(SF_P.map(f => f.g))];
 // 专业 / 轮次的某一项（固定栏直接读，其他从 info 里读）
 const pv = (p, k) => P_CORE.includes(k) ? (p[k] ?? '') : ((p.info || {})[k] ?? '');
+// 院校库的网址只认 http / https 开头的（导入的表里如果混进别的协议，就不显示按钮；体检 C-13）
+const webUrl = (p, k) => { const u = String(pv(p, k) || '').trim(); return /^https?:\/\//i.test(u) ? u : ''; };
 const rv = (r, k) => R_CORE.includes(k) ? (r[k] ?? '') : ((r.info || {})[k] ?? '');
 
 async function progLoad(force){
@@ -79,7 +81,7 @@ function progCard(p){
       </tbody></table></div>` : '<div class="muted small">还没有填入试日期</div>'}
       ${pv(p,'campus')?`<div class="small"><span class="muted">校区：</span>${esc(pv(p,'campus'))}</div>`:''}
       <div class="pg-grps">${groups}</div>
-      <div class="row">${pv(p,'url')?`<a class="btn sm" href="${esc(pv(p,'url'))}" target="_blank" rel="noopener">官方入试页面</a>`:''}${pv(p,'url2')?`<a class="btn sm" href="${esc(pv(p,'url2'))}" target="_blank" rel="noopener">募集要项 PDF</a>`:''}
+      <div class="row">${webUrl(p,'url')?`<a class="btn sm" href="${esc(webUrl(p,'url'))}" target="_blank" rel="noopener">官方入试页面</a>`:''}${webUrl(p,'url2')?`<a class="btn sm" href="${esc(webUrl(p,'url2'))}" target="_blank" rel="noopener">募集要项 PDF</a>`:''}
         <span class="muted xs">${p.updated_by?`${esc(p.updated_by)} ${String(p.updated_at||'').slice(0,10)} 更新`:''}</span>
         <span style="margin-left:auto" class="row"><button class="btn sm" data-act="prog-edit" data-v="${p.id}">编辑</button><button class="btn sm danger" data-act="prog-del" data-v="${p.id}">删除</button></span></div>
     </div></details>`;

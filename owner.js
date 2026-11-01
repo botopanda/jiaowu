@@ -112,7 +112,8 @@ function ownerSync(force){
 
 /* ───────── 老师链接：一位老师一行（总管理在「全部 / Panda」里看） ─────────
    两边都教的老师有两条链接：老师自己用的完整链接，和一条只给潘、金看的普通链接（总管理这边不显示）。
-   切换归属时，数据库会自动处理这两条链接，老师自己的链接永远不变。 */
+   切换归属时，数据库会自动处理这两条链接。第 40 步起：从 Project K 改成「两边都教 / Panda」时另生成一条完整链接，
+   原来那条（潘、金可能看过）不升级，留作只看 Project K 的普通链接。 */
 const T_BOOK_TAG = {K: ['mute', '只属于 Project K'], mine: ['gold', '只属于 Panda'], both: ['blue', '两边都教 · 完整链接']};
 // 只给潘、金看的那条普通链接（两边都教的老师才有）
 const ownerShadow = p => ownerUI() && p.role === 'teacher' && (tea(p.teacher_id) || {}).book === 'both' && !p.full_view;
@@ -128,10 +129,18 @@ const ownerFullLinkBtn = t => '';
 document.addEventListener('change', async e => {
   const el = e.target; if (!el.classList || !el.classList.contains('t-book-sel')) return;
   const tid = el.dataset.tid, bk = el.value, t = tea(tid);
-  const msg = {K: `${t.name} 改成只属于 Project K。老师原来的链接不变，以后只看得到 Project K 的学生`,
-               mine: `${t.name} 改成只属于 Panda。老师原来的链接不变，潘老师、金老师那边看不到这位老师了`,
-               both: `${t.name} 改成两边都教。老师原来的链接不变，现在两边的学生都看得到；潘老师、金老师那边看到的是一条只看 Project K 的链接`}[bk];
-  try { await act('owner_set_teacher_book', {tid, bk}, msg); } catch(err) { render(); }
+  // 第 40 步起：改成「两边都教 / Panda」时如果还没有完整链接，数据库另生成一条（原来的链接不升级，只看 Project K）
+  const fullOf = () => ((DB_ALL || DB).people || []).find(x => x.role === 'teacher' && x.teacher_id === tid && x.full_view && x.active);
+  const newFull = bk !== 'K' && !fullOf();
+  if (newFull && !confirm(`${t.name} 改成${bk === 'both' ? '两边都教' : '只属于 Panda'}：系统会另外生成一条完整链接（看得到 Panda 学生），要发给老师，请他以后用新链接。老师原来那条链接以后只看得到 Project K 的学生。确定吗？`)) { render(); return; }
+  const msg = {K: `${t.name} 改成只属于 Project K。老师的链接以后只看得到 Project K 的学生`,
+               mine: `${t.name} 改成只属于 Panda。潘老师、金老师那边看不到这位老师了`,
+               both: `${t.name} 改成两边都教。潘老师、金老师那边看到的是一条只看 Project K 的链接`}[bk];
+  try {
+    await act('owner_set_teacher_book', {tid, bk}, newFull ? '' : msg);
+    const f = newFull && fullOf();
+    if (f) copyText(linkOf(f.key), `已生成 ${t.name} 的新完整链接并复制，发给老师时告诉他「以后用这条」`);
+  } catch(err) { render(); }
 });
 document.addEventListener('click', async e => {
   const a = e.target.closest('[data-act]'); if (!a) return;

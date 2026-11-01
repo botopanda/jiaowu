@@ -27,7 +27,7 @@ async function readShort(){
     if (!k) return false;
     KEY = k; try { localStorage.setItem('jw_k', k); } catch(e) {}
     return true;
-  } catch(e) { return true; }
+  } catch(e) { return 'net'; }   // 网络出错：不能接着用这台设备上次记住的身份
 }
 
 async function rpc(fn, args = {}){
@@ -265,7 +265,7 @@ const isT = () => ME().role==='teacher';
 const chPend = () => (DB.changes||[]).filter(x => x.status==='pending');
 const chPendOf = lid => chPend().find(x => x.lesson_id===lid);
 const chKind = {add:'排课', move:'调课', delete:'删课'};
-const tShow = t => t;
+const tShow = t => esc(t);   // 申请里的时间是老师那边发来的，显示前一定转义（体检 C-01）
 function chText(x){
   if (x.kind==='add'){ const ds = x.d.dates || []; return `${ds.length} 节：${ds.slice(0,8).map(sMD).join('、')}${ds.length>8?' 等':''} · ${tShow(x.d.st)}–${tShow(x.d.et)}${x.d.makeup?' · 补课':''}${x.d.kind?` · ${esc(x.d.kind)}`:''}${x.d.topic?` · 内容：${esc(x.d.topic)}`:''}`; }
   const o = x.old ? `${sMD(x.old.date)} ${tShow(x.old.start)}–${tShow(x.old.end)}` : '（这节课已不在）';
@@ -984,12 +984,14 @@ document.addEventListener('click', async e => {
     case 'save-student': { if(!val('sf-name').trim()){toast('请填写姓名',true);break;}
       const d={name:val('sf-name'), track:val('sf-track'), grad:val('sf-grad')==='true', loc:val('sf-loc'), tz:val('sf-tz'), staff:val('sf-staff'), memo:val('sf-memo')};
       if (v){ d.id=v; d.active = val('sf-active')!=='false'; }
-      const before = v ? stu(v).private : false;
+      else if (isOwner()) d.private = val('sf-book')==='mine';   // 新建 Panda 学生：一次存好归属，不先进 Project K
+      const before = v ? stu(v).private : false;   // 新建的照样再确认一次归属（数据库已经存好就什么都不做）
       const sid = await act('admin_save_student', {d}, v?'已保存':'已添加。接下来在「概况与课程」里给他添加课程'); await ownerAfterSave('student', sid, before); studentModal(sid,'info'); break; }
     case 'teacher-form': teacherForm(v); break;
     case 'save-teacher': { if(!val('tf-name').trim()){toast('请填写姓名',true);break;}
       const d={name:val('tf-name'), subject:val('tf-subject'), loc:val('tf-loc'), tz:val('tf-tz'), cat:val('tf-cat')||'学科'};
       if (v){ d.id=v; d.active = val('tf-active')!=='false'; }
+      else if (isOwner()) d.book = val('tf-book') || 'K';
       const before = v ? tea(v).book : 'K';
       const tid = await act('admin_save_teacher', {d}, v?'已保存':'已添加，老师的专属链接也生成好了'); await ownerAfterSave('teacher', v || tid, before); closeModal(); break; }
     case 'add-course': { if(!subjVal('cf-subj')){toast('请选择科目',true);break;}
@@ -1126,7 +1128,9 @@ document.addEventListener('keydown', e => { if (e.key==='Escape' && mroot.innerH
 
 /* ───────── 启动 ───────── */
 document.addEventListener('app-ready', async function start(){
-  if (!(await readShort())){ try{ localStorage.removeItem('jw_k'); }catch(_){} app.innerHTML = `<div class="center"><h2>这个链接已失效</h2><p class="muted">链接可能已经停用或更换。请联系教务老师重新发一条链接。</p></div>`; return; }
+  const sr = await readShort();
+  if (sr === 'net'){ app.innerHTML = `<div class="center"><h2>暂时打不开</h2><p class="muted">网络好像不太稳定，请稍后刷新再试。</p><p><button class="btn" onclick="location.reload()">刷新</button></p></div>`; return; }
+  if (!sr){ try{ localStorage.removeItem('jw_k'); }catch(_){} app.innerHTML = `<div class="center"><h2>这个链接已失效</h2><p class="muted">链接可能已经停用或更换。请联系教务老师重新发一条链接。</p></div>`; return; }
   if (!KEY){ app.innerHTML = `<div class="center"><h2>学生教务管理系统</h2><p class="muted">请用教务老师发给你的专属链接打开。</p></div>`; return; }
   try { await load(); render(); }
   catch(e){
