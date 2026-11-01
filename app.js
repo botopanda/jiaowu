@@ -993,7 +993,10 @@ document.addEventListener('click', async e => {
       if (v){ d.id=v; d.active = val('tf-active')!=='false'; }
       else if (isOwner()) d.book = val('tf-book') || 'K';
       const before = v ? tea(v).book : 'K';
-      const tid = await act('admin_save_teacher', {d}, v?'已保存':'已添加，老师的专属链接也生成好了'); await ownerAfterSave('teacher', v || tid, before); closeModal(); break; }
+      await act('admin_save_teacher', {d}, v?'已保存':'已添加，老师的专属链接也生成好了');
+      // 新建老师的归属保存时已经一起存好（第 40 步）；改已有老师的归属失败时表单不关，可以再点保存重试（复查 S-02）
+      if (v && await ownerAfterSave('teacher', v, before) === 'fail') break;
+      closeModal(); break; }
     case 'add-course': { if(!subjVal('cf-subj')){toast('请选择科目',true);break;}
       await act('admin_save_course', {d:{student_id:v, teacher_id:val('cf-t'), subject:subjVal('cf-subj'), rate:Number(val('cf-rate'))||0, cur:val('cf-cur')||'CNY'}}, '课程已添加，可以去排课了'); studentModal(v,'info'); break; }
     case 'course-edit': courseEdit(v); break;

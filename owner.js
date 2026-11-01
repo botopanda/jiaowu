@@ -132,7 +132,7 @@ async function ownerBookChange(tid, bk){
   const t = tea(tid);
   const fullOf = () => ((DB_ALL || DB).people || []).find(x => x.role === 'teacher' && x.teacher_id === tid && x.full_view && x.active);
   const newFull = bk !== 'K' && !fullOf();
-  if (newFull && !confirm(`${t.name} 改成${bk === 'both' ? '两边都教' : '只属于 Panda'}：系统会另外生成一条完整链接（看得到 Panda 学生），要发给老师，请他以后用新链接。老师原来那条链接以后只看得到 Project K 的学生。确定吗？`)) { render(); return; }
+  if (newFull && !confirm(`${t.name} 改成${bk === 'both' ? '两边都教' : '只属于 Panda'}：系统会另外生成一条完整链接（看得到 Panda 学生），要发给老师，请他以后用新链接。老师原来那条链接以后只看得到 Project K 的学生。确定吗？`)) { render(); toast('归属没有改'); return 'cancel'; }
   const msg = {K: `${t.name} 改成只属于 Project K。老师的链接以后只看得到 Project K 的学生`,
                mine: `${t.name} 改成只属于 Panda。潘老师、金老师那边看不到这位老师了`,
                both: `${t.name} 改成两边都教。潘老师、金老师那边看到的是一条只看 Project K 的链接`}[bk];
@@ -141,7 +141,8 @@ async function ownerBookChange(tid, bk){
     const f = newFull && fullOf();
     if (f) copyText(linkOf(f.key), `已生成 ${t.name} 的新完整链接并复制，发给老师时告诉他「以后用这条」`);
     else if (newFull) toast(`归属已改好，但没找到 ${t.name} 的完整链接，请到「链接与备份」看一下`, true);
-  } catch(err) { render(); }
+    return 'ok';
+  } catch(err) { render(); return 'fail'; }   // act() 已经提示过错误；老师资料表单看到 'fail' 就不关，可以重试
 }
 document.addEventListener('change', async e => {
   const el = e.target; if (!el.classList || !el.classList.contains('t-book-sel')) return;
