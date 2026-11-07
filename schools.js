@@ -139,6 +139,7 @@ function tgCollect(){
   const d = {tier:g('tg-tier'), seq:g('tg-seq'), school:g('tg-school'), exam_way:g('tg-way'), requirement:g('tg-req'), score_req:g('tg-score'), status:g('tg-status'), doc_status:g('tg-doc'), next_step:g('tg-next'), program_id:g('tg-pid'), round_id:g('tg-rid')};
   DATE_KEYS.forEach(([k]) => d[k] = g('tg-'+k));
   const xi = tgExamInfo(); if (xi) d.exam_info = xi;   // 考试时间、备注（去院校库选完回来还在）
+  d.updated_at = g('tg-ver');   // 打开窗口时这所学校的「最后改动时间」（第 46 步：保存时对不上就不保存）
   return d;
 }
 

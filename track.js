@@ -214,7 +214,7 @@ function targetForm(sid, tid, pre){
   const t = pre ? {...base, ...pre} : base;
   openModal(`${mHead(tid?'编辑大学目标':'添加大学目标')}
   <div class="row" style="justify-content:space-between"><span class="muted xs">${t.program_id?'<span class="tag ok">来自院校库</span> 日期和要求可以再改':'可以从院校库一键带入日期和要求'}</span><button class="btn sm" data-act="tg-pick" data-v="${sid}|${tid||''}">从院校库选</button></div>
-  <input type="hidden" id="tg-pid" value="${t.program_id||''}"><input type="hidden" id="tg-rid" value="${t.round_id||''}">
+  <input type="hidden" id="tg-pid" value="${t.program_id||''}"><input type="hidden" id="tg-rid" value="${t.round_id||''}"><input type="hidden" id="tg-ver" value="${esc(t.updated_at||'')}">
   <div class="fields">${sel_('tg-tier','级别',OPT.tier,t.tier,'选择…')}${fld('tg-seq','序号',t.seq,'inputmode="numeric"')}${fld('tg-school','大学 / 专业 *',t.school,'placeholder="例：早稻田大学／社会科学部"')}</div>
   <div class="fields">${fld('tg-way','入试方式',t.exam_way,'placeholder="例：留学生入试 / EJU利用"')}${fld('tg-req','入试要求',t.requirement,'placeholder="例：EJU、英语成绩、面试"')}${fld('tg-score','分数要求',t.score_req,'placeholder="例：EJU日语300+"')}</div>
   <b class="small">出愿时间</b>
@@ -348,7 +348,7 @@ document.addEventListener('click', async e => {
     case 'tg-edit': { const t=(DB.targets||[]).find(x=>x.id===v); targetForm(t.student_id, v); break; }
     case 'tg-save': { const [sid,tid]=v.split('|'); if(!val('tg-school').trim()){toast('请填写大学／专业',true);break;} if(!val('tg-tier')){toast('请选择级别',true);break;}
       const d={student_id:sid, tier:val('tg-tier'), seq:val('tg-seq'), school:val('tg-school'), exam_way:val('tg-way'), requirement:val('tg-req'), score_req:val('tg-score'), status:val('tg-status'), doc_status:val('tg-doc'), next_step:val('tg-next'), program_id:val('tg-pid'), round_id:val('tg-rid')};
-      DATE_KEYS.forEach(([kk])=>d[kk]=val('tg-'+kk)); if(tid) d.id=tid; const xi=tgExamInfo(); if(xi) d.exam_info=xi;
+      DATE_KEYS.forEach(([kk])=>d[kk]=val('tg-'+kk)); if(tid){ d.id=tid; d.ver=val('tg-ver'); } const xi=tgExamInfo(); if(xi) d.exam_info=xi;
       await act('target_save', {d}, '已保存'); studentModal(sid,'target'); break; }
     case 'tg-del-ask': document.getElementById('tg-del-row').innerHTML=`<span class="small">确定删除？</span><button class="btn danger sm" data-act="tg-del" data-v="${v}">删除</button>`; break;
     case 'tg-del': { const t=(DB.targets||[]).find(x=>x.id===v); await act('target_delete', {xid:v}, '已删除'); studentModal(t.student_id,'target'); break; }

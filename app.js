@@ -354,13 +354,15 @@ function examsOf(sids, ym){
   (DB.targets||[]).filter(t => ok(t.student_id)).forEach(t => EXAM_KEYS.forEach(([k]) => { const d = t[k]; if (!d || (ym && !d.startsWith(ym))) return;
     const inf = (t.exam_info && t.exam_info[k]) || {};
     out.push({date:d, kind:k, label:exLabel(t,k), school:t.school, sid:t.student_id, tid:t.id, time:String(inf.time||''), note:String(inf.note||'')}); }));
-  return out.sort((a,b) => a.date.localeCompare(b.date) || (a.time||'99').localeCompare(b.time||'99'));
+  return out.sort((a,b) => a.date.localeCompare(b.date) || exMin(a.time) - exMin(b.time));
 }
+// 时间里认得出的开始钟点换成分钟（「9:30–11:30」→570、「13時」→780）；没写或认不出（「上午」「待定」）排在后面
+const exMin = tm => { const m = String(tm||'').match(/(\d{1,2})\s*[:：時时点]\s*(\d{1,2})?/); return m && +m[1] < 24 ? (+m[1])*60 + (+(m[2]||0)) : 9999; };
 // 同一天、同一所学校的几场并成一块（例：东京工艺 12/12「笔试·面试」）；items 里是每一场
 function examGroups(list){
   const m = new Map();
   list.forEach(e => { const key = e.tid + '|' + e.date; m.has(key) ? m.get(key).items.push(e) : m.set(key, {...e, items:[e]}); });
-  return [...m.values()].map(g => ({...g, label: g.items.map(x => x.label).join('·'), time: g.items.map(x => x.time).find(Boolean) || ''}));
+  return [...m.values()].map(g => ({...g, label: g.items.map(x => x.label).join('·'), time: g.items.map(x => x.time).filter(Boolean).sort((a,b) => exMin(a) - exMin(b))[0] || ''}));
 }
 // 手机月历格子很窄：「一次结果」→「一次」，「最终结果」→「结果」，同一天好几场→「笔·面」
 const exCellLabel = g => g.items.length>1 ? g.items.map(x => x.label[0]).join('·') : g.label==='一次结果' ? '一次' : g.label==='最终结果' ? '结果' : g.label;

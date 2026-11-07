@@ -39,7 +39,8 @@ function examForm(o={}){
   const sid = t ? t.student_id : (o.sid || (S.calType==='s' && S.calId) || '');
   const studs = DB.students.filter(s => s.active!==false || s.id===sid).slice().sort((x, y) => pyCmp(x.name, y.name));
   const inf = editing ? ((t.exam_info||{})[o.kind] || {}) : {};
-  const kind = o.kind || 'written_date';
+  // 加考试：默认选这所学校还没有的那一种（都有了就选笔试）
+  const kind = o.kind || (t && EXAM_KEYS.map(x => x[0]).find(k => !t[k])) || 'written_date';
   lastModal = null;
   openModal(`${mHead(editing ? '修改考试' : '加考试')}
   ${editing || o.tid ? '' : exSwitch('exam')}
@@ -63,6 +64,12 @@ function examForm(o={}){
   <div class="row"><button class="btn pri" data-act="ex-save" data-v="${editing?`${o.tid}|${o.kind}`:''}">保存</button>${editing?`<button class="btn sm" data-act="exam" data-v="${o.tid}|${t[o.kind]}">返回</button>`:''}</div>`);
   exTgChanged();
 }
+// 加考试（不是修改）时：选的学校已经有这种考试，就把原来的时间、备注带出来（自己改过框里的字就不动）
+function exPrefill(){
+  if (val('ex-old')) return;
+  const t = exTarget(val('ex-tg')), k = val('ex-k'), inf = t && t[k] ? ((t.exam_info||{})[k] || {}) : {};
+  [['ex-time', inf.time], ['ex-note', inf.note]].forEach(([id, v]) => { const el = document.getElementById(id); if (el && !el.dataset.dirty) el.value = v || ''; });
+}
 function exTgOpts(sid, tid){
   if (!sid) return '<option value="">先选学生…</option>';
   const ts = targetsOf(sid);
@@ -74,7 +81,7 @@ async function exTgChanged(){
   const box = document.getElementById('ex-new-box'); if (!box) return;
   const isNew = val('ex-tg')==='__new';
   box.hidden = !isNew;
-  exWarn();
+  exPrefill(); exWarn();
   if (!isNew) return;
   try {
     const list = await progLoad(), dl = document.getElementById('dl-ex-prog');
@@ -86,8 +93,9 @@ const exProgText = p => `${p.school}／${progName(p)}`;
 function exWarn(){
   const box = document.getElementById('ex-warn'); if (!box) return;
   const t = exTarget(val('ex-tg')), k = val('ex-k'), old = val('ex-old'), d = val('ex-d');
-  box.textContent = t && t[k] && t[k]!==d && k!==old
-    ? `这所学校的「${exLabel(t,k)}」原来是 ${sMD(t[k])}，保存后改成 ${d ? sMD(d) : '这天'}。一所学校每种只记一天；另有一天的话，写在备注里。` : '';
+  box.textContent = !t || !t[k] || k===old ? ''
+    : t[k]===d ? `这所学校这天已经有「${exLabel(t,k)}」，保存会更新这一场${old?'':'（下面带出了原来的时间、备注）'}。`
+    : `这所学校的「${exLabel(t,k)}」原来是 ${sMD(t[k])}，保存后改成 ${d ? sMD(d) : '这天'}${old?'':'（原来的时间、备注已带出来）'}。一所学校每种只记一天；另有一天的话，写在备注里。`;
 }
 
 async function exSave(v){
@@ -105,7 +113,11 @@ async function exSave(v){
     }
   }
   const tid = await act('exam_set', {d}, '考试已保存');
-  if (S.page==='calendar' && !d.date.startsWith(S.month)) { S.month = d.date.slice(0,7); if (S.calView==='week' && typeof wkMon==='function') S.week = wkMon(d.date); render(); }
+  // 课表跳到考试那个月 / 那一周（周视图同一个月里换周也要跳）
+  if (S.page==='calendar') { let moved = false;
+    if (!d.date.startsWith(S.month)) { S.month = d.date.slice(0,7); moved = true; }
+    if (S.calView==='week' && typeof wkMon==='function' && S.week !== wkMon(d.date)) { S.week = wkMon(d.date); moved = true; }
+    if (moved) render(); }
   examModal(tid, d.date);
 }
 
@@ -123,7 +135,7 @@ document.addEventListener('click', async e => {
     if (k==='ex-kind') {
       document.getElementById('ex-k').value = v;
       a.parentElement.querySelectorAll('button').forEach(b => b.classList.toggle('on', b===a));
-      exWarn();
+      exPrefill(); exWarn();
     }
     if (k==='ex-edit') { const [tid, kd] = v.split('|'), t = exTarget(tid); if (t) examForm({tid, kind: kd, date: t[kd]}); }
     if (k==='ex-save') await exSave(v);
@@ -136,6 +148,8 @@ document.addEventListener('click', async e => {
     }
   } catch(err) { /* act() 已经提示过 */ }
 });
+// 自己在时间、备注框里打过字：之后换类型、换学校时不再自动带出原来的
+document.addEventListener('input', e => { if (e.target.id==='ex-time' || e.target.id==='ex-note') e.target.dataset.dirty = '1'; });
 document.addEventListener('change', e => {
   const el = e.target.closest('[data-change]'); if (!el) return;
   const k = el.dataset.change;
