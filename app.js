@@ -645,7 +645,7 @@ function tStudents(t){
     return `<section class="card" style="display:flex;flex-direction:column;gap:6px"><div class="row"><h3 style="font-size:16px;margin-right:auto">${esc(s.name)}</h3>${subjTag(c.subject)}</div>
     <dl class="kv small"><dt>方向</dt><dd>${esc(s.track||'—')}</dd><dt>下节课</dt><dd>${next?`${fmtMD(next.date)} ${timeFor(next,t.tz)}`:'—'}</dd>
     <dt>本月计划</dt><dd>${esc(planText(c.id, TODAY.slice(0,7))||'还没写')}</dd><dt>上次作业</dt><dd>${lastF?`${esc(lastF.hw)} ${lastF.hw_sub?'<span class="tag ok">已交</span>':'<span class="tag warn">未交</span>'}`:'—'}</dd></dl>
-    <button class="btn sm" data-act="t-stu" data-v="${c.id}">档案 · 月计划 · 私下备注</button></section>`}).join('') : '<div class="empty">还没有分配学生</div>');
+    <button class="btn sm" data-act="t-stu" data-v="${c.id}">档案 · 月计划 · 月度反馈 · 私下备注</button></section>`}).join('') : '<div class="empty">还没有分配学生</div>');
 }
 function tWrite(t){
   const cand = DB.lessons.filter(l => l.date<=TODAY && l.status==='scheduled' && !fbOf(l)).reverse();
@@ -887,6 +887,7 @@ function tStuModal(cid){
   const c = course(cid), s = stu(c.student_id), ym = TODAY.slice(0,7), nx = ymShift(ym,1);
   openModal(`${mHead(`${esc(s.name)} · ${esc(c.subject)}`)}
   ${teacherTrackBlock(s.id)}
+  ${teacherReviewBlock(s.id)}
   <b class="small">月计划 <span class="muted xs" style="font-weight:400">学生和家长能看到</span></b>
   ${[ym,nx].map(m=>`<label class="field"><span>${ymLabel(m)}</span><textarea id="mp-${m}-${cid}" style="min-height:52px" placeholder="这个月要完成什么，例：日本史近代收尾，每周 1 篇记述">${esc(planText(cid,m))}</textarea></label>${typeof mpTools==='function' ? mpTools(m, cid) : ''}`).join('')}
   <div class="row"><button class="btn pri sm" data-act="t-mp-save" data-v="${cid}">保存计划</button></div>

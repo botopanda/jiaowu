@@ -136,7 +136,7 @@ function studentTrackTab(id, tab){
     ${canEdit?`<div class="row"><button class="btn pri sm" data-act="tg-new" data-v="${id}">＋ 添加大学</button></div>`:''}${targetsView(id, canEdit)}`;
   if (tab==='review'){
     const ym = TODAY.slice(0,7), cur = reviewOf(id, ym), past = reviewsOf(id).filter(r=>r.ym!==ym).slice().reverse();
-    return `<div class="hint" style="margin:0">每月一条：学生在自己的链接里写自我评价，教务填其余部分。状态改成「已完成」后家长才能看到。</div>
+    return `<div class="hint" style="margin:0">每月一条：学生在自己的链接里写自我评价，教务填其余部分。状态改成「已完成」后家长和任课老师才能看到（「补充说明」只有教务看得到）。</div>
       ${cur ? reviewCard(cur,{edit:canEdit}) : `<div class="card small">${ymLabel(ym)} 还没有月度家长反馈。${canEdit?`<button class="btn pri sm" data-act="rv-open" data-v="${id}|${ym}">填写本月</button>`:''}</div>`}
       ${canEdit?`<div class="row"><select id="rv-ym">${[0,-1,-2,-3,1].map(n=>ymShift(ym,n)).map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join('')}</select><button class="btn sm" data-act="rv-pick" data-v="${id}">填写 / 修改这个月</button></div>`:''}
       ${past.map(r=>reviewCard(r,{edit:canEdit})).join('')}`;
@@ -225,7 +225,7 @@ async function rvxLoad(){
 const rawRow = (sid, ym) => (RVX.raw || []).find(x => x.student_id===sid && x.ym===ym) || {};
 function rvRawBox(sid, ym){
   const x = rawRow(sid, ym), raw = x.text || '', tr = x.teacher || '', n = [raw, tr].filter(Boolean).length;
-  return `<details class="rv-raw" ${n?'open':''}><summary><b>只给 AI 看的材料</b> <span class="muted xs">家长、学生看不到；点「AI 生成」时会原样发给 AI 写草稿</span>${n?` <span class="tag ok">已贴 ${n} 样</span>`:''}</summary>
+  return `<details class="rv-raw" ${n?'open':''}><summary><b>只给 AI 看的材料</b> <span class="muted xs">家长、学生、任课老师都看不到；点「AI 生成」时会原样发给 AI 写草稿</span>${n?` <span class="tag ok">已贴 ${n} 样</span>`:''}</summary>
     <label class="field"><span>面谈原始纪要</span><textarea id="rv-raw" rows="5" placeholder="腾讯会议 AI 纪要、录音逐字稿、Plaud 总结或你自己的笔记，原样贴进来（几份可以贴在一起）">${esc(raw)}</textarea></label>
     <div class="muted xs" style="margin-top:-4px">AI 只挑能给家长看的写进下面的「本月面谈记录」。</div>
     <label class="field"><span>任课老师说的</span><textarea id="rv-traw" rows="4" placeholder="平时问老师「孩子最近怎么样」听到的，一条一行，写上日期和哪位老师">${esc(tr)}</textarea></label>
@@ -254,11 +254,11 @@ function reviewForm(sid, ym){
   ${typeof rvAiBox==='function' ? rvAiBox(sid, ym) : ''}
   ${ta('rv-content','本月课程内容',r.content || auto,'例：日语：N2长文、复合助词；数学：函数与数列')}
   ${ta('rv-teacher','老师评价',r.teacher_eval,'')}
-  ${ta('rv-talk','本月面谈记录（家长能看到）',r.talk,'例：学生说这个月……；我建议……；说好下个月……')}
+  ${ta('rv-talk','本月面谈记录（家长、任课老师能看到）',r.talk,'例：学生说这个月……；我建议……；说好下个月……')}
   ${ta('rv-concl','任务 / 跟进结论',r.conclusion,'例：完成 8 次课程与两次阶段复盘')}
   ${ta('rv-next','下月重点',r.next_focus,'')}
   <div class="fields">${sel_('rv-status','状态',OPT.reviewStatus,r.status||'待跟进')}${fld('rv-note','补充说明',r.note)}</div>
-  <div class="muted xs">状态选「已完成」后，家长能在自己的链接里看到这份回访。</div>
+  <div class="muted xs">状态选「已完成」后，家长和任课老师都能看到这份反馈（「补充说明」只有教务看得到）。</div>
   <div class="row"><button class="btn pri" data-act="rv-save" data-v="${sid}|${ym}">保存</button></div>`, true);
 }
 function fuForm(sid, fid){
@@ -301,11 +301,18 @@ function pMonthly(s){
 
 /* ═════════════ 老师：学生详情里的升学信息（只读） ═════════════ */
 function teacherTrackBlock(sid){
-  const s = stu(sid), r = reviewOf(sid, TODAY.slice(0,7)), fus = fusOf(sid).slice(-3).reverse();
+  const s = stu(sid), fus = fusOf(sid).slice(-3).reverse();
   return `<details class="card"><summary><b>学生档案与升学</b> <span class="muted xs">（成绩、大学目标、跟进记录）</span></summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
     ${profileView(s)}${boardView(sid)}<b class="small">成绩变化</b>${scoreTrend(sid)}<b class="small">大学目标</b>${targetsView(sid,false)}
-    ${r ? `<b class="small">本月回访</b>${reviewCard(r)}` : ''}
     ${fus.length ? `<b class="small">最近跟进</b><div class="list">${fus.map(f=>fuCard(f,false)).join('')}</div>` : ''}</div></details>`;
+}
+// 任课老师看月度家长反馈：教务改成「已完成」的那几个月（和家长看到的一样；「补充说明」和只给 AI 看的材料老师拿不到）
+function teacherReviewBlock(sid){
+  const rs = reviewsOf(sid).filter(r => r.content || r.self_eval || r.teacher_eval || r.talk || r.conclusion || r.next_focus).slice().reverse();
+  if (!rs.length) return '';
+  return `<b class="small">月度家长反馈 <span class="muted xs" style="font-weight:400">教务写的，和家长看到的一样</span></b>
+    ${reviewCard(rs[0])}
+    ${rs.length > 1 ? `<details><summary class="muted small">以前的月份（${rs.length - 1}）</summary>${rs.slice(1).map(r => reviewCard(r)).join('')}</details>` : ''}`;
 }
 
 /* ═════════════ 交互（新功能） ═════════════ */
@@ -336,7 +343,7 @@ document.addEventListener('click', async e => {
     case 'rv-open': { const [sid,ym]=v.split('|'); reviewForm(sid, ym); break; }
     case 'rv-pick': reviewForm(v, val('rv-ym')); break;
     case 'rv-save': { const [sid,ym]=v.split('|'); const d={content:val('rv-content'), teacher_eval:val('rv-teacher'), talk:val('rv-talk'), talk_raw:val('rv-raw'), teacher_raw:val('rv-traw'), conclusion:val('rv-concl'), next_focus:val('rv-next'), status:val('rv-status'), note:val('rv-note')};
-      await act('review_save', {sid, month:ym, d}, d.status==='已完成'?'已保存，家长现在能看到':'已保存'); if (S.page==='reviews') closeModal(); else studentModal(sid, S.page==='student' ? S.stuTab : 'review'); break; }
+      await act('review_save', {sid, month:ym, d}, d.status==='已完成'?'已保存，家长和任课老师现在能看到':'已保存'); if (S.page==='reviews') closeModal(); else studentModal(sid, S.page==='student' ? S.stuTab : 'review'); break; }
     case 'ts-open': tsForm(v); break;
     case 'ts-save': { const d=val('ts-date'), txt=val('ts-text').trim(), tid=val('ts-t');
       if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){toast('请填写日期',true);break;} if(!txt){toast('先写老师说了什么',true);break;}
