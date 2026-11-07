@@ -27,7 +27,9 @@ const OPT = {
   subject: ['日语','文综','数学','物理','化学','生物','不分科目','其他'],
   confirm: ['待确认','已确认','需调整','暂缓'],
 };
-const DATE_KEYS = [['apply_start','出愿开始'],['apply_end','出愿截止'],['docs_due','材料截止'],['written_date','笔试'],['interview_date','面试'],['result_date','合格发表'],['procedure_due','手续截止']];
+const DATE_KEYS = [['apply_start','出愿开始'],['apply_end','出愿截止'],['docs_due','材料截止'],['first_result','一次结果'],['written_date','笔试'],['interview_date','面试'],['result_date','合格发表'],['procedure_due','手续截止']];
+// 考试那几天（一次结果 / 笔试 / 面试 / 合格发表）每场能写时间、备注（第 45 步，存在 exam_info）；课表上用红色「考」显示
+const exInfoOf = (t, k) => (t && t.exam_info && t.exam_info[k]) || {};
 const opts = (list, cur, blank='—') => `<option value="">${blank}</option>` + list.map(x=>`<option ${x===cur?'selected':''}>${esc(x)}</option>`).join('');
 const fld = (id, label, val, attrs='') => `<label class="field"><span>${label}</span><input type="text" id="${id}" value="${esc(val||'')}" ${attrs}></label>`;
 const sel_ = (id, label, list, cur, blank) => `<label class="field"><span>${label}</span><select id="${id}">${opts(list, cur, blank)}</select></label>`;
@@ -96,7 +98,8 @@ function targetCard(t, edit){
       ${edit ? `<button class="btn sm" data-act="tg-edit" data-v="${t.id}">编辑</button>` : ''}</div>
     ${t.exam_way || t.requirement ? `<div class="small">${t.exam_way?`<span class="muted">入试方式</span> ${esc(t.exam_way)}　`:''}${t.requirement?`<span class="muted">入试要求</span> ${esc(t.requirement)}`:''}</div>` : ''}
     ${t.score_req ? `<div class="small"><span class="muted">分数要求</span> ${esc(t.score_req)}</div>` : ''}
-    <div class="dates">${DATE_KEYS.map(([k,l]) => t[k] ? `<span class="dchip ${nx && nx.date===t[k] && nx.label===l ? 'next' : t[k] < TODAY ? 'past' : ''}"><small>${l}</small>${fmtYMD(t[k])}</span>` : '').join('') || '<span class="muted xs">日期待定</span>'}</div>
+    <div class="dates">${DATE_KEYS.map(([k,l]) => t[k] ? `<span class="dchip ${nx && nx.date===t[k] && nx.label===l ? 'next' : t[k] < TODAY ? 'past' : ''}"><small>${l}</small>${fmtYMD(t[k])}${exInfoOf(t,k).time?` <small>${esc(exInfoOf(t,k).time)}</small>`:''}</span>` : '').join('') || '<span class="muted xs">日期待定</span>'}</div>
+    ${DATE_KEYS.filter(([k]) => t[k] && exInfoOf(t,k).note).map(([k,l]) => `<div class="small"><span class="muted">${l}</span> ${esc(exInfoOf(t,k).note)}</div>`).join('')}
     ${nx ? `<div class="xs" style="color:${nx.days<=14?'var(--seal)':'var(--gold-text)'}">下一个：${nx.label} ${fmtMD(nx.date)}（还有 ${nx.days} 天）</div>` : ''}
     ${t.next_step ? `<div class="small"><span class="muted">下一步</span> ${esc(t.next_step)}</div>` : ''}
     <div class="muted xs">资料状态：${esc(t.doc_status||'待梳理')}</div></section>`;
@@ -201,6 +204,11 @@ function profileForm(id){
   <div class="muted xs">专业方向可以从列表里选，也可以直接打字。</div>
   <div class="row"><button class="btn pri" data-act="pf-save" data-v="${id}">保存</button></div>`, true);
 }
+// 表单里的考试时间、备注（表单上没有这几个框时返回 null，保存时就不动原来的）
+function tgExamInfo(){
+  if (!document.getElementById('tgx-t-written_date')) return null;
+  return Object.fromEntries(EXAM_KEYS.map(([k]) => [k, {time: val('tgx-t-'+k).trim(), note: val('tgx-n-'+k).trim()}]));
+}
 function targetForm(sid, tid, pre){
   const base = tid ? (DB.targets||[]).find(x=>x.id===tid) : {tier:'目标', seq: targetsOf(sid).filter(x=>x.tier==='目标').length+1, status:'未开始', doc_status:'待梳理'};
   const t = pre ? {...base, ...pre} : base;
@@ -211,6 +219,10 @@ function targetForm(sid, tid, pre){
   <div class="fields">${fld('tg-way','入试方式',t.exam_way,'placeholder="例：留学生入试 / EJU利用"')}${fld('tg-req','入试要求',t.requirement,'placeholder="例：EJU、英语成绩、面试"')}${fld('tg-score','分数要求',t.score_req,'placeholder="例：EJU日语300+"')}</div>
   <b class="small">出愿时间</b>
   <div class="fields">${DATE_KEYS.map(([k,l])=>dt('tg-'+k,l,t[k])).join('')}</div>
+  <details class="card" ${EXAM_KEYS.some(([k]) => exInfoOf(t,k).time || exInfoOf(t,k).note) ? 'open' : ''}><summary class="small"><b>考试时间、备注</b> <span class="muted xs">可以不填；学生、家长、任课老师都能看到</span></summary>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">${EXAM_KEYS.map(([k]) => { const l = DATE_KEYS.find(x => x[0]===k)[1], inf = exInfoOf(t,k);
+      return `<div class="fields"><label class="field"><span>${l} · 时间</span><input type="text" id="tgx-t-${k}" maxlength="40" value="${esc(inf.time||'')}" placeholder="例：9:30–11:30"></label><label class="field" style="flex:2"><span>${l} · 备注</span><input type="text" id="tgx-n-${k}" maxlength="300" value="${esc(inf.note||'')}" placeholder="例：要带漫画原稿"></label></div>`; }).join('')}
+    <div class="muted xs">只有填了日期的那一场才会保存时间和备注。课表上点红色「考」也能改。</div></div></details>
   <div class="fields">${sel_('tg-status','出愿状态',OPT.applyStatus,t.status)}${sel_('tg-doc','资料状态',OPT.docStatus,t.doc_status)}${fld('tg-next','下一步',t.next_step,'placeholder="例：整理志望理由书"')}</div>
   <div class="row"><button class="btn pri" data-act="tg-save" data-v="${sid}|${tid||''}">保存</button>${tid?`<span id="tg-del-row"><button class="btn danger sm" data-act="tg-del-ask" data-v="${tid}">删除这所</button></span>`:''}</div>`, true);
 }
@@ -336,7 +348,7 @@ document.addEventListener('click', async e => {
     case 'tg-edit': { const t=(DB.targets||[]).find(x=>x.id===v); targetForm(t.student_id, v); break; }
     case 'tg-save': { const [sid,tid]=v.split('|'); if(!val('tg-school').trim()){toast('请填写大学／专业',true);break;} if(!val('tg-tier')){toast('请选择级别',true);break;}
       const d={student_id:sid, tier:val('tg-tier'), seq:val('tg-seq'), school:val('tg-school'), exam_way:val('tg-way'), requirement:val('tg-req'), score_req:val('tg-score'), status:val('tg-status'), doc_status:val('tg-doc'), next_step:val('tg-next'), program_id:val('tg-pid'), round_id:val('tg-rid')};
-      DATE_KEYS.forEach(([kk])=>d[kk]=val('tg-'+kk)); if(tid) d.id=tid;
+      DATE_KEYS.forEach(([kk])=>d[kk]=val('tg-'+kk)); if(tid) d.id=tid; const xi=tgExamInfo(); if(xi) d.exam_info=xi;
       await act('target_save', {d}, '已保存'); studentModal(sid,'target'); break; }
     case 'tg-del-ask': document.getElementById('tg-del-row').innerHTML=`<span class="small">确定删除？</span><button class="btn danger sm" data-act="tg-del" data-v="${v}">删除</button>`; break;
     case 'tg-del': { const t=(DB.targets||[]).find(x=>x.id===v); await act('target_delete', {xid:v}, '已删除'); studentModal(t.student_id,'target'); break; }

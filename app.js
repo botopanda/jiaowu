@@ -343,14 +343,37 @@ function pgOverview(){
   </div>`;
 }
 
-// 考试日（来自「升学与出愿」的笔试 / 面试 / 合格发表日）：在课表月历上标出来，不算课
-const EXAM_KEYS = [['written_date','笔试'],['interview_date','面试'],['result_date','结果']];
-function examsOf(sid, ym){
+// 考试日（来自「升学与出愿」的一次结果 / 笔试 / 面试 / 结果日，第 45 步起每场能写时间、备注）：在课表上标出来，不算课
+// 教务在课表上加 / 改 / 删考试的弹窗在 exams.js
+const EXAM_KEYS = [['first_result','一次结果'],['written_date','笔试'],['interview_date','面试'],['result_date','结果']];
+const exLabel = (t, k) => k==='result_date' && t.first_result ? '最终结果' : (EXAM_KEYS.find(x => x[0]===k) || [k,k])[1];
+// sids：一位学生（编号）、好几位（编号数组），或 null＝全部；ym：只要这个月的（可不填）
+function examsOf(sids, ym){
+  const ok = sids==null ? () => true : Array.isArray(sids) ? id => sids.includes(id) : id => id===sids;
   const out = [];
-  (DB.targets||[]).filter(t => !sid || t.student_id===sid).forEach(t => EXAM_KEYS.forEach(([k,lb]) => { const d = t[k]; if (d && (!ym || d.startsWith(ym))) out.push({date:d, label:lb, school:t.school, sid:t.student_id}); }));
-  return out.sort((a,b) => a.date.localeCompare(b.date));
+  (DB.targets||[]).filter(t => ok(t.student_id)).forEach(t => EXAM_KEYS.forEach(([k]) => { const d = t[k]; if (!d || (ym && !d.startsWith(ym))) return;
+    const inf = (t.exam_info && t.exam_info[k]) || {};
+    out.push({date:d, kind:k, label:exLabel(t,k), school:t.school, sid:t.student_id, tid:t.id, time:String(inf.time||''), note:String(inf.note||'')}); }));
+  return out.sort((a,b) => a.date.localeCompare(b.date) || (a.time||'99').localeCompare(b.time||'99'));
 }
-const exShort = s => String(s||'').replace(/大学.*$/, '').replace(/[（(].*$/, '') || String(s||'');
+// 同一天、同一所学校的几场并成一块（例：东京工艺 12/12「笔试·面试」）；items 里是每一场
+function examGroups(list){
+  const m = new Map();
+  list.forEach(e => { const key = e.tid + '|' + e.date; m.has(key) ? m.get(key).items.push(e) : m.set(key, {...e, items:[e]}); });
+  return [...m.values()].map(g => ({...g, label: g.items.map(x => x.label).join('·'), time: g.items.map(x => x.time).find(Boolean) || ''}));
+}
+// 手机月历格子很窄：「一次结果」→「一次」，「最终结果」→「结果」，同一天好几场→「笔·面」
+const exCellLabel = g => g.items.length>1 ? g.items.map(x => x.label[0]).join('·') : g.label==='一次结果' ? '一次' : g.label==='最终结果' ? '结果' : g.label;
+const exShort = s => String(s||'').replace(/大学.*$/, '').replace(/[\s（(／/].*$/, '') || String(s||'');
+const exStart = tm => String(tm||'').split(/[–\-~〜～]/)[0].trim();   // 「9:30–11:30」→「9:30」
+const exStudentsOfTeacher = tid => [...new Set(DB.courses.filter(c => c.teacher_id===tid && c.active).map(c => c.student_id))];
+// 教务课表（月 / 周）现在在看谁的考试：按学生看＝这位学生；按老师看＝这位老师正在教的学生；其他＝全部
+const calExSids = () => S.calType==='s' ? (S.calId || null) : S.calType==='t' && S.calId ? exStudentsOfTeacher(S.calId) : null;
+const exTitle = g => `${stu(g.sid).name} · ${g.school}\n` + g.items.map(x => `${x.label}${x.time?' '+x.time:''}${x.note?'：'+x.note:''}`).join('\n');
+// 手机课表下面「当天」那一栏、列表看法里的一行考试（withName：老师看时前面写学生名字）
+const exLine = (g, withName) => `<div class="li ex-li"><span class="tag seal">考</span><div class="grow"><b>${withName?esc(stu(g.sid).name)+' · ':''}${esc(g.school)}</b>
+  ${g.items.map(x => `<div class="small"><b class="ex-lb">${x.label}</b>${x.time?` <span class="num">${esc(x.time)}</span>`:''}${x.note?` · ${esc(x.note)}`:''}</div>`).join('')}</div></div>`;
+const exAddBtn = () => isAdmin() ? '<button class="btn" data-act="ex-new">＋ 加考试</button>' : '';
 
 function pgCalendar(){
   if (S.calView==='week' && typeof pgWeek==='function') return pgWeek();   // 周视图在 week.js
@@ -362,8 +385,8 @@ function pgCalendar(){
   const chip = l => { const c = course(l.course_id);
     const who = S.calType==='s' ? tea(c.teacher_id).name : S.calType==='t' ? stu(c.student_id).name : `${stu(c.student_id).name}·${tea(c.teacher_id).name.replace('老师','')}`;
     return `<button class="lc ${l.status!=='scheduled'?'leave':''} ${isPend(l)?'pend':''} ${l.moved?'moved':''}" style="--hc:${slotHue(l.start)}" data-act="lesson" data-v="${l.id}" ${l.topic?`title="本节：${esc(l.topic)}"`:''}><span class="t">${l.start}</span>${l.makeup?'<b class="mk">补</b>':''}${fbMark(l)} ${esc(who)}<br>${esc(c.subject)}${l.kind?'·'+esc(l.kind):''}${l.status==='leave'?' 请假':l.status==='cancelled'?' 取消':''}</button>`; };
-  const exs = S.calType==='t' ? [] : examsOf(S.calType==='s' ? S.calId : null, S.month);
-  const exChip = e => `<span class="lc ex" title="${esc(e.school)} ${e.label}（来自「升学与出愿」）"><b class="exk">考</b> ${S.calType==='s'?'':esc(stu(e.sid).name)+'·'}${esc(exShort(e.school))}<br>${e.label}</span>`;
+  const exs = examGroups(examsOf(calExSids(), S.month));
+  const exChip = e => `<button class="lc ex" data-act="exam" data-v="${e.tid}|${e.date}" title="${esc(exTitle(e))}"><b class="exk">考</b>${e.time?` <span class="t">${esc(exStart(e.time))}</span>`:''} ${S.calType==='s'&&S.calId?'':esc(stu(e.sid).name)+'·'}${esc(exShort(e.school))}<br>${e.label}${e.items.some(x=>x.note)?' <span class="ex-n">备注</span>':''}</button>`;
   let cells = ['一','二','三','四','五','六','日'].map((d,i) => `<div class="hd ${i>=5?'we':''}">${d}</div>`).join('');
   for (let i=0;i<lead;i++) cells += `<div class="day off"></div>`;
   for (let d=1; d<=last; d++){ const dd=`${S.month}-${pad(d)}`; cells += `<div class="day ${dd===TODAY?'today':''} ${isAdmin()?'can-add':''}" ${isAdmin()?`data-act="cal-day" data-v="${dd}" title="点空白处在这天排课"`:''}><span class="dn">${d}</span>${exs.filter(e=>e.date===dd).map(exChip).join('')}${ls.filter(l=>l.date===dd).map(chip).join('')}</div>`; }
@@ -373,7 +396,7 @@ function pgCalendar(){
   const who = S.calType==='s' ? DB.students : S.calType==='t' ? DB.teachers : [];
   const title = S.calType==='s' && S.calId ? `${y}年${m}月｜${stu(S.calId).name}` : S.calType==='t' && S.calId ? `${y}年${m}月｜${tea(S.calId).name}` : `${y}年${m}月｜全部课程`;
   const hours = ls.filter(l=>l.status!=='leave').reduce((a,l)=>a+dur(l),0);
-  return `<div class="ph"><h2>课表与排课</h2>${isAdmin()?`<button class="btn pri" data-act="add-lesson" ${DB.courses.length?'':'disabled title="先在学生档案里添加课程"'}>＋ 排课</button>`:'<span class="tag mute">只读</span>'}</div>${scopeNote()}
+  return `<div class="ph"><h2>课表与排课</h2>${isAdmin()?`<span class="row">${exAddBtn()}<button class="btn pri" data-act="add-lesson" ${DB.courses.length?'':'disabled title="先在学生档案里添加课程"'}>＋ 排课</button></span>`:'<span class="tag mute">只读</span>'}</div>${scopeNote()}
   <div class="cal-bar">
     <button class="btn sm" data-act="month" data-v="-1" aria-label="上个月">‹</button><span class="mon">${S.month.replace('-','.')}</span><button class="btn sm" data-act="month" data-v="1" aria-label="下个月">›</button>
     <button class="btn sm" data-act="month" data-v="0">本月</button>
@@ -381,7 +404,7 @@ function pgCalendar(){
     <div class="seg">${[['all','全部'],['s','按学生'],['t','按老师']].map(([k,t])=>`<button class="${S.calType===k?'on':''}" data-act="caltype" data-v="${k}">${t}</button>`).join('')}</div>
     ${who.length ? `<select id="cal-who" data-change="calwho"><option value="">选择${S.calType==='s'?'学生':'老师'}…</option>${who.map(x=>`<option value="${x.id}" ${S.calId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`:''}
   </div>
-  <div class="row"><h3 style="font-size:16px">${esc(title)}</h3><span class="muted xs">共 ${ls.length} 节 · ${hours} 小时 · 北京时间 · 划线＝请假 · 「调」＝调过课 · ${slotLegend()}</span>${S.calType==='s' && S.calId ? `<span style="margin-left:auto">${sxBtn(S.calId)}</span>` : ''}</div>
+  <div class="row"><h3 style="font-size:16px">${esc(title)}</h3><span class="muted xs">共 ${ls.length} 节 · ${hours} 小时 · 北京时间 · 划线＝请假 · 「调」＝调过课 · 红色「考」＝考试，点开看时间、备注 · ${slotLegend()}</span>${S.calType==='s' && S.calId ? `<span style="margin-left:auto">${sxBtn(S.calId)}</span>` : ''}</div>
   <div class="cal">${cells}</div><div class="agenda">${agenda}</div>`;
 }
 
@@ -587,15 +610,14 @@ function reqLine(q){
   if (q.status==='pending') return `<div class="xs" style="color:var(--warn)">已申请${q.type}，等教务处理 · ${esc(q.reason)}${q.wish?` · 希望：${esc(q.wish)}`:''}</div>`;
   return `<div class="xs" style="color:${q.status==='accepted'?'var(--ok)':'var(--seal)'}">${q.type}申请${q.status==='accepted'?'已同意':'未同意'}（${esc(q.handled_by)}）：${esc(q.reply)}</div>`;
 }
-function agenda(ls, tz, whoFn, n=12, canReq=false, canEdit=false){
+// exs：要一起列出来的考试（examGroups 的结果）；只列到最后一节课那天为止，课不满 n 节就列到 60 天后
+function agenda(ls, tz, whoFn, n=12, canReq=false, canEdit=false, exs=[], exWho=false){
   const up = ls.filter(l=>l.date>=TODAY).slice(0,n);
-  if (!up.length) return '<div class="empty">近期没有课</div>';
-  let out='', last='';
-  up.forEach(l => {
-    if (l.date!==last){ out += `<div class="dg ${l.date===TODAY?'today':''}">${l.date===TODAY?'今天 · ':''}${fmtMD(l.date)}</div>`; last=l.date; }
-    out += lessonItem(l, tz, whoFn, canReq, canEdit);
-  });
-  return out;
+  const end = up.length===n ? up[up.length-1].date : addDay(TODAY, 60), ex = exs.filter(e => e.date>=TODAY && e.date<=end);
+  if (!up.length && !ex.length) return '<div class="empty">近期没有课</div>';
+  return [...new Set([...up.map(l=>l.date), ...ex.map(e=>e.date)])].sort().map(d =>
+    `<div class="dg ${d===TODAY?'today':''}">${d===TODAY?'今天 · ':''}${fmtMD(d)}</div>` + ex.filter(e=>e.date===d).map(e => exLine(e, exWho)).join('')
+    + up.filter(l=>l.date===d).map(l => lessonItem(l, tz, whoFn, canReq, canEdit)).join('')).join('');
 }
 const tzNote = tz => '<div class="muted xs">北京时间</div>';
 
@@ -606,11 +628,11 @@ function lessonItem(l, tz, whoFn, canReq, canEdit){
   return `<div class="les" style="--hc:${slotHue(timeFor(l,tz))}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}</div><div style="min-width:0;flex:1">${subjTag(c.subject)}${l.kind?` <span class="tag mute">${esc(l.kind)}</span>`:''} · ${esc(whoFn(c))}${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调课</span>':''}${l.status==='leave'?' <span class="tag seal">请假</span>':''}${l.status==='cancelled'?' <span class="tag mute">已取消</span>':''}${['student','parent'].includes(ME().role) ? (l.status==='scheduled' && l.date<TODAY ? ' <span class="tag mute">已上</span>' : '') : `${isDone(l)?(hasFb(l)?' <span class="tag ok">已反馈</span>':' <span class="tag ok">已上</span>'):''}${isPend(l)?` <span class="tag warn">${ME().role==='teacher'?'待写反馈':'待确认'}</span>`:''}`}${hrsTag(l)}${l.topic?`<div class="les-topic">本节：${esc(l.topic)}</div>`:''}
     ${reqLine(q)}${canReq && !leave && l.date>=TODAY && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave && !fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}</div></div>`;
 }
+// sid：要标考试的学生（学生、家长＝自己；老师＝自己正在教的学生，传编号数组，格子里写学生名字）
 function schedule(ls, tz, whoFn, canReq=false, canEdit=false, extra='', sid=null){
-  const exAll = sid ? examsOf(sid) : [];
-  const exLine = e => `<div class="li ex-li"><span class="tag seal">考</span><div class="grow">${esc(e.school)} · ${e.label}</div></div>`;
+  const exAll = sid && (!Array.isArray(sid) || sid.length) ? examGroups(examsOf(sid)) : [], exWho = Array.isArray(sid);
   const toggle = `<div class="seg" role="group" aria-label="课表看法">${[['cal','月历'],['list','列表']].map(([k,t])=>`<button class="${PV===k?'on':''}" data-act="pview" data-v="${k}">${t}</button>`).join('')}</div>`;
-  if (PV==='list') return `<div class="row" style="justify-content:space-between">${tzNote(tz)}<span class="row">${extra}${toggle}</span></div>${agenda(ls,tz,whoFn,30,canReq,canEdit)}`;
+  if (PV==='list') return `<div class="row" style="justify-content:space-between">${tzNote(tz)}<span class="row">${extra}${toggle}</span></div>${agenda(ls,tz,whoFn,30,canReq,canEdit,exAll,exWho)}`;
   const ym = S.pMonth || (S.pMonth = TODAY.slice(0,7)), [y,m] = ym.split('-').map(Number);
   const first = new Date(y,m-1,1), last = new Date(y,m,0).getDate(), lead = (first.getDay()+6)%7;
   const sel = S.pDay && S.pDay.startsWith(ym) ? S.pDay : (TODAY.startsWith(ym) ? TODAY : `${ym}-01`);
@@ -620,10 +642,12 @@ function schedule(ls, tz, whoFn, canReq=false, canEdit=false, extra='', sid=null
   for (let d=1; d<=last; d++){
     const ds_ = `${ym}-${pad(d)}`, dl = mine.filter(l=>l.date===ds_), de = exAll.filter(e=>e.date===ds_);
     const st = l => l.start;
-    cells += `<button class="ph-day ${ds_===TODAY?'today':''} ${ds_===sel?'sel':''} ${dl.length||de.length?'has':''}" data-act="pday" data-v="${ds_}" aria-label="${fmtMD(ds_)}，${dl.length} 节课${de.length?'，有考试':''}"><span class="n">${d}</span>
-      ${de.slice(0,1).map(e=>`<span class="pc ex"><span class="pt"><b class="exk">考</b> ${e.label}</span><span class="pn">${esc(exShort(e.school))}</span></span>`).join('')}
-      ${dl.slice(0,5).map(l=>{ const c=course(l.course_id); return `<span class="pc ${l.status!=='scheduled'?'lv':''} ${l.date<TODAY?'past':''}" style="--hc:${slotHue(st(l))}"><span class="pt">${st(l)}${l.makeup?'<b class="mk">补</b>':''}${fbMark(l)}<span class="ps"> ${esc(c.subject)}</span></span><span class="pn ${whoFn(c).length>3?'long':''}">${esc(whoFn(c))}</span></span>`; }).join('')}
-      ${dl.length>3?`<span class="more m">+${dl.length-3}</span>`:''}${dl.length>5?`<span class="more d">+${dl.length-5}</span>`:''}</button>`;
+    const tot = de.length + dl.length;   // 考试和课一起算格子（手机 3 块、电脑 5 块，多的显示 +几）；学生、家长考试排前面，老师自己的课排前面
+    const exCells = de.slice(0, exWho ? Math.max(0, 5-dl.length) : 5).map(e=>{ const nm = exWho ? stu(e.sid).name : exShort(e.school); return `<span class="pc ex"><span class="pt"><b class="exk">考</b>${exCellLabel(e)}</span><span class="pn ${nm.length>3?'long':''}">${esc(nm)}</span></span>`; }).join('');
+    const lsCells = dl.slice(0, exWho ? 5 : Math.max(0, 5-de.length)).map(l=>{ const c=course(l.course_id); return `<span class="pc ${l.status!=='scheduled'?'lv':''} ${l.date<TODAY?'past':''}" style="--hc:${slotHue(st(l))}"><span class="pt">${st(l)}${l.makeup?'<b class="mk">补</b>':''}${fbMark(l)}<span class="ps"> ${esc(c.subject)}</span></span><span class="pn ${whoFn(c).length>3?'long':''}">${esc(whoFn(c))}</span></span>`; }).join('');
+    cells += `<button class="ph-day ${ds_===TODAY?'today':''} ${ds_===sel?'sel':''} ${tot?'has':''}" data-act="pday" data-v="${ds_}" aria-label="${fmtMD(ds_)}，${dl.length} 节课${de.length?`，${de.length} 场考试`:''}"><span class="n">${d}</span>
+      ${exWho ? lsCells + exCells : exCells + lsCells}
+      ${tot>3?`<span class="more m">+${tot-3}</span>`:''}${tot>5?`<span class="more d">+${tot-5}</span>`:''}</button>`;
   }
   const day = mine.filter(l=>l.date===sel);
   return `<div class="row" style="justify-content:space-between">${tzNote(tz)}<span class="row">${extra}${toggle}</span></div>
@@ -634,7 +658,7 @@ function schedule(ls, tz, whoFn, canReq=false, canEdit=false, extra='', sid=null
     <div class="muted xs" style="margin-top:6px">这个月共 ${mine.filter(l=>l.status==='scheduled').length} 节课 · 点日期看当天的课${canEdit ? '，<b>再点一下</b>就能排课 / 调课' : ''} · ${slotLegend()}</div>
   </div>
   <div class="dg ${sel===TODAY?'today':''}" id="pday-list">${sel===TODAY?'今天 · ':''}${fmtMD(sel)}</div>
-  ${exAll.filter(e=>e.date===sel).map(exLine).join('')}
+  ${exAll.filter(e=>e.date===sel).map(e => exLine(e, exWho)).join('')}
   ${day.length ? day.map(l=>lessonItem(l,tz,whoFn,canReq,canEdit)).join('') : `<div class="empty" style="padding:10px">这天没有课${canEdit ? '<div style="margin-top:8px"><button class="btn pri sm" data-act="add-lesson">＋ 申请这天排课</button></div>' : ''}</div>`}`;
 }
 // 老师在月历上再点一下已选中的日期：这天没课 → 申请排课；只有一节能调的课 → 调课；有好几节 → 滑到下面当天的课
@@ -652,7 +676,7 @@ function tSchedule(t){
     const done = mine.filter(x => x.status!=='pending').map(x => x.id);
     return mine.length ? `<section class="card"><div class="row"><h3 style="font-size:15px;margin-right:auto">我的排课 / 调课申请</h3>${done.length>1?`<button class="btn sm" data-act="ch-seen-all" data-v="${done.join(',')}">全部知道了（${done.length} 条）</button>`:''}</div><div class="muted xs">教务批准后才会改到课表上。</div><div class="list">${mine.map(x => chCard(x, false)).join('')}</div></section>` : ''; })()}
   <div class="row" style="justify-content:flex-end"><span class="muted xs" style="margin-right:auto">排课、调课提交后要教务批准</span><button class="btn pri sm" data-act="add-lesson">＋ 申请排课</button></div>
-  ${schedule(lsOfT(t.id),t.tz,c=>stu(c.student_id).name,false,true)}`;
+  ${schedule(lsOfT(t.id),t.tz,c=>stu(c.student_id).name,false,true,'',exStudentsOfTeacher(t.id))}`;
 }
 function tStudents(t){
   const cs = DB.courses.filter(c=>c.teacher_id===t.id && c.active);
@@ -792,6 +816,7 @@ function addLessonModal(){
   const pre = S.alPre; S.alPre = null;   // 周视图点空白处带来的 {日期, 开始, 结束}
   const ym = S.pMonth || TODAY.slice(0,7), preD = pre ? pre.d : isT && PV==='cal' ? (S.pDay && S.pDay.startsWith(ym) ? S.pDay : (TODAY.startsWith(ym) ? TODAY : `${ym}-01`)) : TODAY;
   openModal(`${mHead(isT ? '申请排课' : '排课')}
+  ${isT ? '' : exSwitch('lesson')}
   <div class="fields">
     <label class="field"><span>学生</span><select id="al-stu" data-change="al-pick"><option value="">选择学生…</option>${studs.map(x => `<option value="${x.id}" ${x.id===preS?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
     <label class="field"><span>老师</span><select id="al-tea" data-change="al-pick" ${isT?'disabled':''}>${isT?'':'<option value="">选择老师…</option>'}${(() => { const o = t => `<option value="${t.id}" ${t.id===preT?'selected':''}>${esc(t.name)}</option>`, st = teas.filter(t => t.staff);

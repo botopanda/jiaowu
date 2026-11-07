@@ -31,11 +31,14 @@ function pgWeek(){
   const block = ([l, k, n]) => { const c = course(l.course_id), top = y(mins(l.start)), h = Math.max(22, y(mins(l.end)) - top - 2);
     return `<button class="wk-l ${l.status!=='scheduled'?'leave':''} ${isPend(l)?'pend':''}" style="--hc:${slotHue(l.start)};top:${top}px;height:${h}px;left:calc(${k} * 100% / ${n});width:calc(100% / ${n} - 3px)" data-act="lesson" data-v="${l.id}" title="${esc(`${l.start}–${l.end} ${who(c)} ${c.subject}${l.kind?'·'+l.kind:''}${l.topic?'\n本节：'+l.topic:''}`)}">
       <span class="t">${l.start}${l.makeup?'<b class="mk">补</b>':''}${fbMark(l)}</span><span class="w">${esc(who(c))}</span>${h > 40 ? `<span class="s">${esc(c.subject)}${l.kind?'·'+esc(l.kind):''}</span>` : ''}</button>`; };
+  // 考试（升学与出愿里的一次结果 / 笔试 / 面试 / 结果）：在星期那一行下面单独一行，不占钟点
+  const exs = examGroups(examsOf(calExSids())).filter(e => e.date >= days[0] && e.date <= days[6]);
+  const exChip = e => `<button class="wk-ex" data-act="exam" data-v="${e.tid}|${e.date}" title="${esc(exTitle(e))}"><b class="exk">考</b>${e.time?` <span class="t">${esc(exStart(e.time))}</span>`:''} ${S.calType==='s'&&S.calId?'':esc(stu(e.sid).name)+'·'}${esc(exShort(e.school))}<span class="l">${e.label}</span></button>`;
   const whoList = S.calType==='s' ? DB.students : S.calType==='t' ? DB.teachers : [];
   const hours = ls.filter(l => l.status!=='leave').reduce((a, l) => a + dur(l), 0);
   const range = `${+days[0].slice(5,7)}月${+days[0].slice(8)}日–${days[6].slice(5,7)===days[0].slice(5,7) ? '' : +days[6].slice(5,7)+'月'}${+days[6].slice(8)}日`;
   const title = S.calType==='s' && S.calId ? stu(S.calId).name : S.calType==='t' && S.calId ? tea(S.calId).name : '全部课程';
-  return `<div class="ph"><h2>课表与排课</h2>${isAdmin()?`<button class="btn pri" data-act="add-lesson" ${DB.courses.length?'':'disabled title="先在学生档案里添加课程"'}>＋ 排课</button>`:'<span class="tag mute">只读</span>'}</div>${scopeNote()}
+  return `<div class="ph"><h2>课表与排课</h2>${isAdmin()?`<span class="row">${exAddBtn()}<button class="btn pri" data-act="add-lesson" ${DB.courses.length?'':'disabled title="先在学生档案里添加课程"'}>＋ 排课</button></span>`:'<span class="tag mute">只读</span>'}</div>${scopeNote()}
   <div class="cal-bar">
     <button class="btn sm" data-act="wk-go" data-v="-7" aria-label="上一周">‹</button><span class="mon">${range}</span><button class="btn sm" data-act="wk-go" data-v="7" aria-label="下一周">›</button>
     <button class="btn sm" data-act="wk-go" data-v="0">本周</button>
@@ -46,6 +49,7 @@ function pgWeek(){
   <div class="row"><h3 style="font-size:16px">${esc(range)}｜${esc(title)}</h3><span class="muted xs">共 ${ls.length} 节 · ${+hours.toFixed(1)} 小时 · 北京时间 · ${slotLegend()}${isAdmin()?' · <b>点空白处直接排课</b>':''}</span></div>
   <div class="wk-wrap"><div class="wk-grid">
     <div class="wk-hd wk-corner"></div>${days.map((d, i) => `<div class="wk-hd ${d===TODAY?'today':''} ${i>=5?'we':''}">周${WD[pd(d).getDay()]}<b>${+d.slice(8)}</b></div>`).join('')}
+    ${exs.length ? `<div class="wk-exh">考试</div>${days.map(d => `<div class="wk-exd ${d===TODAY?'today':''}" ${isAdmin()?`data-act="ex-new" data-v="${d}" title="点空白处在这天加考试"`:''}>${exs.filter(e => e.date===d).map(exChip).join('')}</div>`).join('')}` : ''}
     <div class="wk-times" style="height:${colH}px">${Array.from({length: h1 - h0}, (_, i) => `<span style="top:${i * WK_HH}px">${h0 + i}:00</span>`).join('')}</div>
     ${days.map(d => `<div class="wk-col ${d===TODAY?'today':''}" style="height:${colH}px" ${isAdmin()?`data-act="wk-slot" data-v="${d}"`:''}>${place(ls.filter(l => l.date===d)).map(block).join('')}</div>`).join('')}
   </div></div>`;

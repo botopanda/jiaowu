@@ -718,3 +718,22 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .rv-raw summary{cursor:pointer}
 .rv-raw[open]{display:flex;flex-direction:column;gap:6px}
 .rv-raw textarea{width:100%;min-height:120px}
+
+/* ══════ 2026-11-08 考试日程（exams.js）：课表上的「考」能点开、周视图考试一行 ══════ */
+.lc.ex{cursor:pointer}
+.lc.ex .t{font-family:var(--f-num);font-size:10.5px}
+.lc.ex:hover,.wk-ex:hover{background:color-mix(in srgb,var(--seal) 20%,var(--surface))}
+.ex-n{font-size:9.5px;font-weight:400;opacity:.8}
+.ex-li .ex-lb{color:var(--seal);margin-right:2px}
+.ex-sw{align-self:flex-start}
+.ex-hi{font-weight:700;color:var(--seal)}
+.wk-exh{border-right:1px solid var(--line);border-bottom:1px solid var(--line);font-size:11px;color:var(--seal);font-weight:600;display:flex;align-items:center;justify-content:center}
+.wk-exd{border-left:1px solid var(--line-2);border-bottom:1px solid var(--line);padding:3px;display:flex;flex-direction:column;gap:2px;min-width:0;min-height:26px}
+.wk-exd[data-act]{cursor:copy}
+.wk-exd.today{background-color:color-mix(in srgb,var(--gold) 6%,transparent)}
+.wk-ex{display:block;width:100%;text-align:left;border:0;border-left:3px solid var(--seal);border-radius:3px;background:color-mix(in srgb,var(--seal) 12%,var(--surface));color:var(--seal);padding:1px 4px;font-size:11px;line-height:1.35;font-weight:600;cursor:pointer;overflow:hidden;overflow-wrap:anywhere}
+.wk-ex .t{font-variant-numeric:tabular-nums;font-size:10.5px}
+.wk-ex .l{display:block;font-weight:400}
+.pc.ex .pt{display:flex;align-items:center;gap:2px}
+.pc.ex .exk{padding:0 2px;font-size:9px;line-height:12px;flex:none}
+@media (min-width:600px){.pc.ex .exk{padding:0 3px;font-size:10px;line-height:14px}}
