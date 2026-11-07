@@ -140,6 +140,12 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 .lc.pend{border-style:dashed;opacity:.85} .mk.q{background:#c98a1a} .mk.ok{background:#3f8f5a}
 .pc.lv{opacity:.5;border-left-color:var(--seal)} .pc.lv .pn{text-decoration:line-through}
 .pc .pn.long{font-size:9px;letter-spacing:-.03em}
+/* 考试日（升学与出愿的笔试/面试/结果日） */
+.lc.ex{border-left-color:var(--seal);background:color-mix(in srgb,var(--seal) 12%,var(--surface));cursor:default;color:var(--seal);font-weight:600}
+.pc.ex{border-left-color:var(--seal);background:color-mix(in srgb,var(--seal) 14%,var(--surface))}
+.pc.ex .pt,.pc.ex .pn{color:var(--seal)}
+.exk{display:inline-block;background:var(--seal);color:#fff;border-radius:3px;padding:0 3px;font-size:10px;line-height:14px;font-weight:700}
+
 .ph-day .more{font-size:10px;color:var(--muted);text-align:center}
 /* 手机：每格最多 3 节、不显示科目；电脑/平板：页面变宽、格子变大、最多 5 节并显示科目 */
 .pc .ps,.ph-day .more.d{display:none}
