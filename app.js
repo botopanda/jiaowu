@@ -628,7 +628,7 @@ let PV = 'cal'; try { PV = localStorage.getItem('jw_view') || 'cal'; } catch(e) 
 function lessonItem(l, tz, whoFn, canReq, canEdit){
   const c = course(l.course_id), q = reqOf(l), leave = l.status!=='scheduled';
   return `<div class="les" style="--hc:${slotHue(timeFor(l,tz))}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}</div><div style="min-width:0;flex:1">${subjTag(c.subject)}${l.kind?` <span class="tag mute">${esc(l.kind)}</span>`:''} · ${esc(whoFn(c))}${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调课</span>':''}${l.status==='leave'?' <span class="tag seal">请假</span>':''}${l.status==='cancelled'?' <span class="tag mute">已取消</span>':''}${['student','parent'].includes(ME().role) ? (l.status==='scheduled' && l.date<TODAY ? ' <span class="tag mute">已上</span>' : '') : `${isDone(l)?(hasFb(l)?' <span class="tag ok">已反馈</span>':' <span class="tag ok">已上</span>'):''}${isPend(l)?` <span class="tag warn">${ME().role==='teacher'?'待写反馈':'待确认'}</span>`:''}`}${hrsTag(l)}${l.topic?`<div class="les-topic">本节：${esc(l.topic)}</div>`:''}
-    ${reqLine(q)}${canReq && !leave && l.date>=TODAY && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave && !fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}</div></div>`;
+    ${reqLine(q)}${canReq && !leave && l.date>=TODAY && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave && !fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}${isT() && fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="t-fb" data-v="${fbOf(l).id}">看反馈</button>`:''}</div></div>`;
 }
 // sid：要标考试的学生（学生、家长＝自己；老师＝自己正在教的学生，传编号数组，格子里写学生名字）
 function schedule(ls, tz, whoFn, canReq=false, canEdit=false, extra='', sid=null){
@@ -688,6 +688,23 @@ function tStudents(t){
     <dt>本月计划</dt><dd>${esc(planText(c.id, TODAY.slice(0,7))||'还没写')}</dd><dt>上次作业</dt><dd>${lastF?`${esc(lastF.hw)} ${lastF.hw_sub?'<span class="tag ok">已交</span>':'<span class="tag warn">未交</span>'}`:'—'}</dd></dl>
     <button class="btn sm" data-act="t-stu" data-v="${c.id}">档案 · 月计划 · 月度反馈 · 私下备注</button></section>`}).join('') : '<div class="empty">还没有分配学生</div>');
 }
+// 老师看自己写过的反馈（2026-11-09）：课表上「看反馈」弹窗、「反馈·批改 → 我写过的反馈」展开，共用下面这段
+function tFbRest(f){
+  const st = (v, ok, bad) => `<span class="tag ${v===ok?'ok':v===bad?'seal':'warn'}">${esc(v||'—')}</span>`;
+  return `${tagRow(f)}<div class="sec"><b>二、学生课堂表现</b><p>${esc(f.perf||'—')}</p></div><div class="sec"><b>三、课后作业</b><p>${esc(f.hw||'—')}</p></div>
+    ${fileList(f.id,'hw','学生交的作业')}${fileList(f.id,'grade','我的批改文件')}
+    ${f.hw_note?`<div class="small"><span class="muted">学生说：</span>${esc(f.hw_note)}</div>`:''}${f.hw_fb?`<div class="small"><span class="muted">我的批改：</span>${esc(f.hw_fb)}</div>`:''}
+    <div class="row xs"><span class="muted">上次作业</span>${st(f.last_hw,'已完成','未完成')}<span class="muted">本次作业</span><span class="tag ${f.hw_fb?'ok':f.hw_sub?'blue':'mute'}">${f.hw_fb?'已批改':f.hw_sub?'已交·待批改':'未交'}</span><span class="muted">学生确认</span>${confirmTag(f)}</div>`;
+}
+function tFbModal(fid){
+  const f = DB.feedbacks.find(x => x.id===fid), l = f && L(f.lesson_id), c = l && course(l.course_id);
+  if (!c) return;
+  lastModal = () => tFbModal(fid);
+  openModal(`${mHead(`${esc(stu(c.student_id).name)} · ${esc(c.subject)} · ${fmtMD(l.date)}`)}
+  <div class="fb"><div class="row xs"><span class="num">${timeFor(l, tea(c.teacher_id).tz)}</span>${l.kind?`<span class="tag mute">${esc(l.kind)}</span>`:''}<span class="tag ${f.status==='approved'?'ok':'warn'}">${f.status==='approved'?'已审核·家长可见':'待教务审核'}</span>${hrsTag(l)}</div>
+  <div class="sec"><b>一、本节授课内容</b><p>${esc(f.content||'—')}</p></div>${tFbRest(f)}${fileList(f.id,'hwref','作业图片')}${fileList(f.id,'note','上课笔记')}</div>
+  <div class="muted xs">补传作业图片、上课笔记，在「反馈·批改 → 我写过的反馈」里。反馈内容要改，请联系教务老师。</div>`, true);
+}
 function tWrite(t){
   const cand = DB.lessons.filter(l => l.date<=TODAY && l.status==='scheduled' && !fbOf(l)).reverse();
   // 我写过的反馈：按上课日期从新到旧，可以按月份、按学生筛选
@@ -718,7 +735,7 @@ function tWrite(t){
     <div class="muted xs">提前结束或者上超了，在这里改；工资按实际时长算。</div>
     <label class="field"><span>上次作业完成情况</span><select id="w-last"><option>已完成</option><option>部分完成</option><option>未完成</option><option>没有布置</option></select></label>
     <button class="btn pri" data-act="submit-fb">提交反馈</button></section>` : `<div class="card empty">上完的课都写好反馈了</div>`;
-  return form + grade + (allF.length ? fbBar + (mine.length ? '' : '<div class="card empty">这个月没有反馈</div>') + mine.map(f=>{const l=L(f.lesson_id);return `<div class="card small"><div class="row"><b>${sMD(l.date)} ${esc(stu(course(l.course_id).student_id).name)}</b>${hrsTag(l)}<span style="margin-left:auto">${confirmTag(f)}</span><span class="tag ${f.status==='approved'?'ok':'warn'}">${f.status==='approved'?'已审核·家长可见':'待教务审核'}</span></div><div class="muted">${esc(f.content)}</div>${fileList(f.id,'hwref','作业图片')}${fileList(f.id,'note','上课笔记')}<div class="row" style="margin-top:4px">${uploadBtn('hwref', f.id, '补传作业图片')}${uploadBtn('note', f.id, '上传上课笔记')}</div></div>`}).join('') : '');
+  return form + grade + (allF.length ? fbBar + (mine.length ? '' : '<div class="card empty">这个月没有反馈</div>') + mine.map(f=>{const l=L(f.lesson_id);return `<div class="card small"><div class="row"><b>${sMD(l.date)} ${esc(stu(course(l.course_id).student_id).name)}</b>${hrsTag(l)}<span style="margin-left:auto">${confirmTag(f)}</span><span class="tag ${f.status==='approved'?'ok':'warn'}">${f.status==='approved'?'已审核·家长可见':'待教务审核'}</span></div><div class="muted">${esc(f.content)}</div><details class="t-fb-more"><summary class="xs">展开：课堂表现、课后作业、学生确认</summary><div class="fb" style="margin-top:6px">${tFbRest(f)}</div></details>${fileList(f.id,'hwref','作业图片')}${fileList(f.id,'note','上课笔记')}<div class="row" style="margin-top:4px">${uploadBtn('hwref', f.id, '补传作业图片')}${uploadBtn('note', f.id, '上传上课笔记')}</div></div>`}).join('') : '');
 }
 function tMe(t){
   const ls = lsOfT(t.id).filter(l=>l.date.startsWith(S.teaMonth) && paidH(l)>0), h = ls.reduce((a,l)=>a+paidH(l),0);
@@ -1002,6 +1019,7 @@ document.addEventListener('click', async e => {
     case 'month': S.month = v==='0' ? TODAY.slice(0,7) : ymShift(S.month, Number(v)); render(); break;
     case 'caltype': S.calType=v; S.calId=''; render(); break;
     case 'lesson': lessonModal(v); break;
+    case 't-fb': tFbModal(v); break;   // 老师看自己写过的一条反馈
     case 'topic': { const box = document.getElementById('tp-view'), l = L(v); if (!box || !l) break;
       box.innerHTML = `<div class="row"><input type="text" id="tp-text" maxlength="200" value="${esc(l.topic||'')}" placeholder="例：第3节｜两点透视" style="flex:1;min-width:0"><button class="btn sm pri" data-act="topic-save" data-v="${v}">保存</button></div>`;
       document.getElementById('tp-text').focus(); break; }

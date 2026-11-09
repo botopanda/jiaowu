@@ -737,3 +737,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .pc.ex .pt{display:flex;align-items:center;gap:2px}
 .pc.ex .exk{padding:0 2px;font-size:9px;line-height:12px;flex:none}
 @media (min-width:600px){.pc.ex .exk{padding:0 3px;font-size:10px;line-height:14px}}
+
+/* ══════ 2026-11-09 老师看自己写过的反馈：「我写过的反馈」每条可以展开 ══════ */
+.t-fb-more{margin-top:2px}
+.t-fb-more>summary{cursor:pointer;color:var(--gold-text);padding:2px 0}
