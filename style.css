@@ -1,21 +1,29 @@
-/* 方案 A 唯新风：暖白底、墨色导航、金棕强调。只用系统字体，不加载任何外部资源（国内打开更稳）。 */
+/* 2026-11-13 新界面：深海军蓝 + 冷白底，全部无衬线字。只用系统字体，不加载任何外部资源（国内打开更稳）。
+   变量名沿用旧的，含义换了：--gold* ＝ 强调蓝（链接、选中、今天）；--nav ＝ 主按钮的深蓝；--seal ＝ 红（要处理）；--brand ＝ 侧栏 / 手机顶栏的深海军蓝。 */
 :root{
-  --am:#2e9e7a; --pm:#d9822b; --ev:#5b5fc7;
-  --bg:#f7f5f0; --surface:#ffffff; --sunk:#f2efe8; --ink:#1a1814; --muted:#8a847a; --line:#e2ded6; --line-2:#ede9e2;
-  --gold:#b8953a; --gold-text:#8c6d1f; --gold-soft:#f7efd9; --nav:#1a1814; --nav-ink:#f7f5f0;
-  --seal:#b03a2e; --ok:#2a8a5e; --warn:#a8780e; --blue:#2a5f9e;
-  --h1:#b8953a; --h2:#6f8452; --h3:#4f7396; --h4:#a0645a; --h5:#86679a; --h6:#5f8a86; --h7:#c4762f; --h8:#5d6db5; --h9:#8c8a3a;
-  --f-disp:"Songti SC","STSong","SimSun","Noto Serif CJK SC","Source Han Serif SC",serif;
-  --f-body:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;
-  --f-num:ui-monospace,"SF Mono",Consolas,Menlo,monospace;
-  --r:5px; color-scheme:light;
+  --am:#0f9d82; --pm:#dc8418; --ev:#6a62d6;
+  --bg:#f1f3f7; --surface:#ffffff; --sunk:#f3f5f9; --ink:#162136; --muted:#687386; --line:#e0e5ed; --line-2:#eaedf2; --line-3:#d2d8e2;
+  --gold:#3257d3; --gold-text:#2b4cbb; --gold-soft:#ebf0fe; --on-gold:#ffffff; --nav:#18243d; --nav-ink:#ffffff;
+  --brand:#131f38; --brand-hi:#86a6ff;
+  --seal:#cf3a3a; --ok:#12865b; --warn:#b4690a; --blue:#2f6bd8;
+  --h1:#3b6fd4; --h2:#22997a; --h3:#7b5fd3; --h4:#cf5f4d; --h5:#bf5590; --h6:#2496a6; --h7:#d48828; --h8:#5565c8; --h9:#84943a;
+  --f-body:-apple-system,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Microsoft YaHei UI","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;
+  --f-disp:var(--f-body); --f-num:var(--f-body);
+  --r:8px; --r-lg:12px; --side-w:212px; --top-h:52px;
+  --sh:0 0 0 1px rgba(22,33,54,.07),0 1px 2px rgba(22,33,54,.05);
+  --sh-up:0 0 0 1px rgba(22,33,54,.07),0 12px 36px rgba(22,33,54,.18);
+  color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root{
-  --am:#5cc9a3; --pm:#f0a85a; --ev:#9a9dff;
-  --bg:#15130f; --surface:#1e1b16; --sunk:#191712; --ink:#ece6da; --muted:#9d9587; --line:#343027; --line-2:#2a2720;
-  --gold:#d2b05a; --gold-text:#dcbb66; --gold-soft:#2c2616; --nav:#ece6da; --nav-ink:#15130f;
-  --seal:#e36b5d; --ok:#5dc295; --warn:#e0b04a; --blue:#7aa8e0;
-  --h1:#d2b05a; --h2:#9cb57d; --h3:#82a6cb; --h4:#d4937f; --h5:#b699c8; --h6:#8cc2bd; --h7:#e9a463; --h8:#9aa7ec; --h9:#c6c46e; color-scheme:dark}}
+  --am:#4fc9ae; --pm:#f0a551; --ev:#a09af6;
+  --bg:#0c1320; --surface:#151e30; --sunk:#111928; --ink:#e4e9f3; --muted:#8f9bb1; --line:#27324a; --line-2:#1e283b; --line-3:#35415b;
+  --gold:#7094ff; --gold-text:#93adff; --gold-soft:#1a2748; --on-gold:#0c1320; --nav:#e4e9f3; --nav-ink:#0c1320;
+  --brand:#090f1b; --brand-hi:#86a6ff;
+  --seal:#f17575; --ok:#52c898; --warn:#e8ae4e; --blue:#7ba7f3;
+  --h1:#7ba1ee; --h2:#5cc7a8; --h3:#a892ee; --h4:#ec9282; --h5:#e08bbb; --h6:#62c3d1; --h7:#eeb05d; --h8:#8f9cec; --h9:#b9c867;
+  --sh:0 0 0 1px rgba(255,255,255,.07);
+  --sh-up:0 0 0 1px rgba(255,255,255,.09),0 14px 40px rgba(0,0,0,.55);
+  color-scheme:dark}}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.6;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
@@ -742,3 +750,279 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .t-fb-more{margin-top:2px}
 .t-fb-more>summary{cursor:pointer;color:var(--gold-text);padding:2px 0}
 .t-fb-txt{white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* ══════════════════════════════════════════════════════════════
+   2026-11-13 新界面（深海军蓝 + 冷白底）
+   上面是历次的布局规则，这一段统一外观：字体、顶栏侧栏、卡片、按钮、标签、课表、手机底栏、弹窗。
+   ══════════════════════════════════════════════════════════════ */
+html{-webkit-text-size-adjust:100%}
+body{line-height:1.55;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+h1,h2,h3,h4{font-weight:600;letter-spacing:0}
+b,strong{font-weight:600}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+select,input[type=text],input[type=date],input[type=time],input[type=number],input[type=month],input[type=search],input[type=url],textarea{
+  border-color:var(--line-3);border-radius:var(--r);padding:7px 10px;transition:border-color .12s,box-shadow .12s}
+select:focus,input:focus,textarea:focus{outline:0;border-color:var(--gold);box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 18%,transparent)}
+::placeholder{color:color-mix(in srgb,var(--muted) 70%,transparent)}
+.chk{accent-color:var(--gold)}
+
+/* ───── 顶栏：电脑上左边一块深蓝放系统名（和侧栏连成一条），右边白底放身份；手机上整条深蓝 ───── */
+.top{gap:6px 12px;padding:0 20px 0 0;min-height:var(--top-h);border-bottom:0;box-shadow:inset 0 -1px 0 var(--line)}
+.top h1{align-self:stretch;width:var(--side-w);padding:0 18px;background:var(--brand);color:#fff;font-size:15px;font-weight:600;letter-spacing:.03em;gap:10px;white-space:nowrap}
+.top .logo{width:26px;height:26px;border-radius:7px;margin-right:0;display:grid;place-items:center;background:linear-gradient(140deg,#5b83f6,#2f52cc);color:#fff;font-size:15px;font-weight:700;letter-spacing:0;line-height:1}
+.top .who{font-size:13px;color:var(--ink);display:inline-flex;align-items:center;gap:8px}
+.top .who-av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--gold-soft);color:var(--gold-text);font-size:12.5px;font-weight:600;flex:none}
+.top .who small{font-size:12px;color:var(--muted)}
+.layout,.layout.pl{min-height:calc(100vh - var(--top-h))}
+@media (min-width:761px){.layout{grid-template-columns:var(--side-w) minmax(0,1fr)}}
+
+/* ───── 侧栏（电脑）：深海军蓝；里面的字、线跟着变浅 ───── */
+@media (min-width:761px){
+  .side{background:var(--brand);border-right:0;padding:6px 10px 14px;gap:2px;position:sticky;top:var(--top-h);height:calc(100vh - var(--top-h));align-self:start;overflow-y:auto;scrollbar-width:thin;
+    --ink:#ffffff;--muted:rgba(255,255,255,.52);--line:rgba(255,255,255,.1);--line-2:rgba(255,255,255,.08);--line-3:rgba(255,255,255,.2);--sunk:rgba(255,255,255,.07);--surface:transparent;--gold-text:#a9c0ff;--gold:#4f74e6;--on-gold:#fff;color:rgba(255,255,255,.8)}
+  .side .grp{font-size:11px;letter-spacing:.14em;color:rgba(255,255,255,.36);padding:16px 10px 6px}
+  .side .nav{color:rgba(255,255,255,.74);padding:8px 10px;border-radius:8px;font-size:13.5px;transition:background .12s,color .12s}
+  .side .nav:hover{background:rgba(255,255,255,.07);color:#fff}
+  .side .nav.on{background:rgba(255,255,255,.12);color:#fff;font-weight:600;box-shadow:inset 3px 0 0 var(--brand-hi)}
+  .side .nav-ic{width:18px;height:18px;opacity:.9}
+  .side .nav .cnt{background:#e5484d;font-weight:600;padding:0 6px;line-height:18px;border-radius:9px;font-size:11px}
+  .pside{top:var(--top-h);height:calc(100vh - var(--top-h))}
+  .side-me{padding:12px 8px 14px;margin-bottom:8px}
+  .side-foot{font-size:12.5px}
+}
+/* ───── 手机：顶栏整条深蓝、跟着页面滚走；教务的菜单条吸在最上面 ───── */
+@media (max-width:760px){
+  .top{position:static;background:var(--brand);padding:9px 14px;min-height:50px;box-shadow:none;color:#fff;
+    --ink:#ffffff;--muted:rgba(255,255,255,.68);--line:rgba(255,255,255,.2);--line-3:rgba(255,255,255,.3);--surface:transparent;--sunk:rgba(255,255,255,.12)}
+  .top h1{width:auto;padding:0;background:none;align-self:center;font-size:15.5px}
+  .top .who-av{display:none}
+  .top .who{color:rgba(255,255,255,.8)}
+  .top .seg{border-color:transparent}
+  .top .seg button.on{background:#fff;color:var(--brand);box-shadow:none}
+  .top .btn:hover{background:rgba(255,255,255,.12)}
+  .side{top:0;background:var(--surface);padding:8px 12px;gap:6px;border-bottom:1px solid var(--line)}
+  .side .nav{padding:6px 12px;border-radius:999px;background:var(--sunk);font-size:13px;gap:5px}
+  .side .nav.on{background:var(--nav);color:var(--nav-ink);font-weight:600}
+  .side .nav .cnt{line-height:16px;font-size:10.5px}
+}
+
+/* ───── 页面骨架 ───── */
+.main{padding:20px 24px 64px;gap:14px}
+.ph{gap:8px 10px}
+.ph h2{font-size:20px}
+.hint{margin-top:-8px}
+.scope{background:var(--gold-soft);color:var(--gold-text);border-radius:var(--r);padding:8px 12px}
+.note{border-left:0;border-radius:var(--r);background:var(--gold-soft);padding:9px 12px;font-size:13px;line-height:1.6}
+.note.warn{background:color-mix(in srgb,var(--seal) 9%,var(--surface))}
+.empty{padding:22px 16px;font-size:13px}
+@media (max-width:760px){.main{padding:14px 14px 56px}}
+
+/* ───── 卡片：不描边，用一圈很淡的阴影 ───── */
+.card,.stat,.tw,.les,.pf-page,.sx-list,.wk-wrap,.bst div{border-color:transparent;box-shadow:var(--sh)}
+.card,.pf-page,.tw,.wk-wrap,.sx-list{border-radius:var(--r-lg)}
+.card{padding:14px 16px}
+.card>h3,.sh-h,.sp-h,.cv-h{font-size:14.5px}
+.card .card{box-shadow:none;border-color:var(--line);border-radius:var(--r)}
+.grid2{gap:14px;align-items:start}
+details.card>summary{outline-offset:6px}
+
+/* ───── 数字方块 ───── */
+.stats{gap:10px;grid-template-columns:repeat(auto-fit,minmax(132px,1fr))}
+.stat{position:relative;border-radius:var(--r-lg);padding:11px 14px 10px;gap:1px;transition:box-shadow .12s,transform .12s}
+.stat small{font-size:12.5px}
+.stat b{font-size:26px;font-weight:600;line-height:1.25;color:var(--ink)}
+.stat.al b{color:var(--seal)}
+.stat.al::after{content:"";position:absolute;right:13px;top:15px;width:7px;height:7px;border-radius:50%;background:var(--seal)}
+button.stat:hover{border-color:transparent;box-shadow:0 0 0 1.5px var(--gold),0 4px 14px rgba(22,33,54,.08)}
+.bst{gap:8px}
+.bst div{border-radius:var(--r);padding:8px 4px}
+.bst b{font-weight:600;color:var(--ink)}
+.sp-stats>div{border-radius:var(--r)}
+
+/* ───── 按钮 ───── */
+.btn{border-color:var(--line-3);border-radius:var(--r);padding:5px 12px;font-size:13px;font-weight:500;line-height:1.5;transition:background .12s,border-color .12s,box-shadow .12s}
+.btn:hover{border-color:var(--line-3);background:var(--sunk)}
+.btn.sm{padding:2px 9px;font-size:12.5px;border-radius:7px}
+.btn.pri{background:var(--nav);color:var(--nav-ink);border-color:var(--nav)}
+.btn.pri:hover{background:color-mix(in srgb,var(--nav) 86%,var(--gold));border-color:transparent}
+.btn.gold{background:var(--gold);color:var(--on-gold);border-color:var(--gold)}
+.btn.gold:hover{background:color-mix(in srgb,var(--gold) 88%,#000)}
+.btn.seal{background:var(--seal);border-color:var(--seal)}
+.btn.seal:hover{background:color-mix(in srgb,var(--seal) 88%,#000)}
+.btn.danger{color:var(--seal)}
+.btn.danger:hover{background:color-mix(in srgb,var(--seal) 8%,var(--surface));border-color:color-mix(in srgb,var(--seal) 40%,var(--line-3))}
+.btn:disabled{background:var(--sunk)}
+.link-btn{color:var(--gold-text)}
+
+/* ───── 切换条：浅灰底上一块白色滑块 ───── */
+.seg{border:1px solid var(--line);background:var(--sunk);border-radius:9px;padding:2px;gap:2px;overflow:visible}
+.seg button{background:transparent;border-radius:7px;padding:3px 12px;font-size:13px;color:var(--muted);font-weight:500;transition:background .12s,color .12s}
+.seg button+button{border-left:0}
+.seg button:hover{color:var(--ink)}
+.seg button.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 0 0 1px rgba(22,33,54,.06),0 1px 2px rgba(22,33,54,.12)}
+.book-seg button{padding:2px 10px}
+@media (prefers-color-scheme:dark){.seg button.on{background:var(--line-3)}}
+
+/* ───── 小标签：淡底色的小药丸。红＝要处理，绿＝完成，其余灰 ───── */
+.tag{border:0!important;background:color-mix(in srgb,currentColor 10%,transparent)!important;padding:0 7px!important;border-radius:5px;color:var(--muted)!important;font-weight:500;font-size:11.5px;line-height:19px;vertical-align:1px}
+.tag.seal,.tag.warn{color:var(--seal)!important;font-weight:600}
+.tag.ok{color:var(--ok)!important}
+.li>.tag:first-child{min-width:46px;text-align:center;margin-top:1px;flex:none}
+.chip{border-color:var(--line-3);border-radius:999px;padding:3px 12px;transition:background .12s}
+.chip:hover{background:var(--sunk)}
+.chip.on{background:var(--nav);color:var(--nav-ink);border-color:var(--nav)}
+.tchip{border-radius:6px;border-color:transparent;background:var(--sunk)}
+.subj{gap:5px}
+.subj::before{width:6px;height:6px;border-radius:50%}
+
+/* ───── 列表、表格 ───── */
+.li{padding:9px 0;gap:10px}
+.tw{border:0}
+th,td{padding:9px 12px}
+th{background:color-mix(in srgb,var(--sunk) 70%,var(--surface));font-size:12px;border-bottom-color:var(--line)}
+tr.click:hover td{background:color-mix(in srgb,var(--gold-soft) 55%,var(--surface))}
+.kv{gap:4px 14px}
+
+/* ───── 教务月历 ───── */
+.cal-bar{gap:8px}
+.mon{font-size:16px;font-weight:600;min-width:84px}
+.cal{border:0;border-radius:var(--r-lg);background:var(--line-2);box-shadow:var(--sh)}
+.cal .hd{background:var(--surface);font-size:12px;color:var(--muted);padding:7px 0;font-weight:500}
+.cal .hd.we{color:color-mix(in srgb,var(--seal) 75%,var(--muted))}
+.cal .day{min-height:104px;padding:5px 5px 6px;gap:3px}
+.cal .day.off{background:color-mix(in srgb,var(--sunk) 60%,var(--surface))}
+.cal .dn{font-size:12px;font-weight:500;padding:0 3px}
+.cal .day.today{background:color-mix(in srgb,var(--gold-soft) 45%,var(--surface))}
+.cal .day.today .dn{background:var(--gold);color:var(--on-gold);border-radius:999px;padding:0 7px;font-weight:600}
+.lc{border-left:3px solid var(--hc);background:color-mix(in srgb,var(--hc) 11%,var(--surface));border-radius:5px;padding:2px 6px;font-size:11.5px;line-height:1.4;color:var(--ink);transition:background .12s}
+button.lc:hover{background:color-mix(in srgb,var(--hc) 20%,var(--surface))}
+.lc .t{font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;color:color-mix(in srgb,var(--hc) 62%,var(--ink))}
+.lc.ex .t{color:inherit}
+.exk{border-radius:4px}
+.mk{border-radius:4px}
+.slot-lg i{border-radius:50%;width:8px;height:8px}
+
+/* ───── 老师 / 学生 / 家长的月历 ───── */
+.pw{padding:18px 20px}
+.ph-cal{padding:10px 8px}
+.ph-grid{gap:3px}
+.ph-hd{font-size:11.5px;font-weight:500;padding:2px 0 4px}
+.ph-hd.we{color:color-mix(in srgb,var(--seal) 75%,var(--muted))}
+.ph-day{border:1.5px solid transparent;border-radius:8px;min-height:60px;padding:3px 2px 4px;gap:2px;background:color-mix(in srgb,var(--sunk) 75%,var(--surface))}
+.ph-day:not(.has){background:color-mix(in srgb,var(--sunk) 75%,var(--surface));border-color:transparent}
+.ph-day.has{background:var(--surface);box-shadow:inset 0 0 0 1px var(--line-2)}
+.ph-day .n{font-size:11.5px;font-weight:500;line-height:1.45}
+.ph-day.today .n{background:var(--gold);color:var(--on-gold);border-radius:999px;padding:0 6px;font-weight:600}
+.ph-day.sel{border-color:var(--gold);box-shadow:none;background:color-mix(in srgb,var(--gold-soft) 60%,var(--surface))}
+.pc{border-left:2px solid var(--hc);background:color-mix(in srgb,var(--hc) 13%,var(--surface));border-radius:4px;padding:1px 3px}
+.pc .pt{font-variant-numeric:tabular-nums;color:color-mix(in srgb,var(--hc) 55%,var(--muted))}
+.pc .pn{font-weight:600}
+@media (min-width:900px){.ph-day{border-radius:10px}.ph-day .n{padding:0 3px}.ph-day.today .n{padding:0 8px}}
+.dg{font-size:12.5px;font-weight:500;letter-spacing:.02em;margin-top:8px}
+.dg.today{color:var(--gold-text);font-weight:600}
+.les{border-radius:10px;padding:10px 12px;gap:12px;border-left:0!important}
+.les .when{font-family:var(--f-body);font-weight:600;font-variant-numeric:tabular-nums;font-size:13.5px;min-width:92px}
+.nx-card,.fbx,.fbp{border-left:0!important}
+
+/* ───── 周视图 ───── */
+.wk-hd.today b{background:var(--gold);color:var(--on-gold)}
+.wk-l{border-radius:6px}
+
+/* ───── 手机底部菜单 ───── */
+.tabbar{background:color-mix(in srgb,var(--surface) 92%,transparent);-webkit-backdrop-filter:saturate(1.5) blur(14px);backdrop-filter:saturate(1.5) blur(14px);border-top:1px solid var(--line)}
+.tabbar button{font-size:11px;gap:3px;padding:8px 0 7px;border-top:0;transition:color .12s}
+.tabbar button.on{color:var(--gold-text);font-weight:600}
+.tabbar .nav-ic{width:22px;height:22px}
+.tabbar button.on .nav-ic{stroke-width:2.1}
+.tabbar .dot{background:#e5484d;font-weight:600;top:3px;margin-left:18px}
+
+/* ───── 反馈卡 ───── */
+.fb{gap:8px}
+.fb .sec b{font-size:12px}
+.stamp{right:14px;top:13px;width:auto;height:auto;border:0;border-radius:5px;transform:none;opacity:1;display:inline-block;font-family:inherit;font-size:11.5px;font-weight:600;letter-spacing:0;padding:0 7px;line-height:19px;color:var(--ok);background:color-mix(in srgb,var(--ok) 11%,transparent)}
+.remind{border:0;border-radius:var(--r);background:var(--gold-soft);padding:9px 12px}
+.remind b,.remind button::before{color:var(--gold-text)}
+
+/* ───── 弹窗、提示 ───── */
+.mb{background:rgba(10,17,31,.5);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);padding:6vh 16px}
+.modal{border:0;border-radius:14px;padding:20px;gap:14px;box-shadow:var(--sh-up)}
+.mh h3{font-size:16.5px}
+.field{gap:4px}
+.field>span{font-size:12.5px}
+.fields{gap:10px}
+.toast{box-shadow:var(--sh-up);padding:9px 18px}
+@media (max-width:560px){.mb{padding:3vh 10px}.modal{padding:16px;border-radius:12px}}
+
+/* ───── 学生 / 家长首页 ───── */
+.sh-hi h2{font-size:21px}
+.nx-card{background:linear-gradient(160deg,var(--gold-soft),color-mix(in srgb,var(--gold-soft) 35%,var(--surface)));box-shadow:0 0 0 1px color-mix(in srgb,var(--gold) 14%,transparent)}
+.nx-label{letter-spacing:.06em;font-size:12.5px}
+.nx-when{font-size:21px}
+.nx-when .num{font-size:26px;font-weight:700;letter-spacing:-.01em}
+.nx-topic{background:color-mix(in srgb,var(--surface) 70%,transparent)}
+.nx-later{border-top-style:solid;border-top-color:color-mix(in srgb,var(--gold) 14%,transparent)}
+.todo-i{border:0;background:var(--sunk);border-radius:10px;transition:background .12s}
+.todo-i:hover{background:color-mix(in srgb,var(--gold-soft) 60%,var(--sunk))}
+.todo-go{margin-left:auto}
+.todo-ok{border-left:0}
+.cd-n{border-radius:10px}
+.wk-row{border-top-color:var(--line-2)}
+.wk-row.today .wk-d{color:var(--gold-text)}
+.msg-entry{border:0;background:var(--gold-soft);border-radius:10px}
+.wd-w{font-family:"Hiragino Sans","Yu Gothic","Noto Sans CJK JP",var(--f-body);font-weight:600}
+.sx-list{border:0}
+.side-av{background:var(--gold);color:var(--on-gold)}
+
+/* ───── 学生页（教务看一个学生） ───── */
+.sp-title h2{font-size:22px}
+.sp-ti{border:0;border-left:0;background:var(--sunk);border-radius:10px;padding:9px 12px;transition:background .12s}
+.sp-ti::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--muted);flex:none}
+.sp-ti.warn::before,.sp-ti.seal::before{background:var(--seal)}
+.sp-ti:hover{background:color-mix(in srgb,var(--gold-soft) 60%,var(--sunk))}
+.sp-pop{border:0;border-radius:10px;box-shadow:var(--sh-up)}
+.sp-tabs button,.pg-tabs button{padding:8px 12px}
+
+/* ───── 个人档案页（也用来打印）：小标题后面拉一条细线，不要左边的色条 ───── */
+.pf-head{border-bottom:2px solid var(--nav)}
+.pf-head small{color:var(--muted)}
+.pf-h{display:flex;align-items:center;gap:10px;color:var(--ink);font-size:14.5px;padding-left:0;border-left:0}
+.pf-h::after{content:"";flex:1;height:1px;background:var(--line)}
+.pf-kv{border-radius:6px}
+.pf-note{border-radius:6px}
+.pg-school{font-size:15.5px;font-weight:600}
+.tl-mh b{font-size:15px}
+
+/* ───── 总览：左边今天的课 + 近期考试，右边要处理的事 ───── */
+.ov-col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.ov-t{min-width:92px;font-weight:600}
+.ov-d{white-space:nowrap;color:var(--muted)}
+@media (min-width:900px){.ov-grid{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}}
+@media (max-width:899px){.ov-grid{grid-template-columns:minmax(0,1fr)}.ov-col{display:contents}.ov-today{order:1}.ov-todo{order:2}.ov-exam{order:3}}
+
+/* ───── 手机上的细节 ───── */
+@media (max-width:760px){
+  .top .book-seg{order:9;flex:1 1 100%;display:flex}
+  .top .book-seg button{flex:1;padding:4px 0}
+  .stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .stat{padding:9px 11px 8px}
+  .stat small{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stat b{font-size:22px}
+  .stat.al::after{right:10px;top:12px;width:6px;height:6px}
+  .li-ch{flex-wrap:wrap}
+  .li-ch>.grow{flex:1 1 calc(100% - 60px)}
+  .li-ch>.row{flex:1 1 100%;justify-content:flex-end}
+}
+/* 手机月历格子里的「已反馈 / 待写」小记号：不要色块，只留一个小符号，免得被格子裁掉 */
+.pc .mk.ok,.pc .mk.q{background:none;padding:0;margin-left:1px}
+.pc .mk.ok{color:var(--ok)}
+.pc .mk.q{color:var(--warn)}
+@media (max-width:599px){.pc{padding:1px 2px}}
+
+/* ───── 表单 ───── */
+.main .card>.fields,.main .card .field>input[type=text]{max-width:780px}
+input[type=file]{font-size:12.5px;color:var(--muted);max-width:100%}
+input[type=file]::file-selector-button{font:inherit;font-weight:500;color:var(--ink);background:var(--surface);border:1px solid var(--line-3);border-radius:7px;padding:4px 11px;margin-right:8px;cursor:pointer}
+input[type=file]::file-selector-button:hover{background:var(--sunk)}
+.ov-exam>.row{margin-bottom:4px}
+.wk-hd b{line-height:28px}
+.wk-hd.today b{display:block;width:28px;margin:0 auto}

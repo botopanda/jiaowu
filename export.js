@@ -5,7 +5,7 @@
    · 图片在弹窗里显示：手机长按保存或转发，电脑点「下载图片」
    · 不管系统是深色还是浅色，导出的图片都用浅色，方便发给别人看
    ══════════════════════════════════════════════════════════════ */
-const SX_C = {bg:'#f7f5f0', card:'#ffffff', ink:'#1a1814', muted:'#8a847a', line:'#e2ded6', off:'#faf8f4', gold:'#b8953a', seal:'#b03a2e', am:'#2e9e7a', pm:'#d9822b', ev:'#5b5fc7'};
+const SX_C = {bg:'#f1f3f7', card:'#ffffff', ink:'#162136', muted:'#687386', line:'#e0e5ed', off:'#f6f7fa', gold:'#3257d3', seal:'#cf3a3a', am:'#0f9d82', pm:'#dc8418', ev:'#6a62d6'};
 const SX_TINT = {am:'rgba(46,158,122,.11)', pm:'rgba(217,130,43,.12)', ev:'rgba(91,95,199,.11)'};
 const sxSlot = t => { const h = +String(t).slice(0, 2); return h < 12 ? 'am' : h < 18 ? 'pm' : 'ev'; };
 const sxBtn = sid => `<button class="btn sm" data-act="sx" data-v="${sid}">导出图片</button>`;
@@ -109,7 +109,7 @@ document.addEventListener('click', e => {
    · 通关进度（美术生）、接下来的出愿 / 考试、下个月计划
    · 只用教务审核过的反馈（家长本来就只看得到审核过的）
    ══════════════════════════════════════════════════════════════ */
-const SX_HUE = {'--h1':'#b8953a','--h2':'#6f8452','--h3':'#4f7396','--h4':'#a0645a','--h5':'#86679a','--h6':'#5f8a86','--h7':'#c4762f','--h8':'#5d6db5','--h9':'#8c8a3a'};
+const SX_HUE = {'--h1':'#3b6fd4','--h2':'#22997a','--h3':'#7b5fd3','--h4':'#cf5f4d','--h5':'#bf5590','--h6':'#2496a6','--h7':'#d48828','--h8':'#5565c8','--h9':'#84943a'};
 const sxHue = subj => SX_HUE[(hue(subj).match(/--h\d/) || ['--h1'])[0]];
 // 按宽度把一段话折成几行，最多 max 行（超出的最后一行加「……」）
 function sxWrap(g, txt, w, max){
@@ -166,7 +166,7 @@ async function mrCanvas(sid, ym){
     const sw = g.measureText(c.subject).width; g.fillStyle = SX_C.muted; g.font = font(13.5); g.fillText(`${tea(c.teacher_id).name} 老师 · 这个月 ${fs.length} 节`, P + 46 + sw, cy);
     cy += 32; g.fillStyle = SX_C.ink; g.font = font(14.5); say.forEach(t => { g.fillText(t, P + 18, cy); cy += 24; });
     if (tags.length) { let tx = P + 18; cy += 4; g.font = font(12.5);
-      tags.forEach(t => { const w = g.measureText(t).width + 18; g.fillStyle = '#f7efd9'; sxRound(g, tx, cy - 15, w, 22, 11); g.fill(); g.fillStyle = '#8c6d1f'; g.fillText(t, tx + 9, cy); tx += w + 6; }); }
+      tags.forEach(t => { const w = g.measureText(t).width + 18; g.fillStyle = '#ebf0fe'; sxRound(g, tx, cy - 15, w, 22, 11); g.fill(); g.fillStyle = '#2b4cbb'; g.fillText(t, tx + 9, cy); tx += w + 6; }); }
     yy += h + 12;
   });
   yy += 18;

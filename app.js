@@ -76,7 +76,8 @@ const ymLabel = ym => `${+ym.slice(0,4)}年${+ym.slice(5)}月`;
 const ymShift = (ym, n) => { const [y,m] = ym.split('-').map(Number); const d = new Date(y, m-1+n, 1); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; };
 const HUES = ['--h1','--h2','--h3','--h4','--h5','--h6','--h7','--h8','--h9'];
 const hueMap = {};
-const hue = s => { const fi = typeof SUBJECTS !== "undefined" ? SUBJECTS.indexOf(s) : -1; if (fi >= 0) return `var(${HUES[fi]})`; if (!(s in hueMap)) hueMap[s] = HUES[Object.keys(hueMap).length % HUES.length]; return `var(${hueMap[s]})`; };
+const hue = s => { const fi = typeof SUBJECTS !== "undefined" ? SUBJECTS.indexOf(s) : -1; if (fi >= 0) return `var(${HUES[fi]})`; if (!(s in hueMap)) { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) % 9973; hueMap[s] = HUES[h % HUES.length]; }   // 不在固定科目里的：按名字算出一个固定的颜色，谁看、在哪一页看都一样
+  return `var(${hueMap[s]})`; };
 // 课表颜色按上课时间分：上午（0–12 点）/ 下午（12–18 点）/ 晚上（18–24 点）
 const slotHue = t => { const h = +String(t).slice(0, 2); return h < 12 ? 'var(--am)' : h < 18 ? 'var(--pm)' : 'var(--ev)'; };
 const slotLegend = () => '<span class="slot-lg"><i style="--hc:var(--am)"></i>上午<i style="--hc:var(--pm)"></i>下午<i style="--hc:var(--ev)"></i>晚上</span>';
@@ -239,7 +240,7 @@ function render(){
   const me = ME();
   const label = me.role==='admin' ? (me.owner ? '总管理' : me.level==='top' ? '教务 · 管理' : '教务') : {teacher:'任课老师', student:'学生', parent:'家长'}[me.role];
   setTimeout(labelTables);
-  app.innerHTML = `<header class="top"><h1><img class="logo" src="apple-touch-icon.png" alt="">学生教务管理系统</h1>${me.owner ? bookSwitch() : ''}<span class="who">${esc(me.name)}${me.role==='student' ? '同学' : me.role==='parent' || me.owner ?'':' · '+label}</span>${['student','parent'].includes(me.role) ? '' : '<button class="btn sm" data-act="logout" title="让这台设备忘掉你的链接">退出</button>'}</header>` + (isAdmin() ? adminView() : phoneView());
+  app.innerHTML = `<header class="top"><h1><span class="logo" aria-hidden="true">教</span>学生教务管理系统</h1>${me.owner ? bookSwitch() : ''}<span class="who"><span class="who-av" aria-hidden="true">${esc(String(me.name||'').slice(0,1))}</span><span>${esc(me.name)}${me.role==='student' ? '同学' : ''}</span>${me.role==='student' || me.role==='parent' || me.owner ? '' : `<small>${label}</small>`}</span>${['student','parent'].includes(me.role) ? '' : '<button class="btn sm" data-act="logout" title="让这台设备忘掉你的链接">退出</button>'}</header>` + (isAdmin() ? adminView() : phoneView());
 }
 
 /* ═════════════ 教务端 ═════════════ */
@@ -299,7 +300,7 @@ function chClash(x){
 function chCard(x, forAdmin){
   const cl = forAdmin && x.status==='pending' ? chClash(x) : [];
   const c = course(x.course_id) || {}, who = forAdmin ? `<b>${esc(x.by_name)}</b> · ${esc(stu(c.student_id).name)} ${c.subject?subjTag(c.subject):''}` : `<b>${esc(stu(c.student_id).name)}</b> ${c.subject?subjTag(c.subject):''}`;
-  return `<div class="li ${cl.length?'li-clash':''}"><span class="tag ${x.kind==='delete'?'seal':x.kind==='add'?'blue':'warn'}">${chKind[x.kind]}</span><div class="grow">${who}<br><span class="small">${chText(x)}</span>
+  return `<div class="li li-ch ${cl.length?'li-clash':''}"><span class="tag ${x.kind==='delete'?'seal':x.kind==='add'?'blue':'warn'}">${chKind[x.kind]}</span><div class="grow">${who}<br><span class="small">${chText(x)}</span>
     ${cl.length ? `<div class="ch-clash">撞课：${cl.map(esc).join('；')}</div>` : ''}
     ${x.status!=='pending' && x.status!=='withdrawn' ? `<div class="xs" style="color:${x.status==='approved'?'var(--ok)':'var(--seal)'}">${x.status==='approved'?'已批准':'未批准'}（${esc(x.handled_by||'')}）${x.result?'：'+esc(x.result):''}${x.reply?'：'+esc(x.reply):''}</div>`:''}</div>
     ${x.status==='pending' ? (forAdmin ? `<span class="row"><button class="btn sm" data-act="ch-no" data-v="${x.id}">不批准</button><button class="btn pri sm" data-act="ch-ok" data-v="${x.id}">批准</button></span>` : `<span class="row">${chStatus(x)}<button class="btn sm" data-act="ch-withdraw" data-v="${x.id}">撤回</button></span>`) : (forAdmin ? '' : `<span class="row">${chStatus(x)}<button class="btn sm" data-act="ch-seen" data-v="${x.id}">知道了</button></span>`)}</div>`;
@@ -316,6 +317,7 @@ function pgOverview(){
   const reqs = DB.requests.filter(q => q.status==='pending');
   const bad = DB.feedbacks.filter(f => f.confirm==='不满意' && L(f.lesson_id).date >= ymShift(TODAY.slice(0,7),-1)+'-01');
   const empty = !DB.students.length;
+  const evs = upcomingEvents(14), fus = (DB.followups||[]).filter(f=>f.next_date && f.confirm!=='已确认' && f.next_date<=TODAY);
   return `<div class="ph"><h2>总览</h2><span class="muted small">${fmtMD(TODAY)}</span></div>${scopeNote()}
   ${empty && isTop() ? `<div class="note">系统是空的，按这个顺序开始：① <b>老师档案</b>里添加老师 → ② <b>学生档案</b>里添加学生，并在学生里添加课程（哪位老师、什么科目、单价）→ ③ <b>课表与排课</b>里排课 → ④ <b>链接与备份</b>里复制每个人的专属链接发给他们。</div>` : ''}
   <div class="stats">
@@ -326,19 +328,21 @@ function pgOverview(){
     <button class="stat ${miss.length?'al':''}" ${isTop()?'data-act="page" data-v="feedback-missing"':''}><small>待确认的课</small><b>${miss.length}</b></button>
   </div>
   ${ownerClashBlock()}
-  <div class="grid2">
-    <section class="card"><h3>今天的课</h3><div class="list">${today.length ? today.map(l => { const c=course(l.course_id);
-      return `<div class="li"><span class="num">${l.start}</span><div class="grow">${esc(stu(c.student_id).name)} · ${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}</div>${l.status==='leave'?'<span class="tag seal">请假</span>':''}</div>`}).join('') : '<div class="empty">今天没有课</div>'}</div></section>
-    <section class="card"><h3>需要处理</h3><div class="list">
+  <div class="grid2 ov-grid">
+    <div class="ov-col">
+    <section class="card ov-today"><h3>今天的课</h3><div class="list">${today.length ? today.map(l => { const c=course(l.course_id);
+      return `<div class="li"><span class="num ov-t">${l.start}–${l.end}</span><div class="grow"><b>${esc(stu(c.student_id).name)}</b> · ${esc(tea(c.teacher_id).name)} ${subjTag(c.subject)}</div>${l.status==='leave'?'<span class="tag seal">请假</span>':''}</div>`}).join('') : '<div class="empty">今天没有课</div>'}</div></section>
+    <section class="card ov-exam"><div class="row"><h3 style="margin:0 auto 0 0">近期考试 <span class="muted small" style="font-weight:400">14 天内</span></h3><button class="btn sm" data-act="page" data-v="apply">升学与出愿 ›</button></div><div class="list">${evs.length ? evs.map(e=>`<div class="li"><span class="tag ${e.days<=7?'seal':'mute'}">${e.days===0?'今天':e.days+' 天'}</span><div class="grow"><b>${esc(stu(e.t.student_id).name)}</b> · ${esc(e.t.school)}</div><span class="num small ov-d">${e.label} ${sMD(e.date)}</span></div>`).join('') : '<div class="empty">14 天内没有考试</div>'}</div></section>
+    </div>
+    <section class="card ov-todo"><h3>需要处理</h3><div class="list">
       ${isTop() ? reqs.map(q => { const l=L(q.lesson_id), c=course(l.course_id); return `<div class="li"><span class="tag ${q.type==='请假'?'seal':'warn'}">${q.type}</span><div class="grow">${esc(stu(c.student_id).name)} · ${sMD(l.date)} ${esc(c.subject)}：${esc(q.reason)}</div><button class="btn sm" data-act="page" data-v="requests">去处理</button></div>`}).join('') : ''}
       ${isTop() && pend.length ? `<div class="li"><span class="tag seal">审批</span><div class="grow">${pend.length} 条反馈等待审批，审批后家长才能看到</div><button class="btn sm" data-act="page" data-v="feedback">去审批</button></div>` : ''}
       ${bad.map(f => { const l=L(f.lesson_id), c=course(l.course_id); return `<div class="li"><span class="tag seal">不满意</span><div class="grow">${esc(stu(c.student_id).name)} 对 ${sMD(l.date)} ${esc(tea(c.teacher_id).name)} 的课评价「不满意」</div></div>`}).join('')}
       ${chPend().map(x => chCard(x, true)).join('')}
       ${miss.length ? `<div class="li"><span class="tag warn">待确认</span><div class="grow">${pendByT(miss)}<br><span class="muted xs">上课时间过了、老师还没写反馈的课，暂时不计课时和工资。</span></div>${miss.length>1?`<button class="btn sm" data-act="done-all">全部标为已上课</button>`:''}</div>` : ''}
       ${miss.length ? `<details class="ov-more"><summary>逐条处理（${miss.length} 节）</summary>${miss.slice(0,8).map(pendRow).join('')}${miss.length>8?`<div class="muted xs" style="padding:4px 2px">还有 ${miss.length-8} 节${isTop()?'，在「待处理 → 反馈审批 → 待确认」里看全部':''}</div>`:''}</details>` : ''}
-      ${upcomingEvents(14).map(e=>`<div class="li"><span class="tag ${e.days<=7?'seal':'warn'}">${e.days===0?'今天':e.days+' 天'}</span><div class="grow">${esc(stu(e.t.student_id).name)} · ${esc(e.t.school)} ${e.label} ${sMD(e.date)}</div><button class="btn sm" data-act="page" data-v="apply">查看</button></div>`).join('')}
-      ${(DB.followups||[]).filter(f=>f.next_date && f.confirm!=='已确认' && f.next_date<=TODAY).map(f=>`<div class="li"><span class="tag gold">跟进</span><div class="grow">${esc(stu(f.student_id).name)} · ${esc(f.next_action||f.task||'')}（${sMD(f.next_date)}）</div><button class="btn sm" data-act="fu-edit" data-v="${f.id}">更新</button></div>`).join('')}
-      ${!chPend().length && !reqs.length && !pend.length && !bad.length && !miss.length && !upcomingEvents(14).length ? '<div class="empty">没有要处理的事</div>' : ''}
+      ${fus.map(f=>`<div class="li"><span class="tag gold">跟进</span><div class="grow">${esc(stu(f.student_id).name)} · ${esc(f.next_action||f.task||'')}（${sMD(f.next_date)}）</div><button class="btn sm" data-act="fu-edit" data-v="${f.id}">更新</button></div>`).join('')}
+      ${!chPend().length && !reqs.length && !pend.length && !bad.length && !miss.length && !fus.length ? '<div class="empty">没有要处理的事</div>' : ''}
     </div></section>
   </div>`;
 }
