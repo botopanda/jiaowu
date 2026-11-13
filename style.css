@@ -741,3 +741,4 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 /* ══════ 2026-11-09 老师看自己写过的反馈：「我写过的反馈」每条可以展开 ══════ */
 .t-fb-more{margin-top:2px}
 .t-fb-more>summary{cursor:pointer;color:var(--gold-text);padding:2px 0}
+.t-fb-txt{white-space:pre-wrap;overflow-wrap:anywhere}

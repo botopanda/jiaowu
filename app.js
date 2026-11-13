@@ -693,7 +693,7 @@ function tFbRest(f){
   const st = (v, ok, bad) => `<span class="tag ${v===ok?'ok':v===bad?'seal':'warn'}">${esc(v||'—')}</span>`;
   return `${tagRow(f)}<div class="sec"><b>二、学生课堂表现</b><p>${esc(f.perf||'—')}</p></div><div class="sec"><b>三、课后作业</b><p>${esc(f.hw||'—')}</p></div>
     ${fileList(f.id,'hw','学生交的作业')}${fileList(f.id,'grade','我的批改文件')}
-    ${f.hw_note?`<div class="small"><span class="muted">学生说：</span>${esc(f.hw_note)}</div>`:''}${f.hw_fb?`<div class="small"><span class="muted">我的批改：</span>${esc(f.hw_fb)}</div>`:''}
+    ${f.hw_note?`<div class="small t-fb-txt"><span class="muted">学生说：</span>${esc(f.hw_note)}</div>`:''}${f.hw_fb?`<div class="small t-fb-txt"><span class="muted">我的批改：</span>${esc(f.hw_fb)}</div>`:''}
     <div class="row xs"><span class="muted">上次作业</span>${st(f.last_hw,'已完成','未完成')}<span class="muted">本次作业</span><span class="tag ${f.hw_fb?'ok':f.hw_sub?'blue':'mute'}">${f.hw_fb?'已批改':f.hw_sub?'已交·待批改':'未交'}</span><span class="muted">学生确认</span>${confirmTag(f)}</div>`;
 }
 function tFbModal(fid){
