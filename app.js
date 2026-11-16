@@ -160,6 +160,10 @@ const isPend = l => l.status==='scheduled' && l.date < TODAY && !isDone(l);
 const realH = l => l.actual_hours!=null ? Number(l.actual_hours) : dur(l);   // 实际上课时长（没改过就是排课时长）
 const paidH = l => isDone(l) ? realH(l) : l.status==='leave' ? Number(l.deduct) : 0;
 const hrsTag = l => l.actual_hours!=null && isDone(l) ? ` <span class="tag warn">实际 ${realH(l)}h（排 ${dur(l)}h）</span>` : '';
+// 老师写反馈的「实际上课时长」选项：教务已经改过时长的，默认「保持」，老师不动就不会冲掉（数据库第 49 步）
+const wHrsOpts = l => { if (!l) return ''; const pl = dur(l), hs = [...new Set([0.5,1,1.5,2,2.5,3,3.5,4].concat(Number.isInteger(pl*2) ? [pl] : []))].sort((a,b)=>a-b);
+  return (l.actual_hours!=null ? `<option value="">保持 ${realH(l)} 小时（已经记的${l.actual_note?'：'+esc(l.actual_note):''}）</option>` : `<option value="">和排课一样（${+pl.toFixed(2)} 小时）</option>`)
+    + hs.map(h=>`<option value="${h}">${h} 小时${h===pl?'（和排课一样）':''}</option>`).join(''); };
 const timeFor = (l, tz) => `${l.start}–${l.end}`;   // 2026-10-13 起所有时间都是北京时间，不再换算
 const lsOfS = sid => DB.lessons.filter(l => course(l.course_id)?.student_id===sid);
 const lsOfT = tid => DB.lessons.filter(l => course(l.course_id)?.teacher_id===tid);
@@ -734,7 +738,7 @@ function tWrite(t){
     <div class="field"><span>学生状态（点选，可多选）</span><div class="chips">${[...TAGS_GOOD,...TAGS_WARN].map(x=>`<button class="chip ${wTags.has(x)?'on':''}" data-act="w-tag" data-v="${x}">${x}</button>`).join('')}</div></div>
     <label class="field"><span>三、课后作业安排</span><textarea id="w-hw" placeholder="例：1. 复习本节生词  2. 完成长文 1–10"></textarea></label>
     <label class="field"><span>作业图片 / PDF（可以不选；学生在「作业」里能看到，最多 9 个）</span><input type="file" id="w-hwfiles" accept="image/*,.pdf,application/pdf" multiple></label>
-    <div class="fields"><label class="field"><span>实际上课时长</span><select id="w-hrs"><option value="">和排课一样</option>${[0.5,1,1.5,2,2.5,3,3.5,4].map(h=>`<option value="${h}">${h} 小时</option>`).join('')}</select></label>
+    <div class="fields"><label class="field"><span>实际上课时长</span><select id="w-hrs">${wHrsOpts(cand[0])}</select></label>
     <label class="field"><span>时长不一样的原因</span><input type="text" id="w-why" placeholder="例：学生临时有事，提前半小时结束"></label></div>
     <div class="muted xs">提前结束或者上超了，在这里改；工资按实际时长算。</div>
     <label class="field"><span>上次作业完成情况</span><select id="w-last"><option>已完成</option><option>部分完成</option><option>未完成</option><option>没有布置</option></select></label>
@@ -1169,7 +1173,8 @@ document.addEventListener('change', e => {
   else if (k==='paym'){ S.payMonth=el.value; render(); }
   else if (k==='al-pick'){ alPick(); }
   else if (k==='w-lesson'){ const box = document.getElementById('w-content'), tp = L(el.value)?.topic || '';   // 换了哪节课：没自己改过的话，换成那节课的本节内容
-    if (box && box.value === (box.dataset.auto || '')){ box.value = tp; box.dataset.auto = tp; } }
+    if (box && box.value === (box.dataset.auto || '')){ box.value = tp; box.dataset.auto = tp; }
+    const hs = document.getElementById('w-hrs'); if (hs) hs.innerHTML = wHrsOpts(L(el.value)); }
   else if (k==='l-kind'){ let kind = el.value;
     if (kind==='__other'){ kind = (prompt('写课程名称（例：色彩构成）', '') || '').trim().slice(0, 30); if (!kind){ lessonModal(el.dataset.lid); return; } }
     act('admin_update_lesson', {lid:el.dataset.lid, d:{kind}}, ME().role==='teacher' ? '已提交修改申请，教务批准后生效' : '课程已改').then(() => lessonModal(el.dataset.lid)).catch(() => {}); }
