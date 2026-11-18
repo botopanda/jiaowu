@@ -19,7 +19,8 @@ function sTabs(s){
   if (PRO()) return [['a','首页'],['b','课表'],['c','作业'],['d','上课记录'],...(ckListsOf(s.id).length ? [['f','通关']] : []),['e','档案']];
   return [['a','首页'],['b','课表'],['c','作业',sUnHw(s).length],['d','上课记录',sUnConfirm(s).length],...(ckListsOf(s.id).length ? [['f','通关']] : []),['e','我的',sSelfDue(s)?1:0]];
 }
-function sView(s){ return ({a:sHome2, b:sSched, c:sHomework2, d:sFeedback2, e:sMine, f:sCheck}[S.tab] || sHome2)(s); }
+function sView(s){ return ({a:sHome2, b:sSched, c:sHomework2, d:sFeedback2, e:sMine, f:sCheck}[S.tab] || sHome2)(s)
+  + (S.tab === 'e' ? '<div class="row" style="justify-content:center;margin:20px 0 4px"><button class="btn sm" data-act="logout">退出这台设备</button></div><div class="muted xs" style="text-align:center;margin-bottom:12px">在别人的手机、电脑上打开过的话，看完点这里退出</div>' : ''); }   // 2026-11-19
 
 /* ───────── 首页 ───────── */
 function sHome2(s){

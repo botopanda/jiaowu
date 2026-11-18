@@ -23,7 +23,8 @@ async function readShort(){
   if (!sq) return true;
   try {
     const r = await fetch(`${SB_URL}/rest/v1/rpc/short_key`, {method:'POST', headers:{apikey: SB_KEY, 'Content-Type':'application/json'}, body: JSON.stringify({s: sq})});
-    const k = r.ok ? await r.json() : null;
+    if (!r.ok) return r.status >= 500 ? 'net' : false;   // 2026-11-19：服务器临时出错（5xx）不当成链接失效，不清掉本机记住的身份
+    const k = await r.json();
     if (!k) return false;
     KEY = k; try { localStorage.setItem('jw_k', k); } catch(e) {}
     return true;
@@ -68,10 +69,12 @@ const yen = n => '¥' + Math.round(n||0).toLocaleString('ja-JP');
 // 币种：课程上写明（人民币 / 日元）；老数据没写时按老规则（4 位数以上算日元）
 const curOf = c => (c && c.cur) || ((c && c.rate || 0) >= 1000 ? 'JPY' : 'CNY');
 const curSel = (id, cur) => `<select id="${id}" aria-label="币种"><option value="CNY" ${cur!=='JPY'?'selected':''}>人民币</option><option value="JPY" ${cur==='JPY'?'selected':''}>日元</option></select>`;
-const money = (n, cur) => cur==='JPY' ? '¥' + Math.round(n||0).toLocaleString('ja-JP') : Math.round(n||0).toLocaleString('zh-CN') + ' 元';
+// 2026-11-19：每一笔先按币种取整（日元到 1 円、人民币到 1 分），合计 = 每笔加起来，明细和合计对得上
+const curRound = (n, cur) => cur==='JPY' ? Math.round(n||0) : Math.round((n||0)*100)/100;
+const money = (n, cur) => cur==='JPY' ? '¥' + curRound(n, cur).toLocaleString('ja-JP') : curRound(n, cur).toLocaleString('zh-CN', {maximumFractionDigits: 2}) + ' 元';
 const rateTxt = c => (c && c.rate ? money(c.rate, curOf(c)) : '未设') + '/小时';
 // 多种币种分开合计，比如「3,400 元 + ¥12,000」
-const sumMoney = ls => { const t = {}; ls.forEach(([amt, cur]) => t[cur] = (t[cur]||0) + amt); return Object.keys(t).length ? Object.entries(t).sort().map(([c,v]) => money(v,c)).join(' + ') : money(0,'CNY'); };
+const sumMoney = ls => { const t = {}; ls.forEach(([amt, cur]) => t[cur] = (t[cur]||0) + curRound(amt, cur)); return Object.keys(t).length ? Object.entries(t).sort().map(([c,v]) => money(v,c)).join(' + ') : money(0,'CNY'); };
 const ymLabel = ym => `${+ym.slice(0,4)}年${+ym.slice(5)}月`;
 const ymShift = (ym, n) => { const [y,m] = ym.split('-').map(Number); const d = new Date(y, m-1+n, 1); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; };
 const HUES = ['--h1','--h2','--h3','--h4','--h5','--h6','--h7','--h8','--h9'];
@@ -158,7 +161,7 @@ const lesEnded = l => l.date < TODAY || (l.date === TODAY && l.end <= bjHM());  
 // 「已上课」= 老师写了反馈，或者教务手动确认过；时间过了但两样都没有 = 「待确认」，不计课时
 // 教务老师的课（面谈、升学指导）下课时间一过就算已上
 const isDone = l => l.status==='scheduled' && (l.has_fb || l.done_manual || !!fbOf(l) || (lesEnded(l) && isStaffT(course(l.course_id)?.teacher_id)));
-const isPend = l => l.status==='scheduled' && l.date < TODAY && !isDone(l);
+const isPend = l => l.status==='scheduled' && lesEnded(l) && !isDone(l);   // 2026-11-19：今天下了课就算（以前要等到第二天）
 const realH = l => l.actual_hours!=null ? Number(l.actual_hours) : dur(l);   // 实际上课时长（没改过就是排课时长）
 const paidH = l => isDone(l) ? realH(l) : l.status==='leave' ? Number(l.deduct) : 0;
 const hrsTag = l => l.actual_hours!=null && isDone(l) ? ` <span class="tag warn">实际 ${realH(l)}h（排 ${dur(l)}h）</span>` : '';
@@ -205,32 +208,48 @@ function monthStats(sid, ym){
 }
 const latestHw = sid => DB.courses.filter(c => c.student_id===sid).map(c => DB.feedbacks.filter(f => L(f.lesson_id).course_id===c.id && hasHw(f)).slice(-1)[0]).filter(Boolean);   // 2026-11-19：写「无」的不算
 
-let lastLoad = 0;
+let lastLoad = 0, LOAD_ERRS = [], LOAD_STALE = 0;
+// 2026-11-19：有几样没读出来、或者后台刷新失败时，顶上说一声（不然页面上看着像「没有」）
+function loadBar(){
+  const old = document.getElementById('load-bar'); if (old) old.remove();
+  if (!LOAD_ERRS.length && !LOAD_STALE) return;
+  const d = document.createElement('div'); d.id = 'load-bar'; d.className = 'upd-bar load-bar'; d.setAttribute('role', 'status');
+  d.innerHTML = `<span>${LOAD_ERRS.length ? `有几样没读出来：${esc(LOAD_ERRS.join('、'))}，页面上这几处可能是空的` : `网络不太稳定，页面上是 ${esc(new Date(LOAD_STALE + 8 * 3600e3).toISOString().slice(11, 16))} 读的，最新的改动可能还没显示`}</span><button type="button" class="upd-go">刷新</button><button type="button" class="upd-x" aria-label="先不管" title="先不管">✕</button>`;
+  d.querySelector('.upd-go').onclick = () => location.reload();
+  d.querySelector('.upd-x').onclick = () => d.remove();
+  document.body.appendChild(d);
+}
 async function load(){
   // 2026-11-19：先读进 D，全部读完才一起换成 DB；读的过程中页面还用上一次筛好的数据（总管理在 K 视图不会一闪出两本账）
   const D = await rpc('app_load'); lastLoad = Date.now();
   D.changes = [];
-  if (D.me.role==='admin' || D.me.role==='teacher'){ try { D.changes = await rpc('changes_load') || []; } catch(e) {} }
-  if (D.me.role==='admin' && D.me.level==='top'){ try { SHORT = Object.fromEntries((await rpc('admin_short_links')).map(x => [x.key, x.skey])); } catch(e) {} }
+  const errs = [];
+  if (D.me.role==='admin' || D.me.role==='teacher'){ try { D.changes = await rpc('changes_load') || []; } catch(e) { errs.push('老师排课申请'); } }
+  if (D.me.role==='admin' && D.me.level==='top'){ try { SHORT = Object.fromEntries((await rpc('admin_short_links')).map(x => [x.key, x.skey])); } catch(e) { errs.push('短链接'); } }
   TODAY = D.today;
   D.lessons.sort((a,b) => (a.date+a.start).localeCompare(b.date+b.start));
   if (!DB) DB = D;   // 第一次打开：下面几样只看 DB.me（是谁）
   if (!S.month) S.month = TODAY.slice(0,7);
   if (!S.payMonth) S.payMonth = ymShift(TODAY.slice(0,7), -1);
   if (!S.teaMonth) S.teaMonth = TODAY.slice(0,7);
-  try { CK = await rpc('checks_load') || {templates: [], lists: []}; } catch(e) { CK = {templates: [], lists: []}; }
+  try { CK = await rpc('checks_load') || {templates: [], lists: []}; } catch(e) { CK = {templates: [], lists: []}; errs.push('通关点检'); }
   if (typeof cvLoad === 'function') await cvLoad();   // 老师履历（teacher_cv.js）
   if (typeof msgLoad === 'function') await msgLoad();   // 学生留言（msgs.js）
   if (typeof wkLoad === 'function') await wkLoad();   // 今日单词记住的词（word.js）
   if (typeof rvxLoad === 'function') await rvxLoad();   // 面谈原始纪要、AI 写法要求（track.js，只有教务）
+  if (['admin','teacher'].includes(D.me.role) && typeof CVS_OK !== 'undefined' && !CVS_OK) errs.push('老师履历');
+  if (typeof MSGS_OK !== 'undefined' && !MSGS_OK) errs.push('学生留言');
+  if (typeof WK_OK !== 'undefined' && !WK_OK) errs.push('今日单词');
+  if (D.me.role === 'admin' && typeof RVX !== 'undefined' && !RVX.ok) errs.push('面谈原始纪要');
+  LOAD_ERRS = errs; LOAD_STALE = 0; setTimeout(loadBar);
   DB_ALL = D; DB = bookView(DB_ALL);   // 总管理：按「全部 / Project K / Panda」筛选；其他人原样
 }
 // 点菜单、切回这个网页时：先马上显示，再在后台取最新数据（别人刚写的反馈、刚排的课）再画一遍
 // 正在打字或开着弹窗时不重画，免得把填了一半的内容冲掉
 async function refresh(minGap = 3000){
   if (Date.now() - lastLoad < minGap) return;
-  try { await load(); } catch(e) { return; }
-  const busy = document.querySelector('.modal') || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+  try { await load(); } catch(e) { if (!LOAD_STALE) LOAD_STALE = lastLoad; loadBar(); return; }
+  const busy = document.querySelector('.modal') || S.dirtyMain || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
   if (!busy) render();
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && DB) refresh(30000); });
@@ -261,15 +280,22 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 setInterval(() => { if (document.visibilityState === 'visible') checkVersion(); }, 5 * 60000);
 // 做完一个操作：刷新数据、重画页面、提示结果
 async function act(fn, args, okMsg, after){
-  document.body.classList.add('busy');
-  try { const r = await rpc(fn, args); await load(); if (after) after(r); render(); if (okMsg) toast(typeof okMsg==='function' ? okMsg(r) : okMsg); return r; }
-  catch(e){ toast(e.message, true); throw e; }
-  finally { document.body.classList.remove('busy'); }
+  // 2026-11-19：上一个操作还没做完就不再发（双击、慢网连点）；保存成功但刷新失败时说清楚「已经保存了」，免得再点一次又存一份
+  if (act.busy) { toast('上一个操作还在进行，请稍等一下', true); throw new Error('busy'); }
+  act.busy = true; document.body.classList.add('busy');
+  try {
+    let r;
+    try { r = await rpc(fn, args); } catch(e){ toast(e.message, true); throw e; }
+    try { await load(); }
+    catch(e){ try { if (after) after(r); } catch(_){} render(); toast('已经保存好了，但页面没刷新出来。请刷新一下页面再看，不用再点保存', true, 6000); return r; }
+    if (after) after(r); render(); if (okMsg) toast(typeof okMsg==='function' ? okMsg(r) : okMsg); return r;
+  } finally { act.busy = false; document.body.classList.remove('busy'); }
 }
 
 /* ───────── 渲染入口 ───────── */
 const app = document.getElementById('app');
 function render(){
+  S.dirtyMain = false;   // 重画以后页面上没有填了一半的内容了
   const me = ME();
   const label = me.role==='admin' ? (me.owner ? '总管理' : me.level==='top' ? '教务 · 管理' : '教务') : {teacher:'任课老师', student:'学生', parent:'家长'}[me.role];
   setTimeout(labelTables);
@@ -301,6 +327,8 @@ const chPendOf = lid => chPend().find(x => x.lesson_id===lid);
 // 2026-11-18：老师提交申请后、教务批之前就写了反馈 → 写了反馈的课不能再改，这条批不了（第 54 步以后写反馈时会自动关掉）
 const chStuck = x => !!(x.status==='pending' && x.kind!=='add' && L(x.lesson_id) && fbOf(L(x.lesson_id)));
 const chKind = {add:'排课', move:'调课', delete:'删课'};
+// 审批反馈时带上打开页面时看到的版本：老师在这之后改过的，数据库不批（第 60 步）
+const fbVers = ids => Object.fromEntries(ids.map(id => [id, (DB.feedbacks.find(f => f.id === id) || {}).ver]).filter(x => x[1]));
 const tShow = t => esc(t);   // 申请里的时间是老师那边发来的，显示前一定转义（体检 C-01）
 function chText(x){
   if (x.kind==='add'){ const ds = x.d.dates || []; return `${ds.length} 节：${ds.slice(0,8).map(sMD).join('、')}${ds.length>8?' 等':''} · ${tShow(x.d.st)}–${tShow(x.d.et)}${x.d.makeup?' · 补课':''}${x.d.kind?` · ${esc(x.d.kind)}`:''}${x.d.topic?` · 内容：${esc(x.d.topic)}`:''}${x.d.murl?` · 已填上课链接${ds.length>1?(x.d.mall?'（每节都用）':'（只填第一节）'):''}`:''}`; }
@@ -578,7 +606,7 @@ function pgTeachers(){
   ${DB.teachers.some(t => !t.staff) ? `<div class="grid2 cards-fix">${DB.teachers.filter(t => !t.staff).map(t => { const cs = DB.courses.filter(c=>c.teacher_id===t.id), ym = TODAY.slice(0,7);
     const ms = lsOfT(t.id).filter(l=>l.date.startsWith(ym)), p = teacherRealLink(t);
     const done = ms.filter(l=>paidH(l)>0), plan = ms.filter(l=>l.status==='scheduled'), pn = ms.filter(isPend).length;
-    const hDone = +done.reduce((a,l)=>a+paidH(l),0).toFixed(1), hPlan = +plan.reduce((a,l)=>a+dur(l),0).toFixed(1);
+    const hDone = +done.reduce((a,l)=>a+paidH(l),0).toFixed(2), hPlan = +plan.reduce((a,l)=>a+dur(l),0).toFixed(2);
     const names = [...new Set(cs.map(c=>stu(c.student_id).name))];
     return `<section class="card"><div class="row" style="margin-bottom:6px">${cvPhoto(t, 'sm')}<h3 style="margin-right:auto;font-size:16px">${esc(t.name)} ${tBookTag(t)}${tCat(t.id)==='艺术'?' <span class="tag mute">艺术</span>':''}</h3>${t.subject?subjTag(t.subject):''}${t.loc?`<span class="tag mute">${esc(t.loc)}</span>`:''}</div>
     ${cvOf(t.id).tagline ? `<div class="small" style="margin:-2px 0 6px">${esc(cvOf(t.id).tagline)}</div>` : ''}
@@ -594,13 +622,14 @@ function pgPayroll(){
   const ym = S.payMonth;
   const rows = DB.teachers.filter(t => !t.staff).map(t => { const ls = lsOfT(t.id).filter(l => l.date.startsWith(ym) && paidH(l)>0);
     const parts = ls.map(l => { const c = course(l.course_id); return [paidH(l)*(c.rate||0), curOf(c)]; });
-    return {t, ls, h: +ls.reduce((a,l)=>a+paidH(l),0).toFixed(1), parts, amt: sumMoney(parts), pn: lsOfT(t.id).filter(l => l.date.startsWith(ym) && isPend(l)).length}; }).filter(r => r.ls.length || r.pn);
+    const hr = ls.reduce((a,l)=>a+paidH(l),0);
+    return {t, ls, hr, h: +hr.toFixed(2), parts, amt: sumMoney(parts), pn: lsOfT(t.id).filter(l => l.date.startsWith(ym) && isPend(l)).length}; }).filter(r => r.ls.length || r.pn);
   const total = sumMoney(rows.flatMap(r => r.parts));
   const months = [...new Set(DB.lessons.map(l=>l.date.slice(0,7)).concat([TODAY.slice(0,7), ymShift(TODAY.slice(0,7),-1)]))].sort().reverse();
   return `<div class="ph"><h2>课时与工资</h2><select id="pay-m" data-change="paym">${months.map(v=>`<option value="${v}" ${v===ym?'selected':''}>${ymLabel(v)}</option>`).join('')}</select></div>
   <div class="note">只有<b>教务 · 管理</b>能看到这一页。<b>老师写了反馈（或教务标为已上课）的课才计入课时</b>，按实际上课时长算；当天请假扣学生的课时，照样计入老师工资。单价和币种（人民币 / 日元）在学生档案 → 课程里设置。每位老师每月：<b>核对课时 → 审核通过 → 结算完成</b>。</div>
-  <div class="stats"><div class="stat"><small>计费课时</small><b>${+rows.reduce((a,r)=>a+r.h,0).toFixed(1)}</b></div><div class="stat"><small>工资合计</small><b style="font-size:18px">${total}</b></div>
-    <div class="stat"><small>已审核</small><b>${rows.filter(r=>payOf(r.t.id,ym).reviewed_at).length}/${rows.length}</b></div><div class="stat"><small>已结算</small><b>${rows.filter(r=>payOf(r.t.id,ym).settled_at).length}/${rows.length}</b></div></div>
+  <div class="stats"><div class="stat"><small>计费课时</small><b>${+rows.reduce((a,r)=>a+r.hr,0).toFixed(2)}</b></div><div class="stat"><small>工资合计</small><b style="font-size:18px">${total}</b></div>
+    <div class="stat"><small>已审核</small><b>${rows.filter(r=>payDone(r.t.id,ym,'reviewed_at')).length}/${rows.length}</b></div><div class="stat"><small>已结算</small><b>${rows.filter(r=>payDone(r.t.id,ym,'settled_at')).length}/${rows.length}</b></div></div>
   ${rows.length ? '' : '<div class="card empty">这个月还没有上完的课</div>'}
   ${rows.map(r => `<details class="card"><summary class="row"><b style="margin-right:auto;font-family:var(--f-disp)">${esc(r.t.name)}</b><span class="num small">${r.ls.length} 节 · ${r.h} 小时</span>${r.pn?`<span class="tag warn">${r.pn} 节待确认未计入</span>`:''}<b class="num">${r.amt}</b>${payBadge(r.t.id, ym)}${payDiffTag(r.t.id, ym)}<span class="muted xs">展开明细</span></summary>
     ${payDiffBox(r.t.id, ym)}
@@ -682,7 +711,7 @@ const tzNote = tz => bjOn() ? '<div class="bj-note"><span class="bj-tag">北京�
 let PV = 'cal'; try { PV = localStorage.getItem('jw_view') || 'cal'; } catch(e) {}
 function lessonItem(l, tz, whoFn, canReq, canEdit){
   const c = course(l.course_id), q = reqOf(l), leave = l.status!=='scheduled';
-  return `<div class="les" style="--hc:${slotHue(timeFor(l,tz))}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}${bjOn() ? '<span class="bj-sub">北京时间</span>' : ''}</div><div style="min-width:0;flex:1">${subjTag(c.subject)}${l.kind?` <span class="tag mute">${esc(l.kind)}</span>`:''} · ${esc(whoFn(c))}${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调课</span>':''}${l.status==='leave'?' <span class="tag seal">请假</span>':''}${l.status==='cancelled'?' <span class="tag mute">已取消</span>':''}${['student','parent'].includes(ME().role) ? (l.status==='scheduled' && l.date<TODAY ? ' <span class="tag mute">已上</span>' : '') : `${isDone(l)?(hasFb(l)?' <span class="tag ok">已反馈</span>':' <span class="tag ok">已上</span>'):''}${isPend(l)?` <span class="tag warn">${ME().role==='teacher'?'待写反馈':'待确认'}</span>`:''}`}${hrsTag(l)}${l.topic?`<div class="les-topic">本节：${esc(l.topic)}</div>`:''}
+  return `<div class="les" style="--hc:${slotHue(timeFor(l,tz))}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}${bjOn() ? '<span class="bj-sub">北京时间</span>' : ''}</div><div style="min-width:0;flex:1">${subjTag(c.subject)}${l.kind?` <span class="tag mute">${esc(l.kind)}</span>`:''} · ${esc(whoFn(c))}${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调课</span>':''}${l.status==='leave'?' <span class="tag seal">请假</span>':''}${l.status==='cancelled'?' <span class="tag mute">已取消</span>':''}${['student','parent'].includes(ME().role) ? (isDone(l) ? ' <span class="tag mute">已上</span>' : '') : `${isDone(l)?(hasFb(l)?' <span class="tag ok">已反馈</span>':' <span class="tag ok">已上</span>'):''}${isPend(l)?` <span class="tag warn">${ME().role==='teacher'?'待写反馈':'待确认'}</span>`:''}`}${hrsTag(l)}${l.topic?`<div class="les-topic">本节：${esc(l.topic)}</div>`:''}
     ${reqLine(q)}${ME().role==='student' && !leave && l.date>=TODAY && typeof meetBtn==='function' && meetOk(l) ? `<div style="margin-top:6px">${meetBtn(l)}</div>` : ''}${canReq && !leave && l.date>=TODAY && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave && !fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}${isT() && fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="t-fb" data-v="${fbOf(l).id}">看反馈</button>`:''}</div></div>`;
 }
 // sid：要标考试的学生（学生、家长＝自己；老师＝自己正在教的学生，传编号数组，格子里写学生名字）
@@ -762,7 +791,7 @@ function tFbModal(fid){
   <div class="muted xs">补传作业图片、上课笔记，在「反馈·批改 → 我写过的反馈」里。反馈内容要改，请联系教务老师。</div>`, true);
 }
 function tWrite(t){
-  const cand = DB.lessons.filter(l => l.date<=TODAY && l.status==='scheduled' && !fbOf(l)).reverse();
+  const cand = DB.lessons.filter(l => (l.date < TODAY || (l.date === TODAY && l.start <= bjHM())) && l.status==='scheduled' && !fbOf(l)).reverse();   // 今天还没开始的课不列
   // 我写过的反馈：按上课日期从新到旧，可以按月份、按学生筛选
   const sidOf = f => course(L(f.lesson_id).course_id).student_id, dOf = f => L(f.lesson_id).date;
   const allF = DB.feedbacks.filter(f => L(f.lesson_id) && course(L(f.lesson_id).course_id)).sort((a,b) => dOf(b).localeCompare(dOf(a)));
@@ -845,10 +874,10 @@ const pSchedule = s => schedule(lsOfS(s.id),'JP',c=>tea(c.teacher_id).name,false
 
 /* ═════════════ 弹窗 ═════════════ */
 const mroot = document.getElementById('modal-root');
-function openModal(html, wide){ mroot.innerHTML = `<div class="mb" data-act="close-bg"><div class="modal ${wide==='xl'?'wide xl':wide?'wide':''}" role="dialog" aria-modal="true">${html}</div></div>`; labelTables(); }
+function openModal(html, wide){ mroot.dataset.dirty = ''; mroot.innerHTML = `<div class="mb" data-act="close-bg"><div class="modal ${wide==='xl'?'wide xl':wide?'wide':''}" role="dialog" aria-modal="true">${html}</div></div>`; labelTables(); }
 // 手机上把宽表格变成卡片：每个格子前面显示它的列名
 function labelTables(){ document.querySelectorAll('table.rt').forEach(t => { const hs = [...t.querySelectorAll('thead th')].map(th => th.textContent.trim()); t.querySelectorAll('tbody tr').forEach(tr => [...tr.children].forEach((td, i) => td.setAttribute('data-label', hs[i] || ''))); }); }
-function closeModal(){ mroot.innerHTML=''; lastModal = null; }
+function closeModal(){ mroot.innerHTML=''; mroot.dataset.dirty = ''; lastModal = null; }
 const mHead = t => `<div class="mh"><h3>${t}</h3><button class="btn sm" data-act="close" aria-label="关闭">✕</button></div>`;
 
 function lessonModal(id){
@@ -1084,14 +1113,14 @@ document.addEventListener('click', async e => {
     case 'add-lesson': addLessonModal(); break;
     case 'cal-day': S.alPre = {d:v, s:'18:00', e:'20:00'}; addLessonModal(); break;   // 教务月历：点某天空白处直接排课
     case 'al-mk': { const on = val('al-mk')!=='1'; document.getElementById('al-mk').value = on ? '1' : '0'; a.classList.toggle('on', on); a.setAttribute('aria-pressed', on); break; }
-    case 'close': case 'close-bg': closeModal(); break;
+    case 'close': case 'close-bg': if (mroot.dataset.dirty && !confirm('填的内容还没保存，确定关掉吗？')) break; closeModal(); break;
     case 'fbtab': S.fbTab=v; S.sel.clear(); S.editing=null; render(); break;
     case 'sel': S.sel.has(v)?S.sel.delete(v):S.sel.add(v); render(); break;
     case 'sel-all': { const p=DB.feedbacks.filter(f=>f.status==='pending'); if (S.sel.size===p.length) S.sel.clear(); else p.forEach(f=>S.sel.add(f.id)); render(); break; }
-    case 'approve': await act('admin_feedback_approve', {ids:[v]}, '已审批，家长现在能看到这条反馈'); S.sel.delete(v); break;
+    case 'approve': await act('admin_feedback_approve', {ids:[v], vers:fbVers([v])}, r => r ? '已审批，家长现在能看到这条反馈' : '老师刚改过这条反馈，请重新看一遍再批'); S.sel.delete(v); break;
     case 'approve-sel': { const pend=new Set(DB.feedbacks.filter(f=>f.status==='pending').map(f=>f.id)), ids=[...S.sel].filter(id=>pend.has(id));
       if (!ids.length){ S.sel.clear(); render(); toast('这一页上没有选中的反馈', true); break; }
-      await act('admin_feedback_approve', {ids}, r=>`已审批 ${r} 条`); S.sel.clear(); render(); break; }
+      await act('admin_feedback_approve', {ids, vers:fbVers(ids)}, r => r === ids.length ? `已审批 ${r} 条` : `已审批 ${r} 条；另外 ${ids.length - r} 条老师刚改过，请重新看一遍再批`); S.sel.clear(); render(); break; }
     case 'unapprove': await act('admin_feedback_unapprove', {fid:v}, '已撤回，家长暂时看不到'); break;
     case 'edit': S.editing=v; render(); break;
     case 'cancel-edit': S.editing=null; render(); break;
@@ -1170,9 +1199,14 @@ document.addEventListener('click', async e => {
       await act('admin_handle_request', args, '已处理，学生和老师都能看到结果'); break; }
     case 'req-no': await act('admin_handle_request', {rid:v, accept:false, reply:val('rq-r-'+v)}, '已回复学生'); break;
     case 'mp-save': { const [sid,m]=v.split('|'); const cs=DB.courses.filter(c=>c.student_id===sid && c.active);
-      for (const c of cs) await rpc('plan_save', {cid:c.id, month:m, txt:val(`mp-${m}-${c.id}`)});
-      await load(); render(); studentModal(sid,'mp'); toast('计划已保存，学生和家长能看到'); break; }
-    case 't-mp-save': { const ym=TODAY.slice(0,7); for (const m of [ym, ymShift(ym,1)]) await rpc('plan_save', {cid:v, month:m, txt:val(`mp-${m}-${v}`)}); await load(); render(); tStuModal(v); toast('计划已保存'); break; }
+      const fails = []; document.body.classList.add('busy');
+      try { for (const c of cs) { try { await rpc('plan_save', {cid:c.id, month:m, txt:val(`mp-${m}-${c.id}`)}); } catch(e){ fails.push(`${c.subject}：${e.message}`); } } }
+      finally { document.body.classList.remove('busy'); }
+      await load(); render(); studentModal(sid,'mp'); toast(fails.length ? `有 ${fails.length} 门没存上（${fails.join('；')}），其余已保存` : '计划已保存，学生和家长能看到', !!fails.length); break; }
+    case 't-mp-save': { const ym=TODAY.slice(0,7), fails=[]; document.body.classList.add('busy');
+      try { for (const m of [ym, ymShift(ym,1)]) { try { await rpc('plan_save', {cid:v, month:m, txt:val(`mp-${m}-${v}`)}); } catch(e){ fails.push(`${ymLabel(m)}：${e.message}`); } } }
+      finally { document.body.classList.remove('busy'); }
+      await load(); render(); tStuModal(v); toast(fails.length ? `没存上：${fails.join('；')}` : '计划已保存', !!fails.length); break; }
     case 'note-add': await act('note_add', {sid:v, txt:val('note-new')}, '已保存，学生和家长看不到'); studentModal(v,'note'); break;
     case 't-note-save': { const c=DB.courses.find(x=>x.student_id===v && x.teacher_id===ME().teacher_id); await act('note_add', {sid:v, txt:val('t-note')}, '已保存，只有你和教务能看到'); if(c) tStuModal(c.id); break; }
     case 't-stu': tStuModal(v); break;
@@ -1260,7 +1294,9 @@ document.addEventListener('input', e => {
   if (e.target.dataset?.input==='stuq' && !e.isComposing){ S.stuQ=e.target.value; render(); const i=document.getElementById('stu-q'); i.focus(); i.setSelectionRange(i.value.length,i.value.length); }
 });
 document.addEventListener('compositionend', e => { if (e.target.id==='stu-q'){ S.stuQ=e.target.value; render(); const i=document.getElementById('stu-q'); i.focus(); } });
-document.addEventListener('keydown', e => { if (e.key==='Escape' && mroot.innerHTML) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key==='Escape' && mroot.innerHTML && (!mroot.dataset.dirty || confirm('填的内容还没保存，确定关掉吗？'))) closeModal(); });
+// 填了东西就记一下：弹窗里的（关的时候问）、页面上的（后台刷新时先不重画，免得冲掉）（2026-11-19）
+document.addEventListener('input', e => { if (e.target.closest?.('#modal-root')) mroot.dataset.dirty = '1'; else if (e.target.closest?.('#app')) S.dirtyMain = true; });
 
 /* ───────── 启动 ───────── */
 document.addEventListener('app-ready', async function start(){

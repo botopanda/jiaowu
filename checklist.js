@@ -28,7 +28,7 @@ const ckCanUpload = sid => ['admin','teacher'].includes(ME().role) || (ME().role
 function ckFiles(i, sid){
   const fs = i.files || [];
   if (!fs.length) return '';
-  const canDel = f => isTop() || f.uploaded_by === ME().name;
+  const canDel = f => isTop() || f.mine;   // 2026-11-19：按链接编号认
   return `<div class="ck-files">${fs.map(f => `<span class="fitem">
       <a href="${fileUrl(f)}" target="_blank" rel="noopener" title="${esc(f.name)}${f.uploaded_by ? ' · ' + esc(f.uploaded_by) + ' 上传' : ''}">${isImg(f) ? `<img src="${fileUrl(f)}" alt="${esc(f.name)}" loading="lazy">` : `<span class="fpdf">PDF</span><span class="fname">${esc(f.name)}</span>`}</a>
       ${canDel(f) ? `<button class="fdel" data-act="file-del" data-v="${f.id}" aria-label="删除这个文件">×</button>` : ''}</span>`).join('')}
@@ -134,7 +134,9 @@ document.addEventListener('click', async e => {
     if (k === 'ck-new') {
       const sid = v === 'page' ? val('ck-sid-page') : v; if (!sid) { toast('请选择学生', true); return; }
       const tpl = val('ck-tpl-' + v) || null, title = val('ck-title-' + v).trim() || '通关点检表';
-      await rpc('check_create', {sid, title, tpl}); S.ckSid = sid; toast('已建立'); await redraw();
+      if (document.body.classList.contains('busy')) return;   // 2026-11-19：连点两下不会建两张
+      document.body.classList.add('busy'); try { await rpc('check_create', {sid, title, tpl}); } finally { document.body.classList.remove('busy'); }
+      S.ckSid = sid; toast('已建立'); await redraw();
     }
     if (k === 'ck-pick') { S.ckSid = v; render(); }
     if (k === 'ck-more') { const box = document.getElementById('ck-more-box'); if (box) box.innerHTML = ckNewForm(v, 1); }

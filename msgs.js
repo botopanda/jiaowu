@@ -6,11 +6,11 @@
    · 任课老师：「我的学生」最上面，只看得到学生选了「任课老师也能看」、没被屏蔽的
    · 家长：看不到
    ══════════════════════════════════════════════════════════════ */
-let MSGS = [];
+let MSGS = [], MSGS_OK = true;
 async function msgLoad(){
-  MSGS = [];
+  MSGS = []; MSGS_OK = true;
   if (!['admin','teacher','student','parent'].includes(DB.me.role)) return;
-  try { MSGS = await rpc('msg_load') || []; } catch(e) { MSGS = []; }
+  try { MSGS = await rpc('msg_load') || []; } catch(e) { MSGS = []; MSGS_OK = false; }   // 没读出来：顶上会提示（2026-11-19）
 }
 const msgWhen = iso => { const t = new Date(iso).toLocaleString('sv-SE', {timeZone: 'Asia/Shanghai'}).slice(0, 16); return `${+t.slice(5,7)}/${+t.slice(8,10)} ${t.slice(11)}`; };
 const msgUnread = () => ME().role === 'admin' ? msgShown().filter(m => !m.read_at).length : 0;
@@ -79,8 +79,8 @@ document.addEventListener('click', async e => {
     if (k === 'msg-all-read') {
       const ids = msgShown().filter(m => !m.read_at).map(m => m.id);
       document.body.classList.add('busy');
-      try { for (const id of ids) await rpc('msg_admin', {mid: id, what: 'read'}); } finally { document.body.classList.remove('busy'); }
-      await load(); render(); toast(`已把 ${ids.length} 条标为已读`);
+      let n = 0; try { for (const id of ids) { try { await rpc('msg_admin', {mid: id, what: 'read'}); n++; } catch(e) {} } } finally { document.body.classList.remove('busy'); }
+      await load(); render(); toast(n === ids.length ? `已把 ${n} 条标为已读` : `已把 ${n} 条标为已读，还有 ${ids.length - n} 条没标上，再点一次试试`, n !== ids.length);
     }
   } catch(err) { /* act() 已经提示过 */ }
 });

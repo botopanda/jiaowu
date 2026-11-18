@@ -11,7 +11,7 @@ const isImg = f => /^image\//.test(f.mime || '') || /\.(jpe?g|png|webp|heic|heif
 function fileList(ref, purpose, label){
   const fs = filesOf(ref, purpose);
   if (!fs.length) return '';
-  const canDel = f => isTop() || f.uploaded_by === ME().name;
+  const canDel = f => isTop() || f.mine;   // 2026-11-19：按链接编号认是不是自己传的（同名不会认错）
   return `<div class="files">${label ? `<span class="muted xs">${label}</span>` : ''}${fs.map(f => `<span class="fitem">
     <a href="${fileUrl(f)}" target="_blank" rel="noopener" title="${esc(f.name)}">${isImg(f) ? `<img src="${fileUrl(f)}" alt="${esc(f.name)}" loading="lazy">` : `<span class="fpdf">PDF</span><span class="fname">${esc(f.name)}</span>`}</a>
     ${canDel(f) ? `<button class="fdel" data-act="file-del" data-v="${f.id}" aria-label="删除这个文件">×</button>` : ''}</span>`).join('')}</div>`;
@@ -69,7 +69,13 @@ function reopenModal(){ if (lastModal && document.querySelector('.modal')) lastM
 
 /* ───────── 工资：审核 / 结算 ───────── */
 const payOf = (tid, ym) => (DB.pay || []).find(p => p.teacher_id === tid && p.ym === ym && (p.book || 'K') === curBook()) || {};
+// 这个月这位老师在哪几本账有课（「全部」视图里分开显示状态）
+const payBooks = (tid, ym) => [...new Set(lsOfT(tid).filter(l => l.date.startsWith(ym) && paidH(l) > 0).map(l => stu(course(l.course_id).student_id).private ? 'mine' : 'K'))].sort();
+const payOfBook = (tid, ym, bk) => (DB.pay || []).find(p => p.teacher_id === tid && p.ym === ym && (p.book || 'K') === bk) || {};
+const payDone = (tid, ym, f) => isOwner() && S.book === 'all' ? (payBooks(tid, ym).length > 0 && payBooks(tid, ym).every(b => payOfBook(tid, ym, b)[f])) : !!payOf(tid, ym)[f];
 function payBadge(tid, ym){
+  if (isOwner() && S.book === 'all') return payBooks(tid, ym).map(b => { const p = payOfBook(tid, ym, b);
+    return `<span class="tag ${p.settled_at ? 'ok' : p.reviewed_at ? 'blue' : 'mute'}">${b === 'mine' ? 'Panda' : 'K'}：${p.settled_at ? '已结算' : p.reviewed_at ? '已审核' : '未审核'}</span>`; }).join('');
   const p = payOf(tid, ym);
   return p.settled_at ? '<span class="tag ok">已结算</span>' : p.reviewed_at ? '<span class="tag blue">已审核</span>' : '<span class="tag mute">未审核</span>';
 }
@@ -77,7 +83,7 @@ function payBadge(tid, ym){
 function payDetail(tid, ym){
   const rows = lsOfT(tid).filter(l => l.date.startsWith(ym) && paidH(l) > 0).map(l => { const c = course(l.course_id);
     return {id: l.id, d: l.date, s: l.start, e: l.end, stu: stu(c.student_id).name, subj: c.subject, h: paidH(l), rate: c.rate || 0, cur: curOf(c), st: l.status}; });
-  const amt = {}; rows.forEach(r => amt[r.cur] = (amt[r.cur] || 0) + r.h * r.rate);
+  const amt = {}; rows.forEach(r => amt[r.cur] = (amt[r.cur] || 0) + curRound(r.h * r.rate, r.cur));
   return {v: 1, h: +rows.reduce((a, r) => a + r.h, 0).toFixed(2), amt, rows};
 }
 const payAmtTxt = a => sumMoney(Object.entries(a || {}).map(([c, v]) => [v, c]));
@@ -151,11 +157,25 @@ document.addEventListener('click', async e => {
 });
 
 /* ───────── 数据备份：把能看到的全部数据下载成一个文件 ───────── */
+// 第 60 步：每天的自动存档有没有在跑
+let BKS = null, BKS_AT = 0, BKS_ING = false;
+async function bksLoad(){ try { BKS = await rpc('backup_status') || {}; } catch(e) { BKS = {err: e.message}; } BKS_AT = Date.now(); BKS_ING = false; if (S.page === 'sys' && S.sysTab === 'backup' && !document.querySelector('.modal')) render(); }
+function bksLine(){
+  if (!isTop()) return '';
+  if (!BKS_ING && Date.now() - BKS_AT > 60000) { BKS_ING = true; setTimeout(bksLoad); }   // 一分钟内看过就不再问
+  if (!BKS) return '<div class="muted small">正在看每天的自动存档…</div>';
+  if (BKS.err) return `<div class="note warn">没查到每天自动存档的情况：${esc(BKS.err)}</div>`;
+  const h = BKS.last ? (Date.now() - Date.parse(BKS.last)) / 3600e3 : Infinity, when = BKS.last ? bjAt(BKS.last) : '';
+  const bad = BKS.job === 0 || h > 36;
+  return `<div class="note ${bad ? 'warn' : ''}">服务器每天自动存一份全部数据（保留 14 天，误删时可以找回）。${BKS.last ? `最近一次：<b>${+when.slice(5,7)}月${+when.slice(8,10)}日 ${when.slice(11)}</b>（北京时间），最近 14 天存了 ${BKS.n14} 份。` : '<b>还没有自动存过。</b>'}
+    ${BKS.job === 0 ? '<br><b>每天自动存档的定时任务没有在运行</b>，请告诉 Claude 检查。' : h > 36 ? '<br><b>已经超过一天半没有自动存档了</b>，请告诉 Claude 检查。' : ''}</div>`;
+}
 function pgBackup(){
   let last = ''; try { last = localStorage.getItem('jw_backup') || ''; } catch(e) {}
   const all = DB_ALL || DB;
   return `<div class="ph"><h2>数据备份</h2></div>
-  <div class="note">数据库（Supabase 免费版）<b>没有自动备份</b>。建议<b>每周点一次</b>下面的按钮，把备份文件存到电脑或网盘里。万一数据被误删，可以拿这个文件找我恢复。</div>
+  ${bksLine()}
+  <div class="note">上面的自动存档放在数据库里面，万一整个数据库出问题会一起没。所以还是建议<b>每周点一次</b>下面的按钮，把备份文件存到电脑或网盘里。万一数据被误删，可以拿这个文件找我恢复。</div>
   <section class="card" style="display:flex;flex-direction:column;gap:10px">
     <div class="stats"><div class="stat"><small>学生</small><b>${all.students.length}</b></div><div class="stat"><small>老师</small><b>${all.teachers.length}</b></div>
       <div class="stat"><small>课次</small><b>${all.lessons.length}</b></div><div class="stat"><small>课后反馈</small><b>${all.feedbacks.length}</b></div></div>

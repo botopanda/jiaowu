@@ -798,10 +798,11 @@ function wdEx(ex, w){
 /* ───────── 「我记住了，不再出现」（数据库第 35 步）─────────
    学生点了就记下来，以后不再出现；家长看得到孩子记住了哪些；教务在学生档案里看、复制出来出测试卷 */
 let WK = [];
+let WK_OK = true;
 async function wkLoad(){
-  WK = [];
+  WK = []; WK_OK = true;
   if (!['admin', 'student', 'parent'].includes(DB.me.role)) return;
-  try { WK = await rpc('word_load') || []; } catch(e) { WK = []; }
+  try { WK = await rpc('word_load') || []; } catch(e) { WK = []; WK_OK = false; }
 }
 const wkOf = sid => WK.filter(x => x.student_id === sid);
 const wkBtn = sid => `<button class="btn sm" data-act="wd-list" data-v="${sid}">记住的单词（${wkOf(sid).length}）</button>`;   // 教务：学生档案里

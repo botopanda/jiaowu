@@ -281,7 +281,7 @@ async function progImportFile(file){
     openModal(`${mHead('导入院校库')}
     <div class="stats"><div class="stat"><small>专业</small><b>${list.length}</b></div><div class="stat"><small>入试轮次</small><b>${list.reduce((a,p)=>a+p.rounds.length,0)}</b></div>
       <div class="stat"><small>新增</small><b>${list.length - nUpd}</b></div><div class="stat"><small>更新已有</small><b>${nUpd}</b></div></div>
-    ${nUpd ? '<div class="note">「更新已有」的专业：资料换成表里的，<b>入试轮次整组换成表里的</b>。</div>' : ''}
+    ${nUpd ? '<div class="note">「更新已有」的专业：资料换成表里的，<b>入试轮次按名字对上（比如「Ⅰ期」）原地更新</b>，学生目标里选好的轮次不会断；表里没有的轮次会删掉。</div>' : ''}
     ${warn.length ? `<div class="note warn"><b>有 ${warn.length} 处要留意：</b><br>${warn.slice(0,12).map(esc).join('<br>')}${warn.length>12?`<br>……还有 ${warn.length-12} 处`:''}</div>` : ''}
     <div class="list">${list.slice(0,30).map(p => `<div class="li small"><div class="grow"><b>${esc(p.school)}</b> ${esc(progName(p))} <span class="muted">${p.year} · ${esc(p.level||'学部')}${p.field?' · '+esc(p.field):''}</span><br><span class="muted xs">${p.rounds.map(r => esc(r.name||'（未命名）') + (r.apply_end?` ${dS(r.apply_end)} 截止`:'')).join('、') || '没有轮次'}</span></div></div>`).join('')}${list.length>30?`<div class="muted xs">……共 ${list.length} 个</div>`:''}</div>
     <div class="row"><button class="btn pri" data-act="prog-import-go">确认导入</button><button class="btn" data-act="close">算了</button></div>`, true);

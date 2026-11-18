@@ -1078,3 +1078,5 @@ a.btn.meet-go{gap:0}
 .lg-dl{margin-top:6px;font-size:12.5px}.lg-dl>div{white-space:pre-wrap;background:var(--sunk);border-radius:6px;padding:4px 8px;margin-top:3px}
 .lg-kv{display:flex;flex-direction:column;gap:3px;font-size:12.5px;margin-top:4px;white-space:pre-wrap;background:var(--sunk);border-radius:6px;padding:6px 8px}
 .lg-sub{padding:4px 0;font-size:12.5px;border-top:1px dotted var(--line-2)}
+/* 有几样没读出来 / 网络不稳（2026-11-19）：和「系统有更新」错开，放在下面 */
+.load-bar{top:auto;bottom:14px;background:var(--warn,#b7791f);color:#fff}

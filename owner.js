@@ -136,7 +136,7 @@ async function ownerBookChange(tid, bk){
   const t = tea(tid);
   const fullOf = () => ((DB_ALL || DB).people || []).find(x => x.role === 'teacher' && x.teacher_id === tid && x.full_view && x.active);
   const newFull = bk !== 'K' && !fullOf();
-  if (newFull && !confirm(`${t.name} 改成${bk === 'both' ? '两边都教' : '只属于 Panda'}：系统会另外生成一条完整链接（看得到 Panda 学生），要发给老师，请他以后用新链接。老师原来那条链接以后只看得到 Project K 的学生。确定吗？`)) { render(); toast('归属没有改'); return 'cancel'; }
+  if (newFull && !confirm(`${t.name} 改成${bk === 'both' ? '两边都教' : '只属于 Panda'}：系统会另外生成一条完整链接（看得到 Panda 学生），要发给老师，请他以后用新链接。${bk === 'both' ? '老师原来那条链接以后只看得到 Project K 的学生。' : '老师原来那条链接会作废，打不开了。'}确定吗？`)) { render(); toast('归属没有改'); return 'cancel'; }
   const msg = {K: `${t.name} 改成只属于 Project K。老师的链接以后只看得到 Project K 的学生`,
                mine: `${t.name} 改成只属于 Panda。潘老师、金老师那边看不到这位老师了`,
                both: `${t.name} 改成两边都教。潘老师、金老师那边看到的是一条只看 Project K 的链接`}[bk];
