@@ -85,6 +85,8 @@ const LOG_HIDE = new Set(['id', 'skey', 'path', 'mime', 'ref', 'by_person', 'by_
   'approved_at', 'reviewed_at', 'settled_at', 'handled_at', 'self_at', 'read_at']);
 // 新增 / 删除时「看内容」里不再重复的（上面那句话已经写了是哪个学生、哪节课）
 const LOG_CTXCOL = new Set(['student_id', 'teacher_id', 'course_id', 'lesson_id', 'key']);
+// 「Project K」视图：归属、Panda 标记这些也不显示（潘、金那边数据库就不给）
+const logHid = c => LOG_HIDE.has(c) || (S.book === 'K' && ['book', 'private', 'full_view', 'owner'].includes(c));
 const logCol = (t, c) => (LOG_COL[t] || {})[c] || LOG_COL._[c] || c;
 const logEmpty = v => v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length) || (typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length);
 const logLong = v => typeof v === 'string' ? v.length > 40 || v.includes('\n') : (v && typeof v === 'object' && JSON.stringify(v).length > 60);
@@ -126,7 +128,7 @@ function logChange(r){
 function logDiff(r){
   const o = r.old || {}, n = r.new || {}, short = [], long = [];
   for (const c of Object.keys(n)) {
-    if (LOG_HIDE.has(c)) continue;
+    if (logHid(c)) continue;
     if (r.tbl === 'people' && c === 'key') { short.push('<b>换了新链接</b>（旧链接不能用了）'); continue; }
     if (logVal(r.tbl, c, o[c], true) === logVal(r.tbl, c, n[c], true)) continue;   // 显示出来一样（比如只是去掉了空的备注）就不列
     if (logLong(o[c]) || logLong(n[c])) long.push([c, `<div class="lg-dl"><b>${esc(logCol(r.tbl, c))}</b><div>原来：${logVal(r.tbl, c, o[c], true)}</div><div>改成：${logVal(r.tbl, c, n[c], true)}</div></div>`]);
@@ -138,7 +140,7 @@ function logDiff(r){
 // 新增 / 删除：内容放进「看内容」
 function logBody(r){
   const d = (r.op === 'I' ? r.new : r.old) || {};
-  const ks = Object.keys(d).filter(c => !LOG_HIDE.has(c) && !LOG_CTXCOL.has(c) && !logEmpty(d[c]) && !(r.tbl === 'lesson_changes' && ['kind', 'd', 'old', 'status', 'by_name'].includes(c)));
+  const ks = Object.keys(d).filter(c => !logHid(c) && !LOG_CTXCOL.has(c) && !logEmpty(d[c]) && !(r.tbl === 'lesson_changes' && ['kind', 'd', 'old', 'status', 'by_name'].includes(c)));
   return (r.tbl === 'lesson_changes' ? logChange(r) : '')
     + (ks.length ? `<details class="lg-more"><summary class="muted xs">看${r.op === 'D' ? '删掉的' : ''}内容</summary><div class="lg-kv">${ks.map(c => `<div><span class="muted">${esc(logCol(r.tbl, c))}</span>　${logVal(r.tbl, c, d[c], true)}</div>`).join('')}</div></details>` : '');
 }
@@ -161,15 +163,18 @@ function logGroup(g){
     else for (const r of xs) items.push(`<div class="lg-i">${logLine(r)}</div>`);
   }
   const me = r0.who_id && r0.who_id === ME().id;
-  return `<div class="lg-g"><div class="lg-h"><span class="num lg-tm">${logBJ(r0.at).slice(11)}</span><b>${esc(r0.who)}</b>${me ? ' <span class="tag gold">我</span>' : ''}${r0.who === '系统' ? '' : `<span class="muted xs">${esc(LOG_ROLE[r0.role] ?? '')}</span>`}${g.some(r => r.priv) ? '<span class="tag seal">Panda</span>' : ''}</div>${items.join('')}</div>`;
+  return `<div class="lg-g"><div class="lg-h"><span class="num lg-tm">${logBJ(r0.at).slice(11)}</span><b>${esc(r0.who)}</b>${me ? ' <span class="tag gold">我</span>' : ''}${r0.who === '系统' ? '' : `<span class="muted xs">${esc(LOG_ROLE[r0.role] ?? '')}</span>`}${isOwner() && S.book === 'all' && g.some(r => r.priv) ? '<span class="tag seal">Panda</span>' : ''}</div>${items.join('')}</div>`;
 }
 
 function pgLog(){
   if (!LOGX.busy && !LOGX.at) setTimeout(() => logFetch(false));
   const cat = LOG_CATS.find(c => c[0] === LOGX.cat) || LOG_CATS[0];
-  const whos = [...new Set(LOGX.rows.map(r => r.who))];
+  // 总管理切到「Project K」：和潘、金看到的一样，Panda 的记录不显示；切到「Panda」：只显示 Panda 的
+  const inView = r => !isOwner() || S.book === 'all' || (S.book === 'K' ? !r.priv : r.priv);
+  const seen = LOGX.rows.filter(inView);
+  const whos = [...new Set(seen.map(r => r.who))];
   if (LOGX.who && !whos.includes(LOGX.who)) whos.push(LOGX.who);
-  const rows = LOGX.rows.filter(r => (!LOGX.who || r.who === LOGX.who) && (!cat[2] || cat[2].includes(r.tbl)));
+  const rows = seen.filter(r => (!LOGX.who || r.who === LOGX.who) && (!cat[2] || cat[2].includes(r.tbl)));
   // 按天、按「同一次操作」分组（rows 是新的在前）
   const days = [];
   for (const r of rows) {
@@ -178,7 +183,7 @@ function pgLog(){
     if (!day.groups.has(r.tx)) day.groups.set(r.tx, []); day.groups.get(r.tx).push(r);
   }
   const dayName = d => { const n = dBetween(d, TODAY); return n === 0 ? '今天' : n === 1 ? '昨天' : `${logD(d)} 周${WD[pd(d).getDay()]}`; };
-  const stus = logAll().students.slice().sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')) || a.name.localeCompare(b.name));
+  const stus = DB.students.slice().sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')) || a.name.localeCompare(b.name));
   const bar = `<div class="tl-bar lg-bar">
     <label class="lg-f"><span class="muted xs">谁改的</span><select id="lg-who"><option value="">所有人</option>${whos.map(w => `<option value="${esc(w)}" ${w === LOGX.who ? 'selected' : ''}>${esc(w)}</option>`).join('')}</select></label>
     <label class="lg-f"><span class="muted xs">学生</span><select id="lg-sid"><option value="">所有学生</option>${stus.map(s => `<option value="${s.id}" ${s.id === LOGX.sid ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
@@ -186,10 +191,10 @@ function pgLog(){
     <div class="tl-chips">${LOG_CATS.map(([k, t]) => `<button class="chip ${LOGX.cat === k ? 'on' : ''}" data-act="lg-cat" data-v="${k}" aria-pressed="${LOGX.cat === k}">${t}</button>`).join('')}</div>`;
   const body = LOGX.err ? `<div class="card empty">没读到改动记录：${esc(LOGX.err)}</div>`
     : !LOGX.at || (LOGX.busy && !LOGX.rows.length) ? '<div class="card empty">正在读取…</div>'
-    : !rows.length ? `<div class="card empty">${LOGX.rows.length ? '这样筛没有记录，换个条件看看' : '还没有改动记录'}</div>`
+    : !rows.length ? `<div class="card empty">${seen.length ? '这样筛没有记录，换个条件看看' : '还没有改动记录'}</div>`
     : days.map(day => `<div class="lg-day">${dayName(day.d)}</div>${[...day.groups.values()].map(logGroup).join('')}`).join('');
   return `<div class="ph"><h2>改动记录</h2></div>
-  <div class="note">谁（用哪条链接）在什么时候<b>新增、修改、删除</b>了什么，都会自动记在这里，同一次保存的放在一起。打开页面、切换视图、学生记单词不算改动。从 2026 年 11 月 19 日开始记，保留一年。${isOwner() ? '标「Panda」的只有你看得到；你做的事，潘老师、金老师那边显示「潘老师」。' : ''}</div>
+  <div class="note">谁（用哪条链接）在什么时候<b>新增、修改、删除</b>了什么，都会自动记在这里，同一次保存的放在一起。打开页面、切换视图、学生记单词不算改动。从 2026 年 11 月 19 日开始记，保留一年。</div>
   ${bar}${body}
   ${LOGX.more && rows.length ? `<div class="row" style="justify-content:center;margin-top:8px"><button class="btn" data-act="lg-more" ${LOGX.busy ? 'disabled' : ''}>${LOGX.busy ? '正在读取…' : '再往前看'}</button></div>` : ''}`;
 }
