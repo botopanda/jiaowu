@@ -1044,3 +1044,16 @@ a.btn.meet-go{gap:0}
 
 .meet-cell{display:inline-flex;align-items:center;gap:6px;margin-right:6px}
 .meet-cell .meet-go{padding:1px 8px}
+
+/* ───── 有新版本时的提醒（app.js checkVersion） ───── */
+.upd-bar{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:70;display:flex;align-items:center;gap:8px;background:var(--gold);color:var(--on-gold);border-radius:999px;padding:6px 6px 6px 16px;font-size:13.5px;font-weight:500;box-shadow:var(--sh-up);max-width:calc(100% - 24px);white-space:nowrap}
+.upd-go{border:0;background:var(--surface);color:var(--gold-text);border-radius:999px;padding:4px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.upd-x{border:0;background:transparent;color:inherit;opacity:.75;cursor:pointer;padding:2px 8px;font-size:13px}
+.upd-x:hover{opacity:1}
+
+/* ───── 学生、家长端：上课时间旁边的「北京时间」 ───── */
+.bj-tag{display:inline-block;margin-left:6px;padding:0 6px;border-radius:5px;font-family:var(--f-body);font-size:11.5px;font-weight:600;line-height:18px;letter-spacing:0;color:var(--gold-text);background:var(--gold-soft);vertical-align:2px;white-space:nowrap}
+.nx-when .bj-tag{font-size:12.5px;line-height:21px;padding:0 8px;vertical-align:5px;margin-left:8px}
+.bj-sub{display:block;font-size:11px;font-weight:600;color:var(--gold-text);margin-top:1px;font-family:var(--f-body)}
+.bj-note{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+.bj-note .bj-tag{margin-left:0}

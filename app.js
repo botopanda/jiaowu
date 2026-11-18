@@ -230,6 +230,31 @@ async function refresh(minGap = 3000){
   if (!busy) render();
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && DB) refresh(30000); });
+
+/* ───────── 有新版本时提醒刷新（2026-11-18）─────────
+   页面开着不刷新就一直是旧版本。切回这个页面、或者开着每隔 5 分钟，看一眼网站的版本号；
+   变了就在顶上提醒「系统有更新，点这里刷新」。不自己刷新，免得把正在填的内容冲掉 */
+const APP_VER = (() => { const sc = document.querySelector('script[src*="app.js?v="]'); return sc ? decodeURIComponent(sc.src.split('v=')[1] || '') : ''; })();
+let verChecked = 0, verDismissed = '';
+async function checkVersion(){
+  if (!APP_VER || APP_VER.startsWith('dev') || Date.now() - verChecked < 60000) return;   // dev＝本机预览，不提醒
+  verChecked = Date.now();
+  try {
+    const r = await fetch('version.txt?t=' + Date.now(), {cache: 'no-store'}); if (!r.ok) return;
+    const v = (await r.text()).split(String.fromCharCode(10))[0].trim();
+    if (v && v !== APP_VER && v !== verDismissed) showUpdateBar(v);
+  } catch(e) {}
+}
+function showUpdateBar(v){
+  if (document.getElementById('upd-bar')) return;
+  const d = document.createElement('div'); d.id = 'upd-bar'; d.className = 'upd-bar'; d.setAttribute('role', 'status');
+  d.innerHTML = '<span>系统有更新</span><button type="button" class="upd-go">点这里刷新</button><button type="button" class="upd-x" aria-label="先不刷新" title="先不刷新">✕</button>';
+  d.querySelector('.upd-go').onclick = () => location.reload();
+  d.querySelector('.upd-x').onclick = () => { verDismissed = v; d.remove(); };   // 点了 ✕：这个版本不再提醒，再有新版本才提醒
+  document.body.appendChild(d);
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(); });
+setInterval(() => { if (document.visibilityState === 'visible') checkVersion(); }, 5 * 60000);
 // 做完一个操作：刷新数据、重画页面、提示结果
 async function act(fn, args, okMsg, after){
   document.body.classList.add('busy');
@@ -637,13 +662,16 @@ function agenda(ls, tz, whoFn, n=12, canReq=false, canEdit=false, exs=[], exWho=
     `<div class="dg ${d===TODAY?'today':''}">${d===TODAY?'今天 · ':''}${fmtMD(d)}</div>` + ex.filter(e=>e.date===d).map(e => exLine(e, exWho)).join('')
     + up.filter(l=>l.date===d).map(l => lessonItem(l, tz, whoFn, canReq, canEdit)).join('')).join('');
 }
-const tzNote = tz => '<div class="muted xs">北京时间</div>';
+// 学生、家长端：每个上课时间旁边都写「北京时间」（2026-11-18，怕学生没看到页面上方那一行）
+const bjOn = () => ['student','parent'].includes(ME().role);
+const BJ = '<span class="bj-tag">北京时间</span>';
+const tzNote = tz => bjOn() ? '<div class="bj-note"><span class="bj-tag">北京时间</span>课表上的时间都是北京时间</div>' : '<div class="muted xs">北京时间</div>';
 
 /* 手机端课表：月历 / 列表 两种看法，每个人自己选，本机记住 */
 let PV = 'cal'; try { PV = localStorage.getItem('jw_view') || 'cal'; } catch(e) {}
 function lessonItem(l, tz, whoFn, canReq, canEdit){
   const c = course(l.course_id), q = reqOf(l), leave = l.status!=='scheduled';
-  return `<div class="les" style="--hc:${slotHue(timeFor(l,tz))}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}</div><div style="min-width:0;flex:1">${subjTag(c.subject)}${l.kind?` <span class="tag mute">${esc(l.kind)}</span>`:''} · ${esc(whoFn(c))}${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调课</span>':''}${l.status==='leave'?' <span class="tag seal">请假</span>':''}${l.status==='cancelled'?' <span class="tag mute">已取消</span>':''}${['student','parent'].includes(ME().role) ? (l.status==='scheduled' && l.date<TODAY ? ' <span class="tag mute">已上</span>' : '') : `${isDone(l)?(hasFb(l)?' <span class="tag ok">已反馈</span>':' <span class="tag ok">已上</span>'):''}${isPend(l)?` <span class="tag warn">${ME().role==='teacher'?'待写反馈':'待确认'}</span>`:''}`}${hrsTag(l)}${l.topic?`<div class="les-topic">本节：${esc(l.topic)}</div>`:''}
+  return `<div class="les" style="--hc:${slotHue(timeFor(l,tz))}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}${bjOn() ? '<span class="bj-sub">北京时间</span>' : ''}</div><div style="min-width:0;flex:1">${subjTag(c.subject)}${l.kind?` <span class="tag mute">${esc(l.kind)}</span>`:''} · ${esc(whoFn(c))}${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调课</span>':''}${l.status==='leave'?' <span class="tag seal">请假</span>':''}${l.status==='cancelled'?' <span class="tag mute">已取消</span>':''}${['student','parent'].includes(ME().role) ? (l.status==='scheduled' && l.date<TODAY ? ' <span class="tag mute">已上</span>' : '') : `${isDone(l)?(hasFb(l)?' <span class="tag ok">已反馈</span>':' <span class="tag ok">已上</span>'):''}${isPend(l)?` <span class="tag warn">${ME().role==='teacher'?'待写反馈':'待确认'}</span>`:''}`}${hrsTag(l)}${l.topic?`<div class="les-topic">本节：${esc(l.topic)}</div>`:''}
     ${reqLine(q)}${ME().role==='student' && !leave && l.date===TODAY && typeof meetBtn==='function' ? `<div style="margin-top:6px">${meetBtn(c)}</div>` : ''}${canReq && !leave && l.date>=TODAY && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave && !fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}${isT() && fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="t-fb" data-v="${fbOf(l).id}">看反馈</button>`:''}</div></div>`;
 }
 // sid：要标考试的学生（学生、家长＝自己；老师＝自己正在教的学生，传编号数组，格子里写学生名字）
