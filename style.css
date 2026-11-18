@@ -1060,3 +1060,21 @@ a.btn.meet-go{gap:0}
 
 .meet-wd{display:flex;align-items:flex-start;gap:8px;font-size:13.5px;cursor:pointer;line-height:1.5}
 .meet-wd .chk{margin-top:2px;flex:none}
+
+/* 改动记录（log.js，2026-11-19） */
+.lg-bar{gap:8px 14px}
+.lg-f{display:inline-flex;align-items:center;gap:6px}
+.lg-f select{width:auto;max-width:190px}
+.lg-day{font-size:13px;font-weight:700;color:var(--muted);margin:14px 0 6px}
+.lg-g{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r);padding:8px 12px;margin-bottom:8px}
+.lg-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;font-size:13.5px;padding-bottom:2px}
+.lg-tm{color:var(--muted);font-size:12.5px;min-width:38px}
+.lg-i{padding:5px 0 3px;border-top:1px dashed var(--line-2);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.lg-h + .lg-i{border-top:0}
+.lg-k{font-weight:700}
+.lg-d{font-size:12.5px;margin-top:2px}
+.lg-o{color:var(--muted)}
+.lg-more{margin-top:2px}.lg-more>summary{cursor:pointer;width:fit-content}
+.lg-dl{margin-top:6px;font-size:12.5px}.lg-dl>div{white-space:pre-wrap;background:var(--sunk);border-radius:6px;padding:4px 8px;margin-top:3px}
+.lg-kv{display:flex;flex-direction:column;gap:3px;font-size:12.5px;margin-top:4px;white-space:pre-wrap;background:var(--sunk);border-radius:6px;padding:6px 8px}
+.lg-sub{padding:4px 0;font-size:12.5px;border-top:1px dotted var(--line-2)}

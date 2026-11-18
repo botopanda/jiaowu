@@ -127,6 +127,7 @@ const NAV_ICONS = (() => {
     '链接与备份': '<path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1"/><path d="M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/>',
     '链接与权限': '<path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1"/><path d="M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/>',
     '数据备份': '<path d="M12 3v12M7 10l5 5 5-5M4 19h16"/>',
+    '改动记录': '<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4.5V9h4.5"/><path d="M12 7.5V12l3 2"/>',
     '首页': home, '概况': home,
     '作业': '<path d="M5 4h11l3 3v13H5z"/><path d="M9 12h6M9 16h6"/>',
     '上课记录': chat, '老师反馈': chat,
@@ -280,11 +281,11 @@ function adminView(){
   const stuGrp = ['学生',[['students','学生档案'],['reviews','月度家长反馈'],['apply','升学与出愿'],['schools','院校库'],['checks','通关点检']]];
   const items = isTop()
     ? [['日常',[['overview','总览'],['calendar','课表与排课'],['todo','待处理',todoN]]], stuGrp,
-       ['管理',[['teachers','老师档案'],['payroll','课时与工资'],['sys','链接与备份']]]]
+       ['管理',[['teachers','老师档案'],['payroll','课时与工资'],['sys','链接与备份'],['log','改动记录']]]]
     : [['日常',[['overview','总览'],['calendar','课表与排课'],['todo','待处理',todoN]]], stuGrp];
   const nav = items.map(([g,list]) => `<div class="grp">${g}</div>` + list.map(([k,t,n]) =>
     `<button class="nav ${S.page===k || (k==='students' && S.page==='student')?'on':''}" data-act="page" data-v="${k}">${navIcon(t)}<span>${t}</span>${n?`<span class="cnt">${n}</span>`:''}</button>`).join('')).join('');
-  const P = {todo:pgTodo, sys:pgSys, checks:pgChecks, overview:pgOverview, calendar:pgCalendar, apply:pgApply2, reviews:pgReviews, students:pgStudents, student:pgStudent, teachers:pgTeachers, payroll:pgPayroll, schools:pgSchools};
+  const P = {todo:pgTodo, sys:pgSys, log:typeof pgLog==='function' ? pgLog : pgOverview, checks:pgChecks, overview:pgOverview, calendar:pgCalendar, apply:pgApply2, reviews:pgReviews, students:pgStudents, student:pgStudent, teachers:pgTeachers, payroll:pgPayroll, schools:pgSchools};
   const page = (isTop() || ['overview','calendar','todo','students','student','checks','apply','schools','reviews'].includes(S.page)) ? (P[S.page]||pgOverview) : pgOverview;
   return `<div class="layout"><nav class="side" aria-label="教务导航">${nav}</nav><main class="main">${page()}</main></div>`;
 }
@@ -620,12 +621,13 @@ function pgLinks(){
     : p.role==='teacher' ? '自己带的：'+(DB.courses.filter(c=>c.teacher_id===p.teacher_id).map(c=>stu(c.student_id).name).join('、')||'—')
     : p.role==='student' ? '自己的课表、作业、上课记录' : `${stu(p.student_id).name} 的出勤、审批过的反馈、课表`;
   const grp = [['教务','admin'],['任课老师','teacher'],['学生','student'],['家长','parent']];
-  return `<div class="ph"><h2>链接与权限</h2><button class="btn pri" data-act="link-new">＋ 新建链接</button></div>
+  return `<div class="ph"><h2>链接与权限</h2><button class="btn" data-act="seen-clear-all">清除登录记录</button><button class="btn pri" data-act="link-new">＋ 新建链接</button></div>
   <div class="note">每个人一条专属链接，打开就能用。点「复制链接」发到对方微信。<b>链接被转发、老师离职、学生毕业</b>时，点「重新生成」或「停用」，旧链接马上失效。新增老师、学生时会自动生成链接。</div>
+  <div class="note">自己点开学生、老师的链接看情况，也会记成「最近打开」。看完以后，点那一行的「清除」只清这一条，点上面的「清除登录记录」全部清掉。</div>
   ${grp.map(([g,r]) => { const ps = P.filter(p=>p.role===r && !ownerShadow(p)); return ps.length ? `<section><h3 style="font-size:15px;margin:6px 0">${g}</h3><div class="tw"><table class="rt"><thead><tr><th>姓名</th><th>身份</th><th>能看到</th><th>最近打开</th><th>状态</th><th></th></tr></thead><tbody>
     ${ps.map(p => `<tr><td><b>${esc(p.name)}</b>${p.id===ME().id?' <span class="tag gold">我</span>':''}${ownerLinkTag(p)}</td><td><span class="tag ${p.level==='top'?'seal':p.role==='admin'?'gold':'mute'}">${p.role==='admin'?(p.level==='top'?'教务 · 管理':'教务 · 普通'):g}</span></td>
       <td class="small">${esc(scopeTxt(p))}${p.role==='admin'&&p.level!=='top'?` <button class="btn sm" data-act="scope-edit" data-v="${p.id}">改范围</button>`:''}</td>
-      <td class="small">${seenTxt(p)}</td>
+      <td class="small">${seenTxt(p)}${p.last_seen || (p.devices||[]).length ? ` <button class="btn sm" data-act="seen-clear" data-v="${p.id}" title="清掉这条链接的最近打开时间和设备">清除</button>` : ''}</td>
       <td>${p.active?'<span class="tag ok">启用</span>':'<span class="tag seal">已停用</span>'}</td>
       <td><div class="row"><button class="btn sm" data-act="copy-link" data-v="${p.key}" ${p.active?'':'disabled'}>复制链接</button><button class="btn sm" data-act="link-regen" data-v="${p.id}">重新生成</button>${ownerLinkToggle(p)}
         ${p.id===ME().id?'':`<button class="btn sm ${p.active?'danger':''}" data-act="link-toggle" data-v="${p.id}">${p.active?'停用':'恢复'}</button><button class="btn sm danger" data-act="link-del" data-v="${p.id}">删除</button>`}</div></td></tr>`).join('')}
