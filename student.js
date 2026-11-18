@@ -83,7 +83,7 @@ function sNextCard(s){
     <div class="nx-when"><b>${dayWord(l.date)}</b> <span class="num">${t}</span>${BJ}</div>
     <div class="nx-what">${subjTag(c.subject)} <span>${esc(tName(c.teacher_id))}</span>${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调过课</span>':''}</div>
     ${l.topic ? `<div class="nx-topic">本节：${esc(l.topic)}</div>` : ''}
-    ${!PRO() && typeof meetBtn==='function' && meetOk(c) ? `<div class="nx-meet">${meetBtn(c, {big: true})}</div>` : ''}
+    ${!PRO() && typeof meetBtn==='function' && meetOk(l) ? `<div class="nx-meet">${meetBtn(l, {big: true})}</div>` : ''}
     ${q ? reqLine(q) : ''}
     ${PRO() ? '' : !(q && q.status==='pending') ? `<div class="row"><button class="btn sm" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button></div>` : ''}
     ${later.length ? `<div class="nx-later">${later.map(x => { const cc = course(x.course_id); return `<div class="row xs"><span class="muted">之后</span><b>${dayWord(x.date)}</b><span class="num">${timeFor(x, s.tz)}${BJ}</span>${subjTag(cc.subject)}<span class="muted">${esc(tea(cc.teacher_id).name)}</span></div>`; }).join('')}</div>` : ''}
