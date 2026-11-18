@@ -297,7 +297,7 @@ const chPendOf = lid => chPend().find(x => x.lesson_id===lid);
 const chKind = {add:'排课', move:'调课', delete:'删课'};
 const tShow = t => esc(t);   // 申请里的时间是老师那边发来的，显示前一定转义（体检 C-01）
 function chText(x){
-  if (x.kind==='add'){ const ds = x.d.dates || []; return `${ds.length} 节：${ds.slice(0,8).map(sMD).join('、')}${ds.length>8?' 等':''} · ${tShow(x.d.st)}–${tShow(x.d.et)}${x.d.makeup?' · 补课':''}${x.d.kind?` · ${esc(x.d.kind)}`:''}${x.d.topic?` · 内容：${esc(x.d.topic)}`:''}`; }
+  if (x.kind==='add'){ const ds = x.d.dates || []; return `${ds.length} 节：${ds.slice(0,8).map(sMD).join('、')}${ds.length>8?' 等':''} · ${tShow(x.d.st)}–${tShow(x.d.et)}${x.d.makeup?' · 补课':''}${x.d.kind?` · ${esc(x.d.kind)}`:''}${x.d.topic?` · 内容：${esc(x.d.topic)}`:''}${x.d.murl?` · 已填上课链接${ds.length>1?(x.d.mall?'（每节都用）':'（只填第一节）'):''}`:''}`; }
   const wd = d => `${sMD(d)} 周${WD[pd(d).getDay()]}`;
   const o = x.old ? `${wd(x.old.date)} ${tShow(x.old.start)}–${tShow(x.old.end)}` : '（这节课已不在）';
   if (x.kind==='delete') return `删掉 ${o} 这节课`;
@@ -896,6 +896,7 @@ function addLessonModal(){
   <div class="fields"><label class="field"><span>第一节日期</span><input type="date" id="al-d" value="${preD}"></label><label class="field"><span>开始（${tzName(myTz())}）</span><input type="time" id="al-s" value="${pre ? pre.s : '18:00'}"></label><label class="field"><span>结束</span><input type="time" id="al-e" value="${pre ? pre.e : '20:00'}"></label></div>
   <div class="fields"><label class="field"><span>重复</span><select id="al-rep"><option value="month">每周同一时间，到这个月底</option><option value="1">只排这一节</option><option value="4">每周同一时间，共 4 周</option><option value="8">每周同一时间，共 8 周</option></select></label></div>
   <label class="field"><span>本节内容（可以不填）</span><input type="text" id="al-topic" maxlength="200" placeholder="例：第3节｜两点透视"></label>
+  ${typeof meetAddFields==='function' ? meetAddFields() : ''}
   <div class="muted xs">和这位老师已有的课时间重叠的，会自动跳过。每周重复排的课，本节内容只写进第一节，其他几节之后点开那节课再填。</div>
   <div class="row"><button class="btn pri" data-act="save-lesson">${isT ? '提交排课申请' : '排课'}</button></div>`);
   alPick();
@@ -1143,10 +1144,11 @@ document.addEventListener('click', async e => {
       if(!val('al-stu')||!alTeacher()||!alSubj()){toast('请选择学生、老师和科目',true);break;}
       if(!alKind()){toast(val('al-kind')==='__other' ? '请写上课程名称' : '请选择课程',true);break;}
       if(!d||!s||!en||mins(en)<=mins(s)){toast('请检查日期和时间（不能跨过半夜 12 点）',true);break;}
+      const mt = typeof meetAddVals==='function' ? meetAddVals() : {}; if (!mt) break;
       let c = alCourse();
       if (!c){ if (ME().role==='teacher'){toast('你和这位学生还没有这门课，请先联系教务老师建立',true);break;}
         const cid = await rpc('admin_save_course', {d:{student_id:val('al-stu'), teacher_id:alTeacher(), subject:alSubj(), rate:Number(val('al-rate'))||0, cur:val('al-cur')||'CNY'}}); c = {id:cid}; }
-      await act('admin_add_lessons', {course:c.id, kind:alKind(), ...(val('al-topic').trim()?{topic:val('al-topic').trim()}:{}), dates:lessonDates(d, val('al-rep')), st:s, et:en, ...(val('al-mk')==='1'?{makeup:true}:{})}, r=>r.pending?'已提交排课申请，教务批准后会出现在课表上':`已排 ${r.added} 节课`+(r.skipped?`，${r.skipped} 节和老师或学生已有的课撞了，已跳过`:'')); S.month=d.slice(0,7); closeModal(); render(); break; }
+      await act('admin_add_lessons', {course:c.id, kind:alKind(), ...(val('al-topic').trim()?{topic:val('al-topic').trim()}:{}), dates:lessonDates(d, val('al-rep')), st:s, et:en, ...(val('al-mk')==='1'?{makeup:true}:{}), ...mt}, r=>r.pending?'已提交排课申请，教务批准后会出现在课表上':`已排 ${r.added} 节课`+(r.skipped?`，${r.skipped} 节和老师或学生已有的课撞了，已跳过`:'')); S.month=d.slice(0,7); closeModal(); render(); break; }
     case 'req-ok': { const q=DB.requests.find(x=>x.id===v);
       const args = q.type==='改期' ? {rid:v, accept:true, reply:'', nd:val('rq-d-'+v), ns:val('rq-s-'+v), ne:val('rq-e-'+v), deduct:0} : {rid:v, accept:true, reply:'', deduct:Number(val('rq-dd-'+v))};
       await act('admin_handle_request', args, '已处理，学生和老师都能看到结果'); break; }

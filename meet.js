@@ -80,16 +80,39 @@ function meetTeacherSummary(t){
   return ls.length ? (n === ls.length ? `<span class="tag ok">接下来 7 天 ${n} 节都填了</span>` : `<span class="${n ? '' : 'muted'}">接下来 7 天 ${n} / ${ls.length} 节已填</span>`) : '<span class="muted">接下来 7 天没有课</span>';
 }
 
+// 「排课」「申请排课」窗口里：上课链接（可以不填）。默认只填进第一节，勾上就重复的几节都用（第 53 步）
+function meetAddFields(){
+  return `<div class="fields"><label class="field"><span>上课链接（可以不填）</span><input type="text" id="al-url" inputmode="url" autocomplete="off" placeholder="https://meeting.tencent.com/…（整段邀请直接粘贴也行）"></label><label class="field"><span>会议号 / 密码（可以不填）</span><input type="text" id="al-mnote" autocomplete="off" maxlength="120" placeholder="例：会议号 123 456 789，密码 1234"></label></div>
+  <label class="meet-wd" id="al-wd-row" hidden><input type="checkbox" id="al-wd" class="chk"><span>重复的几节都用这个链接<span class="muted xs" style="display:block">不勾就只填第一节，其他几节之后点开那节课再填；每周固定时间的周期性会议可以勾上</span></span></label>`;
+}
+// 填了链接、又真的排出好几节时，才显示「重复的几节都用」
+const meetAddMany = () => (typeof lessonDates === 'function' && val('al-d') ? lessonDates(val('al-d'), val('al-rep')).length : (val('al-rep') === '1' ? 1 : 2)) > 1;
+function meetAddSync(){
+  const r = document.getElementById('al-wd-row'); if (!r) return;
+  r.hidden = !(val('al-url').trim() && meetAddMany());
+}
+document.addEventListener('input', e => { if (e.target?.id === 'al-url') meetAddSync(); });
+document.addEventListener('change', e => { if (['al-rep', 'al-url', 'al-d'].includes(e.target?.id)) meetAddSync(); });
+// 提交时取出来：{} = 没填；null = 填得不对（已经提示过）
+function meetAddVals(){
+  let url = val('al-url').trim(), note = val('al-mnote').trim();
+  if (!url) return {};
+  if (!/^https:\/\//.test(url)) { const m = meetParse(url); if (m.url) { url = m.url; if (!note) note = m.note; } }   // 手机上粘贴整段邀请时也拆开
+  if (url.length > 300 || !/^https:\/\/[^\s<>"'`]+$/.test(url)) { toast('上课链接要以 https:// 开头，请直接复制腾讯会议里的会议链接（不填也可以）', true); return null; }
+  return {murl: url, ...(note ? {mnote: note} : {}), ...(document.getElementById('al-wd')?.checked && meetAddMany() ? {mall: true} : {})};
+}
+
 // 以前按老师 / 按课填的地方，现在不用了（留着名字，旧的调用处不会报错）
 const meetSelfCard = () => '', meetTeacherList = () => '', meetSideBtns = () => '', meetCourseRow = () => '';
 
 // 粘贴整段邀请：自动拆开填好
 document.addEventListener('paste', e => {
-  if (e.target?.id !== 'mt-url') return;
+  const id = e.target?.id; if (id !== 'mt-url' && id !== 'al-url') return;
   const txt = e.clipboardData?.getData('text') || '', m = meetParse(txt);
   if (!m.url || txt.trim() === m.url) return;
   e.preventDefault(); e.target.value = m.url;
-  const n = document.getElementById('mt-note'); if (n && m.note) n.value = m.note;
+  const n = document.getElementById(id === 'mt-url' ? 'mt-note' : 'al-mnote'); if (n && m.note) n.value = m.note;
+  meetAddSync();
 });
 
 const meetBack = lid => mtFrom === 'todo' ? meetTodoModal() : lessonModal(lid);
