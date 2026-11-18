@@ -1041,3 +1041,6 @@ a.btn.meet-go{gap:0}
 .side-tea .meet-wrap{margin-top:4px}
 .side-tea .meet-go{background:transparent;border-color:rgba(255,255,255,.25);color:#a9c0ff;padding:1px 8px;font-size:12px}
 .side-tea .meet-go .meet-ic{width:13px;height:13px}
+
+.meet-cell{display:inline-flex;align-items:center;gap:6px;margin-right:6px}
+.meet-cell .meet-go{padding:1px 8px}

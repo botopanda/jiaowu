@@ -550,10 +550,10 @@ function pgTeachers(){
     ${cvOf(t.id).tagline ? `<div class="small" style="margin:-2px 0 6px">${esc(cvOf(t.id).tagline)}</div>` : ''}
     <dl class="kv small">${cvBrief(t)}
     <dt>带的学生</dt><dd>${names.map(esc).join('、')||'—'}</dd>
-    ${typeof meetBtn==='function' ? `<dt>上课链接</dt><dd>${meetOk(t) ? `<span class="tag ok">已填</span>${t.meet_note?` <span class="muted xs">${esc(t.meet_note)}</span>`:''}` : '<span class="muted">还没填</span>'}</dd>` : ''}
+    ${typeof meetBtn==='function' ? `<dt>上课链接</dt><dd>${meetTeacherSummary(t)}</dd>` : ''}
     <dt>本月已上</dt><dd><b class="num">${hDone}</b> 小时 <span class="muted xs">（${done.length} 节）</span>${pn?` <span class="tag warn">${pn} 节待确认</span>`:''}</dd>
     <dt>本月应上</dt><dd><b class="num">${hPlan}</b> 小时 <span class="muted xs">（${plan.length} 节）</span></dd></dl>
-    <div class="row" style="margin-top:8px"><button class="btn pri sm" data-act="cv-open" data-v="${t.id}">履历</button><button class="btn sm" data-act="teacher-form" data-v="${t.id}">编辑</button>${typeof meetBtn==='function' ? `<button class="btn sm" data-act="mt-open" data-v="${t.id}">上课链接</button>` : ''}${p?`<button class="btn sm" data-act="copy-link" data-v="${p.key}">复制老师链接</button>`:''}${ownerFullLinkBtn(t)}</div></section>`}).join('')}</div>` : '<div class="card empty">还没有老师。点右上角「新增老师」开始。</div>'}`;
+    <div class="row" style="margin-top:8px"><button class="btn pri sm" data-act="cv-open" data-v="${t.id}">履历</button><button class="btn sm" data-act="teacher-form" data-v="${t.id}">编辑</button>${p?`<button class="btn sm" data-act="copy-link" data-v="${p.key}">复制老师链接</button>`:''}${ownerFullLinkBtn(t)}</div></section>`}).join('')}</div>` : '<div class="card empty">还没有老师。点右上角「新增老师」开始。</div>'}`;
 }
 
 function pgPayroll(){
@@ -644,7 +644,7 @@ let PV = 'cal'; try { PV = localStorage.getItem('jw_view') || 'cal'; } catch(e) 
 function lessonItem(l, tz, whoFn, canReq, canEdit){
   const c = course(l.course_id), q = reqOf(l), leave = l.status!=='scheduled';
   return `<div class="les" style="--hc:${slotHue(timeFor(l,tz))}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}</div><div style="min-width:0;flex:1">${subjTag(c.subject)}${l.kind?` <span class="tag mute">${esc(l.kind)}</span>`:''} · ${esc(whoFn(c))}${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调课</span>':''}${l.status==='leave'?' <span class="tag seal">请假</span>':''}${l.status==='cancelled'?' <span class="tag mute">已取消</span>':''}${['student','parent'].includes(ME().role) ? (l.status==='scheduled' && l.date<TODAY ? ' <span class="tag mute">已上</span>' : '') : `${isDone(l)?(hasFb(l)?' <span class="tag ok">已反馈</span>':' <span class="tag ok">已上</span>'):''}${isPend(l)?` <span class="tag warn">${ME().role==='teacher'?'待写反馈':'待确认'}</span>`:''}`}${hrsTag(l)}${l.topic?`<div class="les-topic">本节：${esc(l.topic)}</div>`:''}
-    ${reqLine(q)}${ME().role==='student' && !leave && l.date===TODAY && typeof meetBtn==='function' ? `<div style="margin-top:6px">${meetBtn(tea(c.teacher_id))}</div>` : ''}${canReq && !leave && l.date>=TODAY && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave && !fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}${isT() && fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="t-fb" data-v="${fbOf(l).id}">看反馈</button>`:''}</div></div>`;
+    ${reqLine(q)}${ME().role==='student' && !leave && l.date===TODAY && typeof meetBtn==='function' ? `<div style="margin-top:6px">${meetBtn(c)}</div>` : ''}${canReq && !leave && l.date>=TODAY && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave && !fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}${isT() && fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="t-fb" data-v="${fbOf(l).id}">看反馈</button>`:''}</div></div>`;
 }
 // sid：要标考试的学生（学生、家长＝自己；老师＝自己正在教的学生，传编号数组，格子里写学生名字）
 function schedule(ls, tz, whoFn, canReq=false, canEdit=false, extra='', sid=null){
@@ -700,7 +700,7 @@ function tStudents(t){
   const cs = DB.courses.filter(c=>c.teacher_id===t.id && c.active);
   return (typeof msgTeacherBox==='function' ? msgTeacherBox() : '') + (cs.length ? cs.map(c => { const s=stu(c.student_id), fs=DB.feedbacks.filter(f=>L(f.lesson_id).course_id===c.id), lastF=fs[fs.length-1], next=DB.lessons.find(l=>l.course_id===c.id && l.date>=TODAY && l.status!=='leave');
     return `<section class="card" style="display:flex;flex-direction:column;gap:6px"><div class="row"><h3 style="font-size:16px;margin-right:auto">${esc(s.name)}</h3>${subjTag(c.subject)}</div>
-    <dl class="kv small"><dt>方向</dt><dd>${esc(s.track||'—')}</dd><dt>下节课</dt><dd>${next?`${fmtMD(next.date)} ${timeFor(next,t.tz)}`:'—'}</dd>
+    <dl class="kv small"><dt>方向</dt><dd>${esc(s.track||'—')}</dd><dt>下节课</dt><dd>${next?`${fmtMD(next.date)} ${timeFor(next,t.tz)}`:'—'}</dd>${typeof meetBtn==='function' ? `<dt>上课链接</dt><dd>${meetCourseRow(c, true)}</dd>` : ''}
     <dt>本月计划</dt><dd>${esc(planText(c.id, TODAY.slice(0,7))||'还没写')}</dd><dt>上次作业</dt><dd>${lastF?`${esc(lastF.hw)} ${lastF.hw_sub?'<span class="tag ok">已交</span>':'<span class="tag warn">未交</span>'}`:'—'}</dd></dl>
     <button class="btn sm" data-act="t-stu" data-v="${c.id}">档案 · 月计划 · 月度反馈 · 私下备注</button></section>`}).join('') : '<div class="empty">还没有分配学生</div>');
 }
@@ -816,7 +816,7 @@ function lessonModal(id){
   const l = L(id), c = course(l.course_id), s = stu(c.student_id), t = tea(c.teacher_id), f = fbOf(l), q = reqOf(l);
   const st = isDone(l)?`<span class="tag ok">已上课</span>${!f&&!l.has_fb&&!t.staff?' <span class="tag mute">教务确认</span>':''}${hrsTag(l)}`:l.status==='leave'?'<span class="tag seal">请假</span>':l.status==='cancelled'?'<span class="tag mute">已取消</span>':isPend(l)?'<span class="tag warn">待确认</span> <span class="muted xs">老师还没写反馈，暂不计课时</span>':'<span class="tag blue">待上课</span>';
   openModal(`${mHead(`${esc(s.name)} · ${esc(c.subject)}${l.kind?' · '+esc(l.kind):''}`)}
-  <dl class="kv"><dt>课程</dt><dd>${canSched() && l.status==='scheduled' ? `<select data-change="l-kind" data-lid="${l.id}" data-orig="${esc(l.kind||'')}"><option value="">—</option>${kindsOf(t.id).map(x => `<option ${x===l.kind?'selected':''}>${x}</option>`).join('')}${l.kind && !kindsOf(t.id).includes(l.kind) ? `<option selected>${esc(l.kind)}</option>` : ''}<option value="__other">其他（自己填）…</option></select>${isT() ? `<span id="l-kind-go" class="row" style="display:inline-flex;margin-left:6px" hidden><button class="btn pri sm" data-act="l-kind-submit" data-v="${l.id}">提交</button><button class="btn sm" data-act="l-kind-cancel" data-v="${l.id}">取消</button><span class="muted xs">提交后要教务批准</span></span>` : ''}` : esc(l.kind || '—')}</dd><dt>老师</dt><dd>${esc(t.name)}${t.loc?`（${esc(t.loc)}）`:''}</dd><dt>时间</dt><dd>${fmtMD(l.date)} ${l.start}–${l.end} <span class="muted">北京时间</span></dd>
+  <dl class="kv"><dt>课程</dt><dd>${canSched() && l.status==='scheduled' ? `<select data-change="l-kind" data-lid="${l.id}" data-orig="${esc(l.kind||'')}"><option value="">—</option>${kindsOf(t.id).map(x => `<option ${x===l.kind?'selected':''}>${x}</option>`).join('')}${l.kind && !kindsOf(t.id).includes(l.kind) ? `<option selected>${esc(l.kind)}</option>` : ''}<option value="__other">其他（自己填）…</option></select>${isT() ? `<span id="l-kind-go" class="row" style="display:inline-flex;margin-left:6px" hidden><button class="btn pri sm" data-act="l-kind-submit" data-v="${l.id}">保存</button><button class="btn sm" data-act="l-kind-cancel" data-v="${l.id}">取消</button></span>` : ''}` : esc(l.kind || '—')}</dd><dt>老师</dt><dd>${esc(t.name)}${t.loc?`（${esc(t.loc)}）`:''}</dd><dt>时间</dt><dd>${fmtMD(l.date)} ${l.start}–${l.end} <span class="muted">北京时间</span></dd>
   <dt>本节内容</dt><dd id="tp-view">${l.topic?esc(l.topic):'<span class="muted">还没写</span>'}${canSched()?` <button class="btn sm" data-act="topic" data-v="${l.id}">${l.topic?'修改':'填写'}</button>`:''}</dd>
   <dt>状态</dt><dd>${st} ${l.makeup?'<span class="tag blue">补课</span>':''} ${l.moved?'<span class="tag warn">调过课</span>':''}${l.moved && canSched() && (!f || isTop()) ? ` <button class="btn sm" data-act="unmove" data-v="${l.id}">取消调课标记</button>` : ''}${canSched() && (!f || isTop()) ? ` <button class="btn sm" data-act="makeup" data-v="${l.id}|${l.makeup?0:1}">${l.makeup?'取消补课标记':'标为补课'}</button>` : ''}</dd>${l.note?`<dt>备注</dt><dd>${esc(l.note)}</dd>`:''}
   ${l.status==='leave'?`<dt>扣学生课时</dt><dd class="num">${l.deduct} 小时（老师照发）</dd>`:''}${l.actual_note?`<dt>时长说明</dt><dd>${esc(l.actual_note)}</dd>`:''}${(isDone(l)||isPend(l)) && !t.staff?`<dt>反馈</dt><dd>${f?(f.status==='approved'?'已审批':'待审批'):l.has_fb?'已写':'<span class="tag warn">老师未写</span>'}</dd>`:''}
@@ -1085,7 +1085,7 @@ document.addEventListener('click', async e => {
       await act('admin_update_lesson', {lid:v, d:{date:d, start:s, end:en, moved:false, ...clr}}, isT()?'已提交改时间申请，教务批准后课表才会更新':'时间已改好，不算调课'); closeModal(); break; }
     case 'l-kind-submit': { const el = document.querySelector('[data-change="l-kind"]'), kind = el ? (el.dataset.pick ?? el.value) : null;
       if (kind==null || kind==='__other' || kind===(el.dataset.orig||'')) break;
-      await act('admin_update_lesson', {lid:v, d:{kind}}, '已提交修改申请，教务批准后生效'); lessonModal(v); break; }
+      await act('lesson_set_kind', {lid:v, kd:kind}, '课程已保存'); lessonModal(v); break; }
     case 'l-kind-cancel': lessonModal(v); break;
     case 'unmove': { const l0 = L(v), clr = isTop() && l0 && l0.note==='已调课' ? {note:''} : {};
       await act('admin_update_lesson', {lid:v, d:{moved:false, ...clr}}, isT()?'已提交申请，教务批准后生效':'已取消调课标记'); lessonModal(v); break; }
@@ -1189,7 +1189,7 @@ document.addEventListener('change', e => {
     const hs = document.getElementById('w-hrs'); if (hs) hs.innerHTML = wHrsOpts(L(el.value)); }
   else if (k==='l-kind'){ let kind = el.value;
     if (kind==='__other'){ kind = (prompt('写课程名称（例：色彩构成）', '') || '').trim().slice(0, 30); if (!kind){ lessonModal(el.dataset.lid); return; } }
-    if (isT()){   // 老师：选完不马上提交，要再点「提交」（2026-11-18：一选就提交，容易误点出申请）
+    if (isT()){   // 老师：选完再点「保存」才存（2026-11-18；直接保存，和「本节内容」一样不用教务批准，第 51 步）
       if (el.value==='__other'){ const o = document.createElement('option'); o.value = o.textContent = kind; el.insertBefore(o, el.lastElementChild); el.value = kind; }
       el.dataset.pick = kind; const go = document.getElementById('l-kind-go'); if (go) go.hidden = kind === (el.dataset.orig || ''); return; }
     act('admin_update_lesson', {lid:el.dataset.lid, d:{kind}}, '课程已改').then(() => lessonModal(el.dataset.lid)).catch(() => {}); }

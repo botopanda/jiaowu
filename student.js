@@ -65,7 +65,7 @@ function sSide(s){
   const sub = [s.direction || s.track, s.target_ym ? `目标 ${tgtLabel(s.target_ym)}` : ''].filter(Boolean);
   return {
     top: `<div class="side-me"><span class="side-av">${esc((s.name || '?').slice(-1))}</span><div><b>${esc(s.name)}同学</b>${sub.map(x => `<div class="muted xs">${esc(x)}</div>`).join('')}</div></div>`,
-    bottom: `<div class="side-foot">${Object.keys(by).length ? `<div class="grp">${PRO() ? '孩子的老师' : '我的老师'}</div>${Object.entries(by).map(([tid, subs]) => `<div class="side-tea"><b>${esc(tName(tid))}</b><span class="muted xs">${subs.map(esc).join('、')}</span>${!PRO() && typeof meetBtn==='function' ? meetBtn(tea(tid), {label: '腾讯会议 ›', withNote: false}) : ''}</div>`).join('')}` : ''}
+    bottom: `<div class="side-foot">${Object.keys(by).length ? `<div class="grp">${PRO() ? '孩子的老师' : '我的老师'}</div>${Object.entries(by).map(([tid, subs]) => `<div class="side-tea"><b>${esc(tName(tid))}</b><span class="muted xs">${subs.map(esc).join('、')}</span>${typeof meetBtn==='function' ? meetSideBtns(s.id, tid) : ''}</div>`).join('')}` : ''}
       <div class="muted xs side-help">有问题直接微信联系教务老师</div></div>`,
   };
 }
@@ -83,7 +83,7 @@ function sNextCard(s){
     <div class="nx-when"><b>${dayWord(l.date)}</b> <span class="num">${t}</span></div>
     <div class="nx-what">${subjTag(c.subject)} <span>${esc(tName(c.teacher_id))}</span>${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调过课</span>':''}</div>
     ${l.topic ? `<div class="nx-topic">本节：${esc(l.topic)}</div>` : ''}
-    ${!PRO() && typeof meetBtn==='function' && meetOk(tea(c.teacher_id)) ? `<div class="nx-meet">${meetBtn(tea(c.teacher_id), {big: true})}</div>` : ''}
+    ${!PRO() && typeof meetBtn==='function' && meetOk(c) ? `<div class="nx-meet">${meetBtn(c, {big: true})}</div>` : ''}
     ${q ? reqLine(q) : ''}
     ${PRO() ? '<div class="muted xs">北京时间</div>' : !(q && q.status==='pending') ? `<div class="row"><button class="btn sm" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button><span class="muted xs">北京时间</span></div>` : ''}
     ${later.length ? `<div class="nx-later">${later.map(x => { const cc = course(x.course_id); return `<div class="row xs"><span class="muted">之后</span><b>${dayWord(x.date)}</b><span class="num">${timeFor(x, s.tz)}</span>${subjTag(cc.subject)}<span class="muted">${esc(tea(cc.teacher_id).name)}</span></div>`; }).join('')}</div>` : ''}
