@@ -153,6 +153,7 @@ const fbOf = l => DB.feedbacks.find(f => f.lesson_id===l.id);
 const cOfF = f => course(L(f.lesson_id).course_id);
 const dur = l => (mins(l.end)-mins(l.start))/60;
 const bjHM = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16);   // 现在几点（北京时间）
+const bjAt = iso => new Date(iso).toLocaleString('sv-SE', {timeZone: 'Asia/Shanghai'}).slice(0, 16);   // 某个时刻的北京时间「YYYY-MM-DD HH:MM」
 const lesEnded = l => l.date < TODAY || (l.date === TODAY && l.end <= bjHM());       // 这节课下课了吗
 // 「已上课」= 老师写了反馈，或者教务手动确认过；时间过了但两样都没有 = 「待确认」，不计课时
 // 教务老师的课（面谈、升学指导）下课时间一过就算已上
@@ -197,21 +198,23 @@ function hwDue(f){
   return Date.parse(l.date) + 7 * 864e5 < Date.parse(TODAY);
 }
 function monthStats(sid, ym){
-  const ls = lsOfS(sid).filter(l => l.date.startsWith(ym) && (l.date < TODAY || isDone(l)));
+  const ls = lsOfS(sid).filter(l => l.date.startsWith(ym) && l.status !== 'cancelled' && (l.date < TODAY || isDone(l)));   // 取消的课不算应上
   const actual = ls.filter(isDone).length, leave = ls.filter(l => l.status==='leave').length;
   const fs = fbOfS(sid).filter(f => L(f.lesson_id).date.startsWith(ym) && hasHw(f) && hwDue(f));
   return {req: ls.length, actual, leave, hwOk: fs.length ? Math.round(fs.filter(f => f.hw_sub).length / fs.length * 100) : 0, fbN: fs.length};
 }
-const latestHw = sid => DB.courses.filter(c => c.student_id===sid).map(c => DB.feedbacks.filter(f => L(f.lesson_id).course_id===c.id).slice(-1)[0]).filter(Boolean);
+const latestHw = sid => DB.courses.filter(c => c.student_id===sid).map(c => DB.feedbacks.filter(f => L(f.lesson_id).course_id===c.id && hasHw(f)).slice(-1)[0]).filter(Boolean);   // 2026-11-19：写「无」的不算
 
 let lastLoad = 0;
 async function load(){
-  DB = await rpc('app_load'); lastLoad = Date.now();
-  DB.changes = [];
-  if (DB.me.role==='admin' || DB.me.role==='teacher'){ try { DB.changes = await rpc('changes_load') || []; } catch(e) {} }
-  if (DB.me.role==='admin' && DB.me.level==='top'){ try { SHORT = Object.fromEntries((await rpc('admin_short_links')).map(x => [x.key, x.skey])); } catch(e) {} }
-  TODAY = DB.today;
-  DB.lessons.sort((a,b) => (a.date+a.start).localeCompare(b.date+b.start));
+  // 2026-11-19：先读进 D，全部读完才一起换成 DB；读的过程中页面还用上一次筛好的数据（总管理在 K 视图不会一闪出两本账）
+  const D = await rpc('app_load'); lastLoad = Date.now();
+  D.changes = [];
+  if (D.me.role==='admin' || D.me.role==='teacher'){ try { D.changes = await rpc('changes_load') || []; } catch(e) {} }
+  if (D.me.role==='admin' && D.me.level==='top'){ try { SHORT = Object.fromEntries((await rpc('admin_short_links')).map(x => [x.key, x.skey])); } catch(e) {} }
+  TODAY = D.today;
+  D.lessons.sort((a,b) => (a.date+a.start).localeCompare(b.date+b.start));
+  if (!DB) DB = D;   // 第一次打开：下面几样只看 DB.me（是谁）
   if (!S.month) S.month = TODAY.slice(0,7);
   if (!S.payMonth) S.payMonth = ymShift(TODAY.slice(0,7), -1);
   if (!S.teaMonth) S.teaMonth = TODAY.slice(0,7);
@@ -220,7 +223,7 @@ async function load(){
   if (typeof msgLoad === 'function') await msgLoad();   // 学生留言（msgs.js）
   if (typeof wkLoad === 'function') await wkLoad();   // 今日单词记住的词（word.js）
   if (typeof rvxLoad === 'function') await rvxLoad();   // 面谈原始纪要、AI 写法要求（track.js，只有教务）
-  DB_ALL = DB; DB = bookView(DB_ALL);   // 总管理：按「全部 / Project K / Panda」筛选；其他人原样
+  DB_ALL = D; DB = bookView(DB_ALL);   // 总管理：按「全部 / Project K / Panda」筛选；其他人原样
 }
 // 点菜单、切回这个网页时：先马上显示，再在后台取最新数据（别人刚写的反馈、刚排的课）再画一遍
 // 正在打字或开着弹窗时不重画，免得把填了一半的内容冲掉
@@ -443,7 +446,7 @@ function pgCalendar(){
   const agenda = Object.keys(byD).sort().map(d => `<div class="dg ${d===TODAY?'today':''}">${fmtMD(d)}</div>` + exs.filter(e=>e.date===d).map(exChip).join('') + byD[d].map(chip).join('')).join('') || '<div class="empty">这个月没有课</div>';
   const who = S.calType==='s' ? DB.students : S.calType==='t' ? DB.teachers : [];
   const title = S.calType==='s' && S.calId ? `${y}年${m}月｜${stu(S.calId).name}` : S.calType==='t' && S.calId ? `${y}年${m}月｜${tea(S.calId).name}` : `${y}年${m}月｜全部课程`;
-  const hours = ls.filter(l=>l.status!=='leave').reduce((a,l)=>a+dur(l),0);
+  const hours = ls.filter(l=>l.status==='scheduled').reduce((a,l)=>a+dur(l),0);   // 请假、取消的课不算
   return `<div class="ph"><h2>课表与排课</h2>${isAdmin()?`<span class="row">${exAddBtn()}<button class="btn pri" data-act="add-lesson" ${DB.courses.length?'':'disabled title="先在学生档案里添加课程"'}>＋ 排课</button></span>`:'<span class="tag mute">只读</span>'}</div>${scopeNote()}
   <div class="cal-bar">
     <button class="btn sm" data-act="month" data-v="-1" aria-label="上个月">‹</button><span class="mon">${S.month.replace('-','.')}</span><button class="btn sm" data-act="month" data-v="1" aria-label="下个月">›</button>
@@ -500,9 +503,9 @@ function reqChBody(){
 }
 function reqStuBody(){
   const pend = DB.requests.filter(q=>q.status==='pending'), done = DB.requests.filter(q=>q.status!=='pending').slice().reverse().slice(0,20);
-  const card = q => { const l=L(q.lesson_id), c=course(l.course_id), same = q.created_at.slice(0,10)===l.date;
+  const card = q => { const l=L(q.lesson_id), c=course(l.course_id), at = bjAt(q.created_at), same = at.slice(0,10)===l.date;   // 2026-11-19：按北京时间的日期算当天
     return `<section class="card" style="display:flex;flex-direction:column;gap:8px">
-      <div class="row"><span class="tag ${q.type==='请假'?'seal':'warn'}">${q.type}</span><b>${esc(stu(c.student_id).name)}</b>${subjTag(c.subject)}<span class="muted small">${esc(tea(c.teacher_id).name)} · ${q.status==='pending'?'原定':'课程'} ${fmtMD(l.date)} ${l.start}–${l.end}</span></div>
+      <div class="row"><span class="tag ${q.type==='请假'?'seal':'warn'}">${q.type}</span><b>${esc(stu(c.student_id).name)}</b>${subjTag(c.subject)}<span class="muted small">${esc(tea(c.teacher_id).name)} · ${q.status==='pending'?'原定':'课程'} ${fmtMD(l.date)} ${l.start}–${l.end} · ${+at.slice(5,7)}/${+at.slice(8,10)} ${at.slice(11)} 申请</span></div>
       <dl class="kv small"><dt>原因</dt><dd>${esc(q.reason)}</dd>${q.wish?`<dt>希望时间</dt><dd>${esc(q.wish)}</dd>`:''}</dl>
       ${q.status==='pending' ? `${q.type==='改期'
         ? `<div class="fields"><label class="field"><span>新日期</span><input type="date" id="rq-d-${q.id}" value="${l.date}"></label><label class="field"><span>开始（北京时间）</span><input type="time" id="rq-s-${q.id}" value="${l.start}"></label><label class="field"><span>结束</span><input type="time" id="rq-e-${q.id}" value="${l.end}"></label></div>
@@ -599,7 +602,8 @@ function pgPayroll(){
   <div class="stats"><div class="stat"><small>计费课时</small><b>${+rows.reduce((a,r)=>a+r.h,0).toFixed(1)}</b></div><div class="stat"><small>工资合计</small><b style="font-size:18px">${total}</b></div>
     <div class="stat"><small>已审核</small><b>${rows.filter(r=>payOf(r.t.id,ym).reviewed_at).length}/${rows.length}</b></div><div class="stat"><small>已结算</small><b>${rows.filter(r=>payOf(r.t.id,ym).settled_at).length}/${rows.length}</b></div></div>
   ${rows.length ? '' : '<div class="card empty">这个月还没有上完的课</div>'}
-  ${rows.map(r => `<details class="card"><summary class="row"><b style="margin-right:auto;font-family:var(--f-disp)">${esc(r.t.name)}</b><span class="num small">${r.ls.length} 节 · ${r.h} 小时</span>${r.pn?`<span class="tag warn">${r.pn} 节待确认未计入</span>`:''}<b class="num">${r.amt}</b>${payBadge(r.t.id, ym)}<span class="muted xs">展开明细</span></summary>
+  ${rows.map(r => `<details class="card"><summary class="row"><b style="margin-right:auto;font-family:var(--f-disp)">${esc(r.t.name)}</b><span class="num small">${r.ls.length} 节 · ${r.h} 小时</span>${r.pn?`<span class="tag warn">${r.pn} 节待确认未计入</span>`:''}<b class="num">${r.amt}</b>${payBadge(r.t.id, ym)}${payDiffTag(r.t.id, ym)}<span class="muted xs">展开明细</span></summary>
+    ${payDiffBox(r.t.id, ym)}
     <div class="tw" style="margin-top:8px"><table><thead><tr><th>日期</th><th>时间（北京）</th><th>学生</th><th>科目</th><th>计费</th><th>单价</th><th>金额</th><th>备注</th></tr></thead><tbody>
     ${r.ls.map(l=>{const c=course(l.course_id);return `<tr><td class="num">${sMD(l.date)}</td><td class="num">${l.start}–${l.end}</td><td>${esc(stu(c.student_id).name)}</td><td>${subjTag(c.subject)}</td><td class="num">${paidH(l)}h</td><td class="num">${rateTxt(c)}</td><td class="num">${money(paidH(l)*(c.rate||0), curOf(c))}</td><td class="xs">${l.status==='leave'?'<span class="tag seal">当天请假</span> ':''}${l.done_manual&&!l.has_fb&&!fbOf(l)?'<span class="tag mute">教务确认</span> ':''}${hrsTag(l)} ${esc(l.actual_note||'')} ${esc(l.note)}</td></tr>`}).join('')}
     </tbody></table></div><div class="row" style="margin-top:8px"><button class="btn sm" data-act="copy-pay" data-v="${r.t.id}">复制课时清单（发给老师核对）</button><span style="margin-left:auto" class="row">${payButtons(r.t.id, ym)}</span></div></details>`).join('')}`;
@@ -776,7 +780,7 @@ function tWrite(t){
   const form = cand.length ? `<section class="card" style="display:flex;flex-direction:column;gap:8px">
     <h3 style="font-size:16px">课后反馈</h3>
     <div class="note warn">这条反馈学生会马上看到，<b>教务审核后家长也能看到</b>，请注意用词。不方便让家长看的内容，写到「我的学生 → 私下备注」。</div>
-    <label class="field"><span>哪一节课</span><select id="w-lesson" data-change="w-lesson">${cand.map(l=>`<option value="${l.id}">${sMD(l.date)} ${esc(stu(course(l.course_id).student_id).name)} ${esc(course(l.course_id).subject)}</option>`).join('')}</select></label>
+    <label class="field"><span>哪一节课</span><select id="w-lesson" data-change="w-lesson">${cand.map(l=>`<option value="${l.id}">${sMD(l.date)} ${l.start} ${esc(stu(course(l.course_id).student_id).name)} ${esc(course(l.course_id).subject)}</option>`).join('')}</select></label>
     <label class="field"><span>一、本节授课内容</span><textarea id="w-content" placeholder="例：听解练习，要求学生用日语复述听力内容" data-auto="${esc(cand[0].topic||'')}">${esc(cand[0].topic||'')}</textarea></label>
     <label class="field"><span>二、学生课堂表现</span><textarea id="w-perf" placeholder="例：课堂状态良好，能积极参与练习"></textarea></label>
     <div class="field"><span>学生状态（点选，可多选）</span><div class="chips">${[...TAGS_GOOD,...TAGS_WARN].map(x=>`<button class="chip ${wTags.has(x)?'on':''}" data-act="w-tag" data-v="${x}">${x}</button>`).join('')}</div></div>
@@ -1035,7 +1039,7 @@ function scopeModal(pid){
 }
 
 /* ═════════════ 交互 ═════════════ */
-function toast(msg, err){ const r=document.getElementById('toast-root'); r.innerHTML=`<div class="toast ${err?'err':''}" role="status">${esc(msg)}</div>`; clearTimeout(toast.t); toast.t=setTimeout(()=>r.innerHTML='', err?5000:2800); }
+function toast(msg, err, ms){ const r=document.getElementById('toast-root'); r.innerHTML=`<div class="toast ${err?'err':''}" role="status">${esc(msg)}</div>`; clearTimeout(toast.t); toast.t=setTimeout(()=>r.innerHTML='', ms || (err?5000:2800)); }   // ms：要多停一会儿的提示
 const val = id => document.getElementById(id)?.value ?? '';
 function copyText(t, ok){
   const done = () => toast(ok), fail = () => { openModal(`${mHead('请手动复制')}<textarea readonly style="min-height:90px" onclick="this.select()">${esc(t)}</textarea>`); };
@@ -1085,7 +1089,9 @@ document.addEventListener('click', async e => {
     case 'sel': S.sel.has(v)?S.sel.delete(v):S.sel.add(v); render(); break;
     case 'sel-all': { const p=DB.feedbacks.filter(f=>f.status==='pending'); if (S.sel.size===p.length) S.sel.clear(); else p.forEach(f=>S.sel.add(f.id)); render(); break; }
     case 'approve': await act('admin_feedback_approve', {ids:[v]}, '已审批，家长现在能看到这条反馈'); S.sel.delete(v); break;
-    case 'approve-sel': { const ids=[...S.sel]; await act('admin_feedback_approve', {ids}, r=>`已审批 ${r} 条`); S.sel.clear(); render(); break; }
+    case 'approve-sel': { const pend=new Set(DB.feedbacks.filter(f=>f.status==='pending').map(f=>f.id)), ids=[...S.sel].filter(id=>pend.has(id));
+      if (!ids.length){ S.sel.clear(); render(); toast('这一页上没有选中的反馈', true); break; }
+      await act('admin_feedback_approve', {ids}, r=>`已审批 ${r} 条`); S.sel.clear(); render(); break; }
     case 'unapprove': await act('admin_feedback_unapprove', {fid:v}, '已撤回，家长暂时看不到'); break;
     case 'edit': S.editing=v; render(); break;
     case 'cancel-edit': S.editing=null; render(); break;
@@ -1100,7 +1106,7 @@ document.addEventListener('click', async e => {
       if (v){ d.id=v; d.active = val('sf-active')!=='false'; }
       else if (isOwner()) d.private = val('sf-book')==='mine';   // 新建 Panda 学生：一次存好归属，不先进 Project K
       const before = v ? stu(v).private : false;   // 新建的照样再确认一次归属（数据库已经存好就什么都不做）
-      const sid = await act('admin_save_student', {d}, v?'已保存':'已添加。接下来在「概况与课程」里给他添加课程'); await ownerAfterSave('student', sid, before); studentModal(sid,'info'); break; }
+      const sid = await act('admin_save_student', {d}, v?'已保存':'已添加。接下来在「概况与课程」里给他添加课程'); await ownerAfterSave('student', sid, before); studentModal(sid,'info'); break; }   // 转进 Panda 时 ownerAfterSave 会提示重新发链接
     case 'teacher-form': teacherForm(v); break;
     case 'save-teacher': { if(!val('tf-name').trim()){toast('请填写姓名',true);break;}
       const d={name:val('tf-name'), subject:val('tf-subject'), loc:val('tf-loc'), tz:val('tf-tz'), cat:val('tf-cat')||'学科'};

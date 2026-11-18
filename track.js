@@ -228,15 +228,16 @@ function targetForm(sid, tid, pre){
 }
 // 只给 AI 看的材料：面谈原始纪要（第 38 步）、任课老师说的（第 39 步）
 // 家长、学生、任课老师都看不到（单独一张表，打开网站的大包里不带，教务网页另外取）
-let RVX = {raw: [], rules: ''};
+let RVX = {raw: [], rules: '', ok: false};
 async function rvxLoad(){
-  RVX = {raw: [], rules: ''};
+  RVX = {raw: [], rules: '', ok: false};
   if (DB.me.role !== 'admin') return;
-  try { RVX = await rpc('review_raw_load') || RVX; } catch(e) { /* 第 38 步还没运行 */ }
+  try { RVX = Object.assign({raw: [], rules: ''}, await rpc('review_raw_load') || {}, {ok: true}); } catch(e) { /* 没读出来：ok 留 false，保存时不动原始纪要（2026-11-19） */ }
 }
 const rawRow = (sid, ym) => (RVX.raw || []).find(x => x.student_id===sid && x.ym===ym) || {};
 function rvRawBox(sid, ym){
   const x = rawRow(sid, ym), raw = x.text || '', tr = x.teacher || '', n = [raw, tr].filter(Boolean).length;
+  if (!RVX.ok) return `<div class="note warn rv-raw"><b>只给 AI 看的材料这次没读出来。</b>这次保存不会动它们（原来贴的还在）；刷新页面后再看、再改。</div>`;
   return `<details class="rv-raw" ${n?'open':''}><summary><b>只给 AI 看的材料</b> <span class="muted xs">家长、学生、任课老师都看不到；点「AI 生成」时会原样发给 AI 写草稿</span>${n?` <span class="tag ok">已贴 ${n} 样</span>`:''}</summary>
     <label class="field"><span>面谈原始纪要</span><textarea id="rv-raw" rows="5" placeholder="腾讯会议 AI 纪要、录音逐字稿、Plaud 总结或你自己的笔记，原样贴进来（几份可以贴在一起）">${esc(raw)}</textarea></label>
     <div class="muted xs" style="margin-top:-4px">AI 只挑能给家长看的写进下面的「本月面谈记录」。</div>
@@ -355,6 +356,7 @@ document.addEventListener('click', async e => {
     case 'rv-open': { const [sid,ym]=v.split('|'); reviewForm(sid, ym); break; }
     case 'rv-pick': reviewForm(v, val('rv-ym')); break;
     case 'rv-save': { const [sid,ym]=v.split('|'); const d={content:val('rv-content'), teacher_eval:val('rv-teacher'), talk:val('rv-talk'), talk_raw:val('rv-raw'), teacher_raw:val('rv-traw'), conclusion:val('rv-concl'), next_focus:val('rv-next'), status:val('rv-status'), note:val('rv-note')};
+      if (!RVX.ok || !document.getElementById('rv-raw')) { delete d.talk_raw; delete d.teacher_raw; }   // 原始纪要没读出来：不发这两栏，数据库就不动它们
       await act('review_save', {sid, month:ym, d}, d.status==='已完成'?'已保存，家长和任课老师现在能看到':'已保存'); if (S.page==='reviews') closeModal(); else studentModal(sid, S.page==='student' ? S.stuTab : 'review'); break; }
     case 'ts-open': tsForm(v); break;
     case 'ts-save': { const d=val('ts-date'), txt=val('ts-text').trim(), tid=val('ts-t');

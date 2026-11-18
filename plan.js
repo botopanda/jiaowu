@@ -96,6 +96,7 @@ document.addEventListener('click', async e => {
   a.disabled = true; const old = a.textContent; a.textContent = 'AI 正在看材料、写草稿…（大约半分钟）';
   try {
     const j = await reviewAI(sid, ym);
+    if (document.querySelector('[data-act="rv-save"]')?.dataset.v !== `${sid}|${ym}`) { toast('AI 草稿没有填：你已经换到别的学生或月份了。回到原来那份再点一次「AI 生成」', true); return; }   // 2026-11-19
     Object.entries(ids).forEach(([k, id]) => { const el = document.getElementById(id); if (el && j.review[k]) { el.value = j.review[k]; el.style.height = 'auto'; el.style.height = el.scrollHeight + 4 + 'px'; } });   // 框跟着内容变高，方便通读
     toast(`AI 草稿填好了${j.images ? `（看了 ${j.images} 张作业图片）` : ''}，看过改过再点「保存」`);
   } catch(err) { toast('AI 没写出来：' + err.message, true); }
@@ -105,14 +106,15 @@ document.addEventListener('click', async e => {
 /* ───────── 「AI 写法要求」：链接与备份 → AI 写法要求（只有管理能改；数据库第 38 步）─────────
    AI 写月度家长反馈时，把这里当长期要求、优先遵守。存在数据库 app.settings 的 ai_review_rules */
 function pgAiRules(){
+  const mine = curBook() === 'mine', txt = mine ? (RVX.rules_mine || '') : (RVX.rules || '');   // 第 59 步：两本账各一份
   return `<div class="ph"><h2>AI 写法要求</h2></div>
-  <div class="note">点「AI 生成」写月度家长反馈时，AI 会把这里的要求当成长期规矩，<b>优先遵守</b>。一行写一条，比如怎么称呼学生、哪些事不要写给家长、语气。</div>
+  <div class="note">点「AI 生成」写月度家长反馈时，AI 会把这里的要求当成长期规矩，<b>优先遵守</b>。一行写一条，比如怎么称呼学生、哪些事不要写给家长、语气。${ownerUI() ? (mine ? '<br><b>这是 Panda 学生用的一份。</b>' : '<br><b>这是 Project K 学生用的一份；Panda 学生用的切到「Panda」视图里改。</b>') : ''}</div>
   <section class="card" style="display:flex;flex-direction:column;gap:8px">
-    <textarea id="ai-rules" rows="10" maxlength="4000" placeholder="例：称呼学生用名字（不带姓）">${esc(RVX.rules || '')}</textarea>
+    <textarea id="ai-rules" rows="10" maxlength="4000" placeholder="例：称呼学生用名字（不带姓）">${esc(txt)}</textarea>
     <div class="row"><button class="btn pri" data-act="ai-rules-save">保存</button><span class="muted xs">改完下次点「AI 生成」就按新的写</span></div>
   </section>`;
 }
 document.addEventListener('click', async e => {
   if (!e.target.closest('[data-act="ai-rules-save"]')) return;
-  try { await act('ai_rules_save', {txt: val('ai-rules')}, '已保存，下次 AI 生成就按这个写'); } catch(err) { /* act() 已经提示过 */ }
+  try { await act('ai_rules_save', {txt: val('ai-rules'), ...(isOwner() ? {bk: curBook()} : {})}, '已保存，下次 AI 生成就按这个写'); } catch(err) { /* act() 已经提示过 */ }
 });

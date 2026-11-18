@@ -5,18 +5,22 @@
    · Panda 那边的改动只有总管理看得到（数据库里已经筛好，这里不用再管）
    · 「链接与权限」的「清除」「清除登录记录」：清掉最近打开时间和设备（admin_seen_clear）
    ══════════════════════════════════════════════════════════════ */
-const LOGX = {rows: [], at: 0, busy: false, more: false, err: '', who: '', cat: '', sid: ''};
+const LOGX = {rows: [], at: 0, busy: false, more: false, err: '', who: '', cat: '', sid: '', seq: 0};
+// 每次读都编个号：读的过程中又换了学生、点了刷新，旧的那次结果就不要了（免得乙的筛选下显示甲的记录）
 async function logFetch(older){
-  if (LOGX.busy) return;
+  if (older && LOGX.busy) return;
+  const my = ++LOGX.seq, sid = LOGX.sid;
   LOGX.busy = true; LOGX.err = '';
+  let r = [], err = '';
   try {
     const args = {};
     if (older && LOGX.rows.length) args.upto = LOGX.rows[LOGX.rows.length - 1].id;
-    if (LOGX.sid) args.stu = LOGX.sid;
-    const r = await rpc('change_log_load', args) || [];
-    LOGX.rows = older ? LOGX.rows.concat(r) : r; LOGX.more = r.length >= 300;
-  } catch(e) { LOGX.err = e.message; }
-  finally { LOGX.busy = false; LOGX.at = Date.now(); }
+    if (sid) args.stu = sid;
+    r = await rpc('change_log_load', args) || [];
+  } catch(e) { err = e.message; }
+  if (my !== LOGX.seq) return;
+  LOGX.busy = false; LOGX.at = Date.now();
+  if (err) LOGX.err = err; else { LOGX.rows = older ? LOGX.rows.concat(r) : r; LOGX.more = r.length >= 300; }
   if (S.page === 'log' && !document.querySelector('.modal')) render();
 }
 // 每次从菜单点进来都重新读一遍（在别的点击处理之前先标记）
@@ -162,19 +166,22 @@ function logGroup(g){
       <details class="lg-more"><summary class="muted xs">看是哪些</summary>${xs.map(r => `<div class="lg-sub">${logLine(r, false)}</div>`).join('')}</details></div>`);
     else for (const r of xs) items.push(`<div class="lg-i">${logLine(r)}</div>`);
   }
-  const me = r0.who_id && r0.who_id === ME().id;
-  return `<div class="lg-g"><div class="lg-h"><span class="num lg-tm">${logBJ(r0.at).slice(11)}</span><b>${esc(r0.who)}</b>${me ? ' <span class="tag gold">我</span>' : ''}${r0.who === '系统' ? '' : `<span class="muted xs">${esc(LOG_ROLE[r0.role] ?? '')}</span>`}${isOwner() && S.book === 'all' && g.some(r => r.priv) ? '<span class="tag seal">Panda</span>' : ''}</div>${items.join('')}</div>`;
+  const me = r0.who_id && r0.who_id === ME().id, names = [...new Set(g.map(r => r.who))].join(' / ');
+  return `<div class="lg-g"><div class="lg-h"><span class="num lg-tm">${logBJ(r0.at).slice(11)}</span><b>${esc(names)}</b>${me ? ' <span class="tag gold">我</span>' : ''}${r0.who === '系统' ? '' : `<span class="muted xs">${esc(LOG_ROLE[r0.role] ?? '')}</span>`}${isOwner() && S.book === 'all' && g.some(r => r.priv) ? '<span class="tag seal">Panda</span>' : ''}</div>${items.join('')}</div>`;
 }
 
 function pgLog(){
-  if (!LOGX.busy && !LOGX.at) setTimeout(() => logFetch(false));
+  // 切了视图，选中的学生已经不在这个视图里：回到「所有学生」重新读
+  if (LOGX.sid && !DB.students.some(s => s.id === LOGX.sid)) { LOGX.sid = ''; LOGX.rows = []; LOGX.more = false; LOGX.at = 0; setTimeout(() => logFetch(false)); }
+  else if (!LOGX.busy && !LOGX.at) setTimeout(() => logFetch(false));
   const cat = LOG_CATS.find(c => c[0] === LOGX.cat) || LOG_CATS[0];
   // 总管理切到「Project K」：和潘、金看到的一样，Panda 的记录不显示；切到「Panda」：只显示 Panda 的
   const inView = r => !isOwner() || S.book === 'all' || (S.book === 'K' ? !r.priv : r.priv);
   const seen = LOGX.rows.filter(inView);
-  const whos = [...new Set(seen.map(r => r.who))];
+  const whoKey = r => r.who + (r.who_id && r.who_id === ME().id ? '（我）' : '');
+  const whos = [...new Set(seen.map(whoKey))];
   if (LOGX.who && !whos.includes(LOGX.who)) whos.push(LOGX.who);
-  const rows = seen.filter(r => (!LOGX.who || r.who === LOGX.who) && (!cat[2] || cat[2].includes(r.tbl)));
+  const rows = seen.filter(r => (!LOGX.who || whoKey(r) === LOGX.who) && (!cat[2] || cat[2].includes(r.tbl)));
   // 按天、按「同一次操作」分组（rows 是新的在前）
   const days = [];
   for (const r of rows) {
@@ -191,18 +198,18 @@ function pgLog(){
     <div class="tl-chips">${LOG_CATS.map(([k, t]) => `<button class="chip ${LOGX.cat === k ? 'on' : ''}" data-act="lg-cat" data-v="${k}" aria-pressed="${LOGX.cat === k}">${t}</button>`).join('')}</div>`;
   const body = LOGX.err ? `<div class="card empty">没读到改动记录：${esc(LOGX.err)}</div>`
     : !LOGX.at || (LOGX.busy && !LOGX.rows.length) ? '<div class="card empty">正在读取…</div>'
-    : !rows.length ? `<div class="card empty">${seen.length ? '这样筛没有记录，换个条件看看' : '还没有改动记录'}</div>`
+    : !rows.length ? `<div class="card empty">${LOGX.more ? `已经读出来的 ${LOGX.rows.length} 条里没有符合的，点下面「再往前看」接着找` : seen.length ? '这样筛没有记录，换个条件看看' : '还没有改动记录'}</div>`
     : days.map(day => `<div class="lg-day">${dayName(day.d)}</div>${[...day.groups.values()].map(logGroup).join('')}`).join('');
   return `<div class="ph"><h2>改动记录</h2></div>
   <div class="note">谁（用哪条链接）在什么时候<b>新增、修改、删除</b>了什么，都会自动记在这里，同一次保存的放在一起。打开页面、切换视图、学生记单词不算改动。从 2026 年 11 月 19 日开始记，保留一年。</div>
   ${bar}${body}
-  ${LOGX.more && rows.length ? `<div class="row" style="justify-content:center;margin-top:8px"><button class="btn" data-act="lg-more" ${LOGX.busy ? 'disabled' : ''}>${LOGX.busy ? '正在读取…' : '再往前看'}</button></div>` : ''}`;
+  ${LOGX.more ? `<div class="row" style="justify-content:center;margin-top:8px"><button class="btn" data-act="lg-more" ${LOGX.busy ? 'disabled' : ''}>${LOGX.busy ? '正在读取…' : '再往前看'}</button></div>` : ''}`;
 }
 
 document.addEventListener('change', e => {
   const id = e.target?.id;
   if (id === 'lg-who') { LOGX.who = e.target.value; render(); }
-  if (id === 'lg-sid') { LOGX.sid = e.target.value; LOGX.rows = []; LOGX.at = 0; render(); }
+  if (id === 'lg-sid') { LOGX.sid = e.target.value; LOGX.rows = []; LOGX.more = false; logFetch(false); render(); }
 });
 document.addEventListener('click', async e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
@@ -216,7 +223,7 @@ document.addEventListener('click', async e => {
     try { await act('admin_seen_clear', {pid: v}, r => r ? `已清除「${p.name}」的登录记录` : '本来就没有登录记录'); LOGX.at = 0; } catch(_) {}
   }
   else if (k === 'seen-clear-all') {
-    if (!confirm('把全部链接的登录记录（最近打开时间、设备）都清掉？\n适合自己点开学生、老师的链接看过以后用。以后谁再打开链接，会重新记。\n（你现在用的这条也会清掉，然后马上重新记上）')) return;
+    if (!confirm('把全部链接的登录记录（最近打开时间、设备）都清掉？\n适合自己点开学生、老师的链接看过以后用。以后谁再打开链接，会重新记。' + (ownerUI() ? '\n不管现在是哪个视图，Project K 和 Panda 两边的链接都会清掉。' : '') + '\n（你现在用的这条也会清掉，然后马上重新记上）')) return;
     try { await act('admin_seen_clear', {}, r => r ? `已清除 ${r} 条链接的登录记录` : '本来就没有登录记录'); LOGX.at = 0; } catch(_) {}
   }
 });

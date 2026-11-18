@@ -12,7 +12,7 @@ const nowJST = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 1
 const addDay = (d, n) => { const x = pd(d); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`; };
 const tName = id => { const n = tea(id).name || ''; return /老师$/.test(n) ? n : n + '老师'; };   // 「陈伟健」→「陈伟健老师」
 const dayWord = d => { const n = dBetween(TODAY, d); return n === 0 ? '今天' : n === 1 ? '明天' : n === 2 ? '后天' : fmtMD(d); };
-const sUnHw = s => latestHw(s.id).filter(f => !f.hw_sub);
+const sUnHw = s => latestHw(s.id).filter(f => !f.hw_sub);   // latestHw 已经不算写「无」的
 const sUnConfirm = s => fbOfS(s.id).filter(f => !f.confirm);
 const sSelfDue = s => !reviewOf(s.id, TODAY.slice(0,7))?.self_eval && +TODAY.slice(8,10) >= 20;   // 每月 20 号以后提醒写自评
 function sTabs(s){
@@ -114,7 +114,7 @@ const sSched = s => `<div class="muted xs">${PRO() ? '点某一天看当天的�
 /* ───────── 作业：平时收起，点「我完成了」再填 ───────── */
 function sHomework2(s){
   const cur = latestHw(s.id), todo = cur.filter(f => !f.hw_sub), done = cur.filter(f => f.hw_sub);
-  const older = fbOfS(s.id).filter(f => !cur.includes(f)).slice(-8).reverse();
+  const older = fbOfS(s.id).filter(f => !cur.includes(f) && hasHw(f)).slice(-8).reverse(), olderUn = older.filter(f => !f.hw_sub).length;
   const ro = PRO(), who = ro ? '孩子' : '我';
   const item = (f, now0) => { const l = L(f.lesson_id), c = course(l.course_id), now = now0 && !ro;
     return `<div class="les hw-i" style="--hc:${hue(c.subject)}"><div style="min-width:0;flex:1">
@@ -126,7 +126,7 @@ function sHomework2(s){
       ${f.hw_note?`<div class="muted xs">${who}说：${esc(f.hw_note)}</div>`:''}${f.hw_fb?`<div class="note"><b>老师批改：</b>${esc(f.hw_fb)}</div>`:''}</div></div>`; };
   return `${todo.length ? `<div class="dg">还没交 · ${todo.length} 份</div>${todo.map(f => item(f, true)).join('')}` : '<div class="card todo-ok"><b>作业都交了</b><span class="muted small">新作业会出现在这里</span></div>'}
   ${done.length ? `<div class="dg">这次的作业 · 已交</div>${done.map(f => item(f, true)).join('')}` : ''}
-  ${older.length ? `<details class="sh-more"><summary>以前的作业（${older.length}）</summary>${older.map(f => item(f, false)).join('')}</details>` : ''}`;
+  ${older.length ? `<details class="sh-more" ${olderUn && !ro ? 'open' : ''}><summary>以前的作业（${older.length}）${olderUn ? `· ${olderUn} 份没交，可以补交` : ''}</summary>${older.map(f => item(f, !f.hw_sub)).join('')}</details>` : ''}`;
 }
 
 /* ───────── 上课记录：一行一节，点开看全文；没确认的放最上面 ───────── */

@@ -95,7 +95,7 @@ function boardView(sid){
   const rowsHtml = Array.from({length: 12}, (_, i) => {
     const ym = `${y}-${pad(i + 1)}`, ml = ls.filter(l => l.date.startsWith(ym)), r = rv.find(x => x.ym === ym);
     const cls = (ym > TODAY.slice(0,7) ? 'fut ' : '') + (ym === TODAY.slice(0,7) ? 'cur' : '');
-    return `<tr class="${cls}"><td class="num"><b>${i + 1} 月</b></td><td class="num">${ml.length || ''}</td><td class="num">${ml.length ? +ml.reduce((a, l) => a + dur(l), 0).toFixed(1) : ''}</td>
+    return `<tr class="${cls}"><td class="num"><b>${i + 1} 月</b></td><td class="num">${ml.length || ''}</td><td class="num">${ml.length ? +ml.reduce((a, l) => a + realH(l), 0).toFixed(1) : ''}</td>
       <td>${cut(r && r.content)}</td><td>${cut(r && r.self_eval)}</td><td>${cut(r && r.teacher_eval)}</td><td>${cut(r && r.conclusion)}</td><td>${cut(r && r.next_focus)}</td>
       <td>${r ? `<span class="tag ${r.status === '已完成' ? 'ok' : r.status === '需调整' ? 'seal' : 'mute'}">${esc(r.status || '待跟进')}</span>` : ''}</td></tr>`;
   }).join('');

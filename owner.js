@@ -75,19 +75,22 @@ function ownerClashBlock(){
 }
 
 // 学生 / 老师表单里的「归属」（只有总管理看得到）
-const ownerStudentField = s => isOwner() ? `<label class="field"><span>归属（只有你看得到这一项）</span><select id="sf-book"><option value="K" ${s.private?'':'selected'}>Project K（潘老师、金老师能看到）</option><option value="mine" ${s.private || (!s.id && S.book==='mine') ? 'selected' : ''}>Panda（只有我能看到）</option></select></label>` : '';
+const ownerStudentField = s => ownerUI() ? `<label class="field"><span>归属（只有你看得到这一项）</span><select id="sf-book"><option value="K" ${s.private?'':'selected'}>Project K（潘老师、金老师能看到）</option><option value="mine" ${s.private || (!s.id && S.book==='mine') ? 'selected' : ''}>Panda（只有我能看到）</option></select></label>` : '';
 const T_BOOK = [['K','Project K（只教 Project K 的学生）'],['mine','Panda（只教 Panda 的学生，潘老师、金老师看不到）'],['both','两边都教']];
-const ownerTeacherField = t => { if (!isOwner()) return ''; const cur = t.id ? (t.book || 'K') : (S.book === 'mine' ? 'mine' : 'K');
+const ownerTeacherField = t => { if (!ownerUI()) return ''; const cur = t.id ? (t.book || 'K') : (S.book === 'mine' ? 'mine' : 'K');
   return `<label class="field"><span>归属（只有你看得到这一项）</span><select id="tf-book">${T_BOOK.map(([k, l]) => `<option value="${k}" ${k===cur?'selected':''}>${l}</option>`).join('')}</select></label>`; };
 const tBookTag = t => !ownerUI() ? '' : t.book === 'mine' ? '<span class="tag gold">Panda</span>' : t.book === 'both' ? '<span class="tag blue">两边都教</span>' : '';
 async function ownerAfterSave(kind, id, before){
   if (!isOwner()) return;
   if (kind === 'teacher') {
-    const bk = val('tf-book'); if ((before || 'K') === bk) return;
+    const el = document.getElementById('tf-book'); if (!el) return;   // K 视图没有这一项：不改归属
+    const bk = el.value; if ((before || 'K') === bk) return;
     return ownerBookChange(id, bk);   // 和链接页同一套：要另发完整链接时先提醒、再复制（复查 R-02）
   } else {
-    const want = val('sf-book') === 'mine'; if (!!before === want) return;
+    const el = document.getElementById('sf-book'); if (!el) return;
+    const want = el.value === 'mine'; if (!!before === want) return;
     await rpc('owner_set_private', {kind, xid: id, on_: want});
+    if (want) { await load(); render(); toast('已转进 Panda。这位学生和家长的链接已经换新，旧链接打不开了——请到「链接与备份 → 链接与权限」复制新链接重新发给他们', false, 8000); return 'moved'; }   // 第 59 步
   }
   await load(); render();
 }
@@ -102,6 +105,7 @@ function ownerTeacherWarn(){
 document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a || a.dataset.act !== 'book') return;
   S.book = a.dataset.v; try { localStorage.setItem('jw_book', S.book); } catch(err) {}
+  S.sel.clear(); if (typeof LOGX !== 'undefined') LOGX.who = '';   // 2026-11-19：另一边勾的、筛的不带过来
   DB = bookView(DB_ALL); render(); ownerSync(true);
 });
 // 告诉数据库总管理现在在哪一边：在 Panda 视图做的事记成「Panda」，其余记成「潘老师」（第 28 步）

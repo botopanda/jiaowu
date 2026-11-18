@@ -35,7 +35,7 @@ function pgWeek(){
   const exs = examGroups(examsOf(calExSids())).filter(e => e.date >= days[0] && e.date <= days[6]);
   const exChip = e => `<button class="wk-ex" data-act="exam" data-v="${e.tid}|${e.date}" title="${esc(exTitle(e))}"><b class="exk">考</b>${e.time?` <span class="t">${esc(exStart(e.time))}</span>`:''} ${S.calType==='s'&&S.calId?'':esc(stu(e.sid).name)+'·'}${esc(exShort(e.school))}<span class="l">${e.label}</span></button>`;
   const whoList = S.calType==='s' ? DB.students : S.calType==='t' ? DB.teachers : [];
-  const hours = ls.filter(l => l.status!=='leave').reduce((a, l) => a + dur(l), 0);
+  const hours = ls.filter(l => l.status==='scheduled').reduce((a, l) => a + dur(l), 0);   // 请假、取消的课不算
   const range = `${+days[0].slice(5,7)}月${+days[0].slice(8)}日–${days[6].slice(5,7)===days[0].slice(5,7) ? '' : +days[6].slice(5,7)+'月'}${+days[6].slice(8)}日`;
   const title = S.calType==='s' && S.calId ? stu(S.calId).name : S.calType==='t' && S.calId ? tea(S.calId).name : '全部课程';
   return `<div class="ph"><h2>课表与排课</h2>${isAdmin()?`<span class="row">${exAddBtn()}<button class="btn pri" data-act="add-lesson" ${DB.courses.length?'':'disabled title="先在学生档案里添加课程"'}>＋ 排课</button></span>`:'<span class="tag mute">只读</span>'}</div>${scopeNote()}

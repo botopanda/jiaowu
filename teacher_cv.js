@@ -5,11 +5,11 @@
    · 上传：照片 1 张、简历原件（PDF / Word / 图片）最多 5 个、代表作品最多 12 个
    · 教务：老师档案卡片 →「履历」弹窗；老师：「我的」页
    ══════════════════════════════════════════════════════════════ */
-let CVS = {};   // 老师 id → {cv, files}
+let CVS = {}, CVS_OK = false;   // 老师 id → {cv, files}；CVS_OK：这次读成功了没有
 async function cvLoad(){
-  CVS = {};
+  CVS = {}; CVS_OK = false;
   if (!['admin','teacher'].includes(DB.me.role)) return;
-  try { CVS = await rpc('cv_load') || {}; } catch(e) { CVS = {}; }
+  try { CVS = await rpc('cv_load') || {}; CVS_OK = true; } catch(e) { CVS = {}; }
 }
 const cvOf = tid => (CVS[tid] && CVS[tid].cv) || {};
 const cvFiles = (tid, kind) => ((CVS[tid] && CVS[tid].files) || []).filter(f => f.kind === kind);
@@ -115,7 +115,8 @@ document.addEventListener('click', async e => {
   if (!k.startsWith('cv-')) return;
   try {
     if (k === 'cv-open') cvModal(v);
-    if (k === 'cv-edit') { CVF = {tid: v, d: JSON.parse(JSON.stringify(cvOf(v)))}; cvForm(); }
+    if (k === 'cv-edit') { if (!CVS_OK) { toast('履历这次没读出来，刷新页面后再改（免得把原来填的冲掉）', true); return; }   // 2026-11-19
+      CVF = {tid: v, d: JSON.parse(JSON.stringify(cvOf(v)))}; cvForm(); }
     if (k === 'cv-add') { cvRead(); (CVF.d[v] ??= []).push({}); cvForm(); }
     if (k === 'cv-del') { cvRead(); const [g, i] = v.split('|'); const e0 = CVF.d[g][+i];
       if (Object.values(e0).some(x => x) && !confirm('删除这一条？（点「保存履历」后才真正删掉）')) return;
