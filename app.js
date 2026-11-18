@@ -816,7 +816,7 @@ function lessonModal(id){
   const l = L(id), c = course(l.course_id), s = stu(c.student_id), t = tea(c.teacher_id), f = fbOf(l), q = reqOf(l);
   const st = isDone(l)?`<span class="tag ok">已上课</span>${!f&&!l.has_fb&&!t.staff?' <span class="tag mute">教务确认</span>':''}${hrsTag(l)}`:l.status==='leave'?'<span class="tag seal">请假</span>':l.status==='cancelled'?'<span class="tag mute">已取消</span>':isPend(l)?'<span class="tag warn">待确认</span> <span class="muted xs">老师还没写反馈，暂不计课时</span>':'<span class="tag blue">待上课</span>';
   openModal(`${mHead(`${esc(s.name)} · ${esc(c.subject)}${l.kind?' · '+esc(l.kind):''}`)}
-  <dl class="kv"><dt>课程</dt><dd>${canSched() && l.status==='scheduled' ? `<select data-change="l-kind" data-lid="${l.id}"><option value="">—</option>${kindsOf(t.id).map(x => `<option ${x===l.kind?'selected':''}>${x}</option>`).join('')}${l.kind && !kindsOf(t.id).includes(l.kind) ? `<option selected>${esc(l.kind)}</option>` : ''}<option value="__other">其他（自己填）…</option></select>` : esc(l.kind || '—')}</dd><dt>老师</dt><dd>${esc(t.name)}${t.loc?`（${esc(t.loc)}）`:''}</dd><dt>时间</dt><dd>${fmtMD(l.date)} ${l.start}–${l.end} <span class="muted">北京时间</span></dd>
+  <dl class="kv"><dt>课程</dt><dd>${canSched() && l.status==='scheduled' ? `<select data-change="l-kind" data-lid="${l.id}" data-orig="${esc(l.kind||'')}"><option value="">—</option>${kindsOf(t.id).map(x => `<option ${x===l.kind?'selected':''}>${x}</option>`).join('')}${l.kind && !kindsOf(t.id).includes(l.kind) ? `<option selected>${esc(l.kind)}</option>` : ''}<option value="__other">其他（自己填）…</option></select>${isT() ? `<span id="l-kind-go" class="row" style="display:inline-flex;margin-left:6px" hidden><button class="btn pri sm" data-act="l-kind-submit" data-v="${l.id}">提交</button><button class="btn sm" data-act="l-kind-cancel" data-v="${l.id}">取消</button><span class="muted xs">提交后要教务批准</span></span>` : ''}` : esc(l.kind || '—')}</dd><dt>老师</dt><dd>${esc(t.name)}${t.loc?`（${esc(t.loc)}）`:''}</dd><dt>时间</dt><dd>${fmtMD(l.date)} ${l.start}–${l.end} <span class="muted">北京时间</span></dd>
   <dt>本节内容</dt><dd id="tp-view">${l.topic?esc(l.topic):'<span class="muted">还没写</span>'}${canSched()?` <button class="btn sm" data-act="topic" data-v="${l.id}">${l.topic?'修改':'填写'}</button>`:''}</dd>
   <dt>状态</dt><dd>${st} ${l.makeup?'<span class="tag blue">补课</span>':''} ${l.moved?'<span class="tag warn">调过课</span>':''}${l.moved && canSched() && (!f || isTop()) ? ` <button class="btn sm" data-act="unmove" data-v="${l.id}">取消调课标记</button>` : ''}${canSched() && (!f || isTop()) ? ` <button class="btn sm" data-act="makeup" data-v="${l.id}|${l.makeup?0:1}">${l.makeup?'取消补课标记':'标为补课'}</button>` : ''}</dd>${l.note?`<dt>备注</dt><dd>${esc(l.note)}</dd>`:''}
   ${l.status==='leave'?`<dt>扣学生课时</dt><dd class="num">${l.deduct} 小时（老师照发）</dd>`:''}${l.actual_note?`<dt>时长说明</dt><dd>${esc(l.actual_note)}</dd>`:''}${(isDone(l)||isPend(l)) && !t.staff?`<dt>反馈</dt><dd>${f?(f.status==='approved'?'已审批':'待审批'):l.has_fb?'已写':'<span class="tag warn">老师未写</span>'}</dd>`:''}
@@ -1083,6 +1083,10 @@ document.addEventListener('click', async e => {
     case 'move-fix': { const d=val('mv-date'), s=toJST(val('mv-s')), en=toJST(val('mv-e')); if(!d||!s||!en||mins(en)<=mins(s)){toast('请检查日期和时间（不能跨过半夜 12 点）',true);break;}
       const l0 = L(v), clr = isTop() && l0 && l0.note==='已调课' ? {note:''} : {};   // 之前误存成调课留下的「已调课」备注一起清掉
       await act('admin_update_lesson', {lid:v, d:{date:d, start:s, end:en, moved:false, ...clr}}, isT()?'已提交改时间申请，教务批准后课表才会更新':'时间已改好，不算调课'); closeModal(); break; }
+    case 'l-kind-submit': { const el = document.querySelector('[data-change="l-kind"]'), kind = el ? (el.dataset.pick ?? el.value) : null;
+      if (kind==null || kind==='__other' || kind===(el.dataset.orig||'')) break;
+      await act('admin_update_lesson', {lid:v, d:{kind}}, '已提交修改申请，教务批准后生效'); lessonModal(v); break; }
+    case 'l-kind-cancel': lessonModal(v); break;
     case 'unmove': { const l0 = L(v), clr = isTop() && l0 && l0.note==='已调课' ? {note:''} : {};
       await act('admin_update_lesson', {lid:v, d:{moved:false, ...clr}}, isT()?'已提交申请，教务批准后生效':'已取消调课标记'); lessonModal(v); break; }
     case 'leave': { const dd=Number(val('lv-d')); await act('admin_update_lesson', {lid:v, d:{status:'leave', deduct:dd, note:val('lv-note')||(dd?`当天请假，扣 ${dd} 小时`:'请假，不扣课时')}}, '已标记请假'); closeModal(); break; }
@@ -1185,7 +1189,10 @@ document.addEventListener('change', e => {
     const hs = document.getElementById('w-hrs'); if (hs) hs.innerHTML = wHrsOpts(L(el.value)); }
   else if (k==='l-kind'){ let kind = el.value;
     if (kind==='__other'){ kind = (prompt('写课程名称（例：色彩构成）', '') || '').trim().slice(0, 30); if (!kind){ lessonModal(el.dataset.lid); return; } }
-    act('admin_update_lesson', {lid:el.dataset.lid, d:{kind}}, ME().role==='teacher' ? '已提交修改申请，教务批准后生效' : '课程已改').then(() => lessonModal(el.dataset.lid)).catch(() => {}); }
+    if (isT()){   // 老师：选完不马上提交，要再点「提交」（2026-11-18：一选就提交，容易误点出申请）
+      if (el.value==='__other'){ const o = document.createElement('option'); o.value = o.textContent = kind; el.insertBefore(o, el.lastElementChild); el.value = kind; }
+      el.dataset.pick = kind; const go = document.getElementById('l-kind-go'); if (go) go.hidden = kind === (el.dataset.orig || ''); return; }
+    act('admin_update_lesson', {lid:el.dataset.lid, d:{kind}}, '课程已改').then(() => lessonModal(el.dataset.lid)).catch(() => {}); }
   else if (k==='subj-sel'){ const x = document.getElementById(el.id + '-x'); if (x) { x.hidden = el.value !== '__other'; if (!x.hidden) x.focus(); } }
   else if (k==='tfb-m'){ S.tfbM=el.value; render(); }
   else if (k==='tfb-s'){ S.tfbS=el.value; render(); }
