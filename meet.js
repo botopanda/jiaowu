@@ -11,7 +11,8 @@
 
 // 只认 https:// 开头的链接（数据库也会挡一次）；x 是一节课
 const meetOk = x => !!(x && typeof x.meet_url === 'string' && /^https:\/\/[^\s<>"'`]+$/.test(x.meet_url));
-const meetName = x => /tencent|voovmeeting/i.test(x.meet_url || '') ? '腾讯会议' : '上课链接';
+const meetHost = x => { try { return new URL(x.meet_url).hostname.toLowerCase(); } catch (e) { return ''; } };
+const meetName = x => /(^|\.)(tencent\.com|voovmeeting\.com)$/.test(meetHost(x)) ? '腾讯会议' : '上课链接';
 const MEET_IC = '<svg class="meet-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="M16 10.5l5-3v9l-5-3z"/></svg>';
 // 「进入腾讯会议」按钮（新窗口打开）；withNote：后面带上会议号 / 密码
 function meetBtn(x, o = {}){
@@ -32,8 +33,9 @@ const wdName = d => '周' + WD[pd(d).getDay()];
 // 这门课最近一节填过链接的课（先找这节之前最近的，没有就找之后最近的）——填写时先帮老师填上
 function meetPrev(l){
   const ls = DB.lessons.filter(x => x.course_id === l.course_id && x.id !== l.id && meetOk(x));
-  const before = ls.filter(x => x.date <= l.date).sort((a, b) => (b.date + b.start).localeCompare(a.date + a.start));
-  const after = ls.filter(x => x.date > l.date).sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
+  const t = x => x.date + ' ' + x.start, me = t(l);
+  const before = ls.filter(x => t(x) < me).sort((a, b) => t(b).localeCompare(t(a)));
+  const after = ls.filter(x => t(x) > me).sort((a, b) => t(a).localeCompare(t(b)));
   return before[0] || after[0] || null;
 }
 // 以后同一门课、同一个星期几、还没填链接的课
@@ -47,10 +49,11 @@ function meetLessonRow(l){
 }
 
 // 填写弹窗
-let mtFrom = 'lesson';
+let mtFrom = 'lesson', mtPre = {url: '', note: ''};
 function meetModal(lid){
   const l = L(lid); if (!l) return;
   const c = course(l.course_id), prev = meetOk(l) ? null : meetPrev(l), src = meetOk(l) ? l : (prev || {}), more = meetSameWd(l).length;
+  mtPre = {url: src.meet_url || '', note: src.meet_note || ''};
   openModal(`${mHead(`${esc(stu(c.student_id).name)} · ${esc(c.subject)} · 上课链接`)}
   <div class="small"><b>${fmtMD(l.date)} ${l.start}–${l.end}</b> <span class="bj-tag">北京时间</span> <span class="muted">${esc(tea(c.teacher_id).name)}老师</span></div>
   ${prev ? `<div class="note">已经先帮你填好了 ${sMD(prev.date)} 那节课用的链接。这节课还是这个会议，直接点「保存」；换了会议，换成新的再保存。</div>` : ''}
@@ -58,7 +61,7 @@ function meetModal(lid){
   <label class="field"><span>会议号 / 密码（可以不填）</span><input type="text" id="mt-note" autocomplete="off" maxlength="120" value="${esc(src.meet_note || '')}" placeholder="例：会议号 123 456 789，密码 1234"></label>
   ${more ? `<label class="meet-wd"><input type="checkbox" id="mt-wd" class="chk"><span>以后每${wdName(l.date)}的「${esc(c.subject)}」课也用这个链接<span class="muted xs" style="display:block">还没填链接的还有 ${more} 节；适合每周固定时间的周期性会议</span></span></label>` : ''}
   <div class="muted xs">可以把腾讯会议的整段邀请直接粘贴进来，会自动挑出链接和会议号。学生在自己的页面上点「进入腾讯会议」就能进来。</div>
-  <div class="row"><button class="btn pri" data-act="mt-save" data-v="${l.id}">保存</button>${meetOk(src) ? meetBtn(src, {label: '打开试试', withNote: false}) : ''}${meetOk(l) ? `<button class="btn sm danger" data-act="mt-clear" data-v="${l.id}">清空</button>` : ''}<button class="btn sm" data-act="mt-back" data-v="${l.id}" style="margin-left:auto">返回</button></div>`);
+  <div class="row"><button class="btn pri" data-act="mt-save" data-v="${l.id}">保存</button><button class="btn sm" data-act="mt-try">${MEET_IC}打开试试</button>${meetOk(l) ? `<button class="btn sm danger" data-act="mt-clear" data-v="${l.id}">清空</button>` : ''}<button class="btn sm" data-act="mt-back" data-v="${l.id}" style="margin-left:auto">返回</button></div>`);
 }
 
 // 老师课表页上面：接下来 14 天还有几节课没填链接
@@ -112,8 +115,16 @@ document.addEventListener('paste', e => {
   if (!m.url || txt.trim() === m.url) return;
   e.preventDefault(); e.target.value = m.url;
   const n = document.getElementById(id === 'mt-url' ? 'mt-note' : 'al-mnote'); if (n && m.note) n.value = m.note;
-  meetAddSync();
+  meetAddSync(); meetNoteSync();
 });
+// 换了会议链接：先帮着带出来的旧会议号 / 密码清掉（老师自己改过的不动；链接改回原来的，再填回去）
+function meetNoteSync(){
+  const n = document.getElementById('mt-note'); if (!n || !mtPre.note) return;
+  const changed = val('mt-url').trim() !== mtPre.url;
+  if (changed && n.value === mtPre.note) { n.value = ''; n.dataset.auto = '1'; }
+  else if (!changed && n.value === '' && n.dataset.auto) { n.value = mtPre.note; delete n.dataset.auto; }
+}
+document.addEventListener('input', e => { if (e.target?.id === 'mt-url') meetNoteSync(); });
 
 const meetBack = lid => mtFrom === 'todo' ? meetTodoModal() : lessonModal(lid);
 document.addEventListener('click', async e => {
@@ -122,6 +133,11 @@ document.addEventListener('click', async e => {
   if (k === 'mt-open') { mtFrom = a.dataset.from || 'lesson'; meetModal(v); }
   if (k === 'mt-todo') { mtFrom = 'todo'; meetTodoModal(); }
   if (k === 'mt-back') meetBack(v);
+  if (k === 'mt-try') {
+    let u = val('mt-url').trim(); if (u && !/^https:\/\//.test(u)) u = meetParse(u).url || u;
+    if (!/^https:\/\/[^\s<>"'`]+$/.test(u)) { toast('先填好以 https:// 开头的会议链接', true); return; }
+    window.open(u, '_blank', 'noopener,noreferrer');
+  }
   if (k === 'mt-save' || k === 'mt-clear') {
     let url = k === 'mt-clear' ? '' : val('mt-url').trim(), note = k === 'mt-clear' ? '' : val('mt-note').trim();
     if (url && !/^https:\/\//.test(url)) { const m = meetParse(url); if (m.url) { url = m.url; if (!note) note = m.note; } }   // 手机上粘贴整段邀请时也拆开

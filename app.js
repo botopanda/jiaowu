@@ -246,11 +246,11 @@ async function checkVersion(){
   } catch(e) {}
 }
 function showUpdateBar(v){
-  if (document.getElementById('upd-bar')) return;
-  const d = document.createElement('div'); d.id = 'upd-bar'; d.className = 'upd-bar'; d.setAttribute('role', 'status');
+  const old = document.getElementById('upd-bar'); if (old) { old.dataset.v = v; return; }   // 提示还开着又出了新版本：记住最新的
+  const d = document.createElement('div'); d.id = 'upd-bar'; d.className = 'upd-bar'; d.setAttribute('role', 'status'); d.dataset.v = v;
   d.innerHTML = '<span>系统有更新</span><button type="button" class="upd-go">点这里刷新</button><button type="button" class="upd-x" aria-label="先不刷新" title="先不刷新">✕</button>';
   d.querySelector('.upd-go').onclick = () => location.reload();
-  d.querySelector('.upd-x').onclick = () => { verDismissed = v; d.remove(); };   // 点了 ✕：这个版本不再提醒，再有新版本才提醒
+  d.querySelector('.upd-x').onclick = () => { verDismissed = d.dataset.v; d.remove(); };   // 点了 ✕：这个版本不再提醒，再有新版本才提醒
   document.body.appendChild(d);
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(); });
@@ -491,7 +491,7 @@ function goPage(v){
   S.page = v;
 }
 function reqChBody(){
-  const cp = chPend(), cpOk = cp.filter(x => !chStuck(x)), cd = (DB.changes||[]).filter(x => x.status==='approved' || x.status==='rejected').slice(0,10);
+  const cp = chPend(), cpOk = cp.filter(x => !chStuck(x)), cd = (DB.changes||[]).filter(x => x.status==='approved' || x.status==='rejected' || (x.status==='withdrawn' && x.result)).slice(0,10);
   return `<div class="ph"><h2>老师排课申请</h2>${cpOk.length>1?`<button class="btn pri sm" data-act="ch-ok-all">全部批准（${cpOk.length} 条）</button>`:''}</div>
   <div class="note">老师自己排课、调课、删课，要你们批准后才会改到课表上。</div>
   <section class="card"><div class="list">${cp.length ? cp.map(x => chCard(x, true)).join('') : '<div class="empty">没有待审批的老师申请</div>'}</div>
@@ -1043,7 +1043,7 @@ let lnScope = new Set(), wTags = new Set(), scopeSel = new Set();
 function lessonDates(first, rep){
   const out = [], d0 = pd(first), m = d0.getMonth();
   if (rep==='1') return [first];
-  for (let d = new Date(d0), i = 0; ; d = new Date(d.getTime()+7*86400000), i++){
+  for (let d = new Date(d0), i = 0; ; d = new Date(d.getFullYear(), d.getMonth(), d.getDate()+7), i++){
     if (rep==='month' ? d.getMonth()!==m : i >= Number(rep)) break;
     out.push(ds(d));
   }
@@ -1118,7 +1118,7 @@ document.addEventListener('click', async e => {
       await act('admin_update_lesson', {lid:v, d:{date:d, start:s, end:en, moved:true, note:val('mv-note')||'已调课'}}, isT()?'已提交调课申请，教务批准后课表才会更新':'已调课，各方的课表已更新'); closeModal(); break; }
     case 'move-fix': { const d=val('mv-date'), s=toJST(val('mv-s')), en=toJST(val('mv-e')); if(!d||!s||!en||mins(en)<=mins(s)){toast('请检查日期和时间（不能跨过半夜 12 点）',true);break;}
       const l0 = L(v), clr = isTop() && l0 && l0.note==='已调课' ? {note:''} : {};   // 之前误存成调课留下的「已调课」备注一起清掉
-      if (l0 && d===l0.date && s===l0.start && en===l0.end && !l0.moved && !clr.note){ toast('日期和时间都没有改，不用提交',true); break; }
+      if (l0 && d===l0.date && s===l0.start && en===l0.end && !l0.moved && !('note' in clr)){ toast('日期和时间都没有改，不用提交',true); break; }
       await act('admin_update_lesson', {lid:v, d:{date:d, start:s, end:en, moved:false, ...clr}}, isT()?'已提交改时间申请，教务批准后课表才会更新':'时间已改好，不算调课'); closeModal(); break; }
     case 'l-kind-submit': { const el = document.querySelector('[data-change="l-kind"]'), kind = el ? (el.dataset.pick ?? el.value) : null;
       if (kind==null || kind==='__other' || kind===(el.dataset.orig||'')) break;
