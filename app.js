@@ -543,9 +543,10 @@ function pgTeachers(){
     ${cvOf(t.id).tagline ? `<div class="small" style="margin:-2px 0 6px">${esc(cvOf(t.id).tagline)}</div>` : ''}
     <dl class="kv small">${cvBrief(t)}
     <dt>带的学生</dt><dd>${names.map(esc).join('、')||'—'}</dd>
+    ${typeof meetBtn==='function' ? `<dt>上课链接</dt><dd>${meetOk(t) ? `<span class="tag ok">已填</span>${t.meet_note?` <span class="muted xs">${esc(t.meet_note)}</span>`:''}` : '<span class="muted">还没填</span>'}</dd>` : ''}
     <dt>本月已上</dt><dd><b class="num">${hDone}</b> 小时 <span class="muted xs">（${done.length} 节）</span>${pn?` <span class="tag warn">${pn} 节待确认</span>`:''}</dd>
     <dt>本月应上</dt><dd><b class="num">${hPlan}</b> 小时 <span class="muted xs">（${plan.length} 节）</span></dd></dl>
-    <div class="row" style="margin-top:8px"><button class="btn pri sm" data-act="cv-open" data-v="${t.id}">履历</button><button class="btn sm" data-act="teacher-form" data-v="${t.id}">编辑</button>${p?`<button class="btn sm" data-act="copy-link" data-v="${p.key}">复制老师链接</button>`:''}${ownerFullLinkBtn(t)}</div></section>`}).join('')}</div>` : '<div class="card empty">还没有老师。点右上角「新增老师」开始。</div>'}`;
+    <div class="row" style="margin-top:8px"><button class="btn pri sm" data-act="cv-open" data-v="${t.id}">履历</button><button class="btn sm" data-act="teacher-form" data-v="${t.id}">编辑</button>${typeof meetBtn==='function' ? `<button class="btn sm" data-act="mt-open" data-v="${t.id}">上课链接</button>` : ''}${p?`<button class="btn sm" data-act="copy-link" data-v="${p.key}">复制老师链接</button>`:''}${ownerFullLinkBtn(t)}</div></section>`}).join('')}</div>` : '<div class="card empty">还没有老师。点右上角「新增老师」开始。</div>'}`;
 }
 
 function pgPayroll(){
@@ -636,7 +637,7 @@ let PV = 'cal'; try { PV = localStorage.getItem('jw_view') || 'cal'; } catch(e) 
 function lessonItem(l, tz, whoFn, canReq, canEdit){
   const c = course(l.course_id), q = reqOf(l), leave = l.status!=='scheduled';
   return `<div class="les" style="--hc:${slotHue(timeFor(l,tz))}${leave?';opacity:.6':''}"><div class="when">${timeFor(l,tz)}</div><div style="min-width:0;flex:1">${subjTag(c.subject)}${l.kind?` <span class="tag mute">${esc(l.kind)}</span>`:''} · ${esc(whoFn(c))}${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调课</span>':''}${l.status==='leave'?' <span class="tag seal">请假</span>':''}${l.status==='cancelled'?' <span class="tag mute">已取消</span>':''}${['student','parent'].includes(ME().role) ? (l.status==='scheduled' && l.date<TODAY ? ' <span class="tag mute">已上</span>' : '') : `${isDone(l)?(hasFb(l)?' <span class="tag ok">已反馈</span>':' <span class="tag ok">已上</span>'):''}${isPend(l)?` <span class="tag warn">${ME().role==='teacher'?'待写反馈':'待确认'}</span>`:''}`}${hrsTag(l)}${l.topic?`<div class="les-topic">本节：${esc(l.topic)}</div>`:''}
-    ${reqLine(q)}${canReq && !leave && l.date>=TODAY && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave && !fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}${isT() && fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="t-fb" data-v="${fbOf(l).id}">看反馈</button>`:''}</div></div>`;
+    ${reqLine(q)}${ME().role==='student' && !leave && l.date===TODAY && typeof meetBtn==='function' ? `<div style="margin-top:6px">${meetBtn(tea(c.teacher_id))}</div>` : ''}${canReq && !leave && l.date>=TODAY && !(q && q.status==='pending') ? `<button class="btn sm" style="margin-top:4px" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button>`:''}${canEdit && !leave && !fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="lesson" data-v="${l.id}">调课 / 删除</button>`:''}${isT() && fbOf(l) ? `<button class="btn sm" style="margin-top:4px" data-act="t-fb" data-v="${fbOf(l).id}">看反馈</button>`:''}</div></div>`;
 }
 // sid：要标考试的学生（学生、家长＝自己；老师＝自己正在教的学生，传编号数组，格子里写学生名字）
 function schedule(ls, tz, whoFn, canReq=false, canEdit=false, extra='', sid=null){
@@ -748,7 +749,7 @@ function tWrite(t){
 function tMe(t){
   const ls = lsOfT(t.id).filter(l=>l.date.startsWith(S.teaMonth) && paidH(l)>0), h = ls.reduce((a,l)=>a+paidH(l),0);
   const months = [TODAY.slice(0,7), ymShift(TODAY.slice(0,7),-1), ymShift(TODAY.slice(0,7),-2)];
-  return `<h3 class="dg" style="margin-top:0">我的履历</h3>${cvView(t)}
+  return `${typeof meetSelfCard==='function' ? meetSelfCard(t) : ''}<h3 class="dg" style="margin-top:0">我的履历</h3>${cvView(t)}
   <section class="card"><div class="row" style="margin-bottom:4px"><h3 style="font-size:16px;margin-right:auto">课时记录</h3><select id="tea-m" data-change="team">${months.map(v=>`<option value="${v}" ${v===S.teaMonth?'selected':''}>${ymLabel(v)}</option>`).join('')}</select></div>
   <div class="muted xs" style="margin-bottom:4px">自动记录，不用再整理清单发给教务。${ls.length?` 这个月：${payBadge(t.id, S.teaMonth)}`:''}</div>
   ${ls.length?`<div class="list">${ls.map(l=>`<div class="li small"><span class="num">${sMD(l.date)}</span><span class="num">${timeFor(l,t.tz)}</span><span class="grow">${esc(stu(course(l.course_id).student_id).name)}</span><span class="num">${paidH(l)}h</span>${l.status==='leave'?'<span class="tag seal">请假</span>':''}</div>`).join('')}</div>

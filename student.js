@@ -65,7 +65,7 @@ function sSide(s){
   const sub = [s.direction || s.track, s.target_ym ? `目标 ${tgtLabel(s.target_ym)}` : ''].filter(Boolean);
   return {
     top: `<div class="side-me"><span class="side-av">${esc((s.name || '?').slice(-1))}</span><div><b>${esc(s.name)}同学</b>${sub.map(x => `<div class="muted xs">${esc(x)}</div>`).join('')}</div></div>`,
-    bottom: `<div class="side-foot">${Object.keys(by).length ? `<div class="grp">${PRO() ? '孩子的老师' : '我的老师'}</div>${Object.entries(by).map(([tid, subs]) => `<div class="side-tea"><b>${esc(tName(tid))}</b><span class="muted xs">${subs.map(esc).join('、')}</span></div>`).join('')}` : ''}
+    bottom: `<div class="side-foot">${Object.keys(by).length ? `<div class="grp">${PRO() ? '孩子的老师' : '我的老师'}</div>${Object.entries(by).map(([tid, subs]) => `<div class="side-tea"><b>${esc(tName(tid))}</b><span class="muted xs">${subs.map(esc).join('、')}</span>${!PRO() && typeof meetBtn==='function' ? meetBtn(tea(tid), {label: '腾讯会议 ›', withNote: false}) : ''}</div>`).join('')}` : ''}
       <div class="muted xs side-help">有问题直接微信联系教务老师</div></div>`,
   };
 }
@@ -83,6 +83,7 @@ function sNextCard(s){
     <div class="nx-when"><b>${dayWord(l.date)}</b> <span class="num">${t}</span></div>
     <div class="nx-what">${subjTag(c.subject)} <span>${esc(tName(c.teacher_id))}</span>${l.makeup?' <span class="tag blue">补课</span>':''}${l.moved?' <span class="tag warn">调过课</span>':''}</div>
     ${l.topic ? `<div class="nx-topic">本节：${esc(l.topic)}</div>` : ''}
+    ${!PRO() && typeof meetBtn==='function' && meetOk(tea(c.teacher_id)) ? `<div class="nx-meet">${meetBtn(tea(c.teacher_id), {big: true})}</div>` : ''}
     ${q ? reqLine(q) : ''}
     ${PRO() ? '<div class="muted xs">北京时间</div>' : !(q && q.status==='pending') ? `<div class="row"><button class="btn sm" data-act="req-open" data-v="${l.id}">申请改期 / 请假</button><span class="muted xs">北京时间</span></div>` : ''}
     ${later.length ? `<div class="nx-later">${later.map(x => { const cc = course(x.course_id); return `<div class="row xs"><span class="muted">之后</span><b>${dayWord(x.date)}</b><span class="num">${timeFor(x, s.tz)}</span>${subjTag(cc.subject)}<span class="muted">${esc(tea(cc.teacher_id).name)}</span></div>`; }).join('')}</div>` : ''}
@@ -158,9 +159,11 @@ function sFeedback2(s){
 function sMine(s){
   const ym = TODAY.slice(0,7), r = reviewOf(s.id, ym) || {};
   const past = reviewsOf(s.id).filter(x => x.ym !== ym && (x.content || x.self_eval || x.teacher_eval || x.talk || x.next_focus)).slice().reverse();
-  const jump = [['m-target','目标大学'],['m-score','成绩'],['m-month','月度自评'],['m-profile','个人档案']], ro = PRO();
+  const tl = typeof meetTeacherList==='function' ? meetTeacherList(s) : '';
+  const jump = [...(tl ? [['m-teacher', PRO() ? '孩子的老师' : '我的老师']] : []), ['m-target','目标大学'],['m-score','成绩'],['m-month','月度自评'],['m-profile','个人档案']], ro = PRO();
   return `<h2 style="font-size:19px">${ro ? `${esc(s.name)}同学的档案` : '我的'}</h2>${typeof sMsgBox==='function' ? sMsgBox(s) : ''}
   <div class="chips">${jump.map(([id, t]) => `<button class="chip" data-act="jump" data-v="${id}">${t}</button>`).join('')}</div>
+  ${tl}
   <h3 class="sh-sec" id="m-target">目标大学与出愿日程</h3>
   ${s.target_ym || s.direction ? `<div class="card small">${s.direction?`<span class="tag gold">${esc(s.direction)}</span> `:''}${s.target_ym?`目标入学 <b>${tgtLabel(s.target_ym)}</b>`:''}</div>` : ''}
   ${targetsView(s.id, false)}

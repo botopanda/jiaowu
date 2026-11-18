@@ -1026,3 +1026,18 @@ input[type=file]::file-selector-button:hover{background:var(--sunk)}
 .ov-exam>.row{margin-bottom:4px}
 .wk-hd b{line-height:28px}
 .wk-hd.today b{display:block;width:28px;margin:0 auto}
+
+/* ───── 上课链接（腾讯会议，meet.js） ───── */
+.meet-ic{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linejoin:round;vertical-align:-3px;margin-right:5px}
+h3 .meet-ic{width:18px;height:18px;color:var(--gold-text)}
+.meet-wrap{display:inline-flex;align-items:center;gap:6px 10px;flex-wrap:wrap}
+a.btn.meet-go{gap:0}
+.meet-note{white-space:nowrap}
+.meet-card{display:flex;flex-direction:column;gap:8px;border:1.5px solid color-mix(in srgb,var(--gold) 30%,transparent)}
+.nx-meet{margin-top:2px}
+.nx-meet .btn{padding:7px 16px;font-size:14px}
+.meet-row{display:flex;align-items:center;gap:6px 12px;padding:12px 14px;flex-wrap:wrap}
+.meet-list>.meet-row+.meet-row{border-top:1px solid var(--line)}
+.side-tea .meet-wrap{margin-top:4px}
+.side-tea .meet-go{background:transparent;border-color:rgba(255,255,255,.25);color:#a9c0ff;padding:1px 8px;font-size:12px}
+.side-tea .meet-go .meet-ic{width:13px;height:13px}
