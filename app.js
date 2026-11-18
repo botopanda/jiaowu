@@ -7,9 +7,14 @@ const SB_URL = 'https://euwsrpppykescwflgtgu.supabase.co';
 const SB_KEY = 'sb_publishable_Lgyp6nefs88z4X01-1v3wA_gPJNl8fW';   // 公开用的大门钥匙，本来就放在网页里
 
 /* ───────── 专属钥匙：链接里的 ?k=，本机记住一份 ───────── */
+// 「打开看看」（2026-11-19，数据库第 61 步）：教务·管理在「链接与权限」点开别人的链接，地址是 ?k=那条链接&peek=1。
+//   这一页只能看、不能改，不记那条链接的「最近打开」；本机记住的仍是管理自己的链接（不会被换掉）
+const PEEK = new URLSearchParams(location.search).get('peek') === '1';
+let PEEK_ADMIN = ''; if (PEEK) { try { PEEK_ADMIN = localStorage.getItem('jw_k') || ''; } catch(e) {} }
+const PEEK_OK = new Set(['app_load_peek', 'changes_load', 'checks_load', 'cv_load', 'msg_load', 'word_load', 'review_raw_load', 'admin_short_links', 'programs_load', 'change_log_load', 'backup_status', 'ping']);
 function readKey(){
   const q = new URLSearchParams(location.search).get('k');
-  try { if (q) localStorage.setItem('jw_k', q); } catch(e) {}
+  try { if (q && !PEEK) localStorage.setItem('jw_k', q); } catch(e) {}
   if (q) return q;
   try { return localStorage.getItem('jw_k') || ''; } catch(e) { return ''; }
 }
@@ -32,6 +37,7 @@ async function readShort(){
 }
 
 async function rpc(fn, args = {}){
+  if (PEEK && !PEEK_OK.has(fn)) throw new Error('现在是「打开看看」，只能看不能改。要改请回到你自己的教务页面');
   let r;
   try {
     r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
@@ -221,7 +227,7 @@ function loadBar(){
 }
 async function load(){
   // 2026-11-19：先读进 D，全部读完才一起换成 DB；读的过程中页面还用上一次筛好的数据（总管理在 K 视图不会一闪出两本账）
-  const D = await rpc('app_load'); lastLoad = Date.now();
+  const D = await (PEEK ? rpc('app_load_peek', {ak: PEEK_ADMIN}) : rpc('app_load')); lastLoad = Date.now();
   D.changes = [];
   const errs = [];
   if (D.me.role==='admin' || D.me.role==='teacher'){ try { D.changes = await rpc('changes_load') || []; } catch(e) { errs.push('老师排课申请'); } }
@@ -299,7 +305,7 @@ function render(){
   const me = ME();
   const label = me.role==='admin' ? (me.owner ? '总管理' : me.level==='top' ? '教务 · 管理' : '教务') : {teacher:'任课老师', student:'学生', parent:'家长'}[me.role];
   setTimeout(labelTables);
-  app.innerHTML = `<header class="top"><h1><span class="logo" aria-hidden="true">教</span>学生教务管理系统</h1>${me.owner ? bookSwitch() : ''}<span class="who"><span class="who-av" aria-hidden="true">${esc(String(me.name||'').slice(0,1))}</span><span>${esc(me.name)}${me.role==='student' ? '同学' : ''}</span>${me.role==='student' || me.role==='parent' || me.owner ? '' : `<small>${label}</small>`}</span>${['student','parent'].includes(me.role) ? '' : '<button class="btn sm" data-act="logout" title="让这台设备忘掉你的链接">退出</button>'}</header>` + (isAdmin() ? adminView() : phoneView());
+  app.innerHTML = (PEEK ? `<div class="peek-bar" role="status"><span>正在用「打开看看」查看 <b>${esc(me.name)}</b> 的页面：只能看、不能改，不留登录记录。</span><button class="btn sm" data-act="peek-close">关掉这一页</button></div>` : '') + `<header class="top"><h1><span class="logo" aria-hidden="true">教</span>学生教务管理系统</h1>${me.owner ? bookSwitch() : ''}<span class="who"><span class="who-av" aria-hidden="true">${esc(String(me.name||'').slice(0,1))}</span><span>${esc(me.name)}${me.role==='student' ? '同学' : ''}</span>${me.role==='student' || me.role==='parent' || me.owner ? '' : `<small>${label}</small>`}</span>${['student','parent'].includes(me.role) ? '' : '<button class="btn sm" data-act="logout" title="让这台设备忘掉你的链接">退出</button>'}</header>` + (isAdmin() ? adminView() : phoneView());
 }
 
 /* ═════════════ 教务端 ═════════════ */
@@ -656,13 +662,13 @@ function pgLinks(){
   const grp = [['教务','admin'],['任课老师','teacher'],['学生','student'],['家长','parent']];
   return `<div class="ph"><h2>链接与权限</h2><button class="btn" data-act="seen-clear-all">清除登录记录</button><button class="btn pri" data-act="link-new">＋ 新建链接</button></div>
   <div class="note">每个人一条专属链接，打开就能用。点「复制链接」发到对方微信。<b>链接被转发、老师离职、学生毕业</b>时，点「重新生成」或「停用」，旧链接马上失效。新增老师、学生时会自动生成链接。</div>
-  <div class="note">自己点开学生、老师的链接看情况，也会记成「最近打开」。看完以后，点那一行的「清除」只清这一条，点上面的「清除登录记录」全部清掉。</div>
+  <div class="note">想看学生、老师、家长那边是什么样子，点那一行的<b>「打开看看」</b>：新开一页、只能看，<b>不留登录记录</b>，这台电脑记住的也还是你自己的链接。<br>直接点开别人的链接还是会记成「最近打开」，看完可以点「清除」（只清这一条）或上面的「清除登录记录」（全部）。</div>
   ${grp.map(([g,r]) => { const ps = P.filter(p=>p.role===r && !ownerShadow(p)); return ps.length ? `<section><h3 style="font-size:15px;margin:6px 0">${g}</h3><div class="tw"><table class="rt"><thead><tr><th>姓名</th><th>身份</th><th>能看到</th><th>最近打开</th><th>状态</th><th></th></tr></thead><tbody>
     ${ps.map(p => `<tr><td><b>${esc(p.name)}</b>${p.id===ME().id?' <span class="tag gold">我</span>':''}${ownerLinkTag(p)}</td><td><span class="tag ${p.level==='top'?'seal':p.role==='admin'?'gold':'mute'}">${p.role==='admin'?(p.level==='top'?'教务 · 管理':'教务 · 普通'):g}</span></td>
       <td class="small">${esc(scopeTxt(p))}${p.role==='admin'&&p.level!=='top'?` <button class="btn sm" data-act="scope-edit" data-v="${p.id}">改范围</button>`:''}</td>
       <td class="small">${seenTxt(p)}${p.last_seen || (p.devices||[]).length ? ` <button class="btn sm" data-act="seen-clear" data-v="${p.id}" title="清掉这条链接的最近打开时间和设备">清除</button>` : ''}</td>
       <td>${p.active?'<span class="tag ok">启用</span>':'<span class="tag seal">已停用</span>'}</td>
-      <td><div class="row"><button class="btn sm" data-act="copy-link" data-v="${p.key}" ${p.active?'':'disabled'}>复制链接</button><button class="btn sm" data-act="link-regen" data-v="${p.id}">重新生成</button>${ownerLinkToggle(p)}
+      <td><div class="row"><button class="btn sm" data-act="copy-link" data-v="${p.key}" ${p.active?'':'disabled'}>复制链接</button>${p.id!==ME().id && p.active ? `<button class="btn sm" data-act="peek" data-v="${p.key}" title="用这个人的身份看他的页面：只能看，不留登录记录">打开看看</button>` : ''}<button class="btn sm" data-act="link-regen" data-v="${p.id}">重新生成</button>${ownerLinkToggle(p)}
         ${p.id===ME().id?'':`<button class="btn sm ${p.active?'danger':''}" data-act="link-toggle" data-v="${p.id}">${p.active?'停用':'恢复'}</button><button class="btn sm danger" data-act="link-del" data-v="${p.id}">删除</button>`}</div></td></tr>`).join('')}
   </tbody></table></div></section>` : ''; }).join('')}`;
 }
@@ -1179,7 +1185,9 @@ document.addEventListener('click', async e => {
     case 'ch-close': await act('change_handle', {cid:v, accept:false, why:'这节课已经写了反馈，不能再改'}, '已关掉'); break;
     case 'ch-no': { const why = prompt('不批准的原因（老师能看到，可以不写）', ''); if (why===null) break;
       await act('change_handle', {cid:v, accept:false, why}, '已回复老师'); break; }
-    case 'logout': if (!confirm('退出后，这台设备要重新点专属链接才能进来。确定退出吗？')) break;
+    case 'peek-close': window.close(); setTimeout(() => toast('直接关掉这个浏览器标签就行'), 300); break;
+    case 'logout': if (PEEK) { window.close(); break; }   // 「打开看看」：不动本机记住的管理链接
+      if (!confirm('退出后，这台设备要重新点专属链接才能进来。确定退出吗？')) break;
       try { localStorage.removeItem('jw_k'); } catch(e) {}
       location.href = location.origin + location.pathname; break;
     case 'ch-seen-all': { const ids = chSeen().concat(v.split(',')).slice(-500); try { localStorage.setItem('jw_chseen', JSON.stringify(ids)); } catch(e) {} render(); break; }
@@ -1306,6 +1314,7 @@ document.addEventListener('app-ready', async function start(){
   if (!KEY){ app.innerHTML = `<div class="center"><h2>学生教务管理系统</h2><p class="muted">请用教务老师发给你的专属链接打开。</p></div>`; return; }
   try { await load(); render(); }
   catch(e){
+    if (PEEK){ app.innerHTML = `<div class="center"><h2>「打开看看」打不开</h2><p class="muted">${esc(e.message)}</p></div>`; return; }   // 不动本机记住的管理链接
     const bad = /无效|停用/.test(e.message);
     if (bad){ try{ localStorage.removeItem('jw_k'); }catch(_){} }
     app.innerHTML = `<div class="center"><h2>${bad?'这个链接已失效':'暂时打不开'}</h2><p class="muted">${bad?'链接可能已经停用或更换。请联系教务老师重新发一条链接。':'网络好像不太稳定，请稍后刷新再试。'}</p>${bad?'':'<p><button class="btn" onclick="location.reload()">刷新</button></p>'}</div>`;

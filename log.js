@@ -217,6 +217,10 @@ document.addEventListener('click', async e => {
   if (k === 'lg-cat') { LOGX.cat = v; render(); }
   else if (k === 'lg-more') logFetch(true);
   else if (k === 'lg-reload') logFetch(false);
+  else if (k === 'peek') {   // 「打开看看」：新开一页（第 61 步）
+    const w = window.open(`${location.origin}${location.pathname}?k=${encodeURIComponent(v)}&peek=1`, '_blank');
+    if (w) w.opener = null; else toast('浏览器拦住了新窗口，请允许这个网站弹出窗口后再点', true);
+  }
   else if (k === 'seen-clear') {
     const p = (DB.people || []).find(x => x.id === v); if (!p) return;
     if (!confirm(`清除「${p.name}」的登录记录（最近打开时间、设备）？\n以后有人再打开这条链接，会重新记。`)) return;

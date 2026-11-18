@@ -64,6 +64,7 @@ document.addEventListener('click', async e => {
 
 // AI 生成：交给 Supabase 上的小程序 plan-draft（它会先用链接核对身份，再去问 Claude）
 async function planAI(cid, ym){
+  if (typeof PEEK !== 'undefined' && PEEK) throw new Error('现在是「打开看看」，只能看，不能用 AI 生成');   // 第 61 步
   let r;
   try {
     r = await fetch(`${SB_URL}/functions/v1/plan-draft`, {method: 'POST', headers: {'Content-Type': 'application/json', apikey: SB_KEY},
@@ -79,6 +80,7 @@ async function planAI(cid, ym){
 const rvAiBox = (sid, ym) => PLAN_AI && isAdmin() ? `<div class="rv-ai"><button class="btn sm" data-act="rv-ai" data-v="${sid}|${ym}">AI 生成</button>
   <span class="muted xs">AI 会读这个月老师写的反馈、作业完成情况、成绩、学生上传的作业 / 作品图片和上面只给 AI 看的材料，写一份草稿填进下面五个框；看过改过再保存</span></div>` : '';
 async function reviewAI(sid, ym){
+  if (typeof PEEK !== 'undefined' && PEEK) throw new Error('现在是「打开看看」，只能看，不能用 AI 生成');   // 第 61 步
   let r;
   try {
     r = await fetch(`${SB_URL}/functions/v1/plan-draft`, {method: 'POST', headers: {'Content-Type': 'application/json', apikey: SB_KEY},
