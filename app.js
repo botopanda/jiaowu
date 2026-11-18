@@ -273,14 +273,21 @@ const chKind = {add:'排课', move:'调课', delete:'删课'};
 const tShow = t => esc(t);   // 申请里的时间是老师那边发来的，显示前一定转义（体检 C-01）
 function chText(x){
   if (x.kind==='add'){ const ds = x.d.dates || []; return `${ds.length} 节：${ds.slice(0,8).map(sMD).join('、')}${ds.length>8?' 等':''} · ${tShow(x.d.st)}–${tShow(x.d.et)}${x.d.makeup?' · 补课':''}${x.d.kind?` · ${esc(x.d.kind)}`:''}${x.d.topic?` · 内容：${esc(x.d.topic)}`:''}`; }
-  const o = x.old ? `${sMD(x.old.date)} ${tShow(x.old.start)}–${tShow(x.old.end)}` : '（这节课已不在）';
-  if (x.kind==='delete') return `删掉 ${o}`;
+  const wd = d => `${sMD(d)} 周${WD[pd(d).getDay()]}`;
+  const o = x.old ? `${wd(x.old.date)} ${tShow(x.old.start)}–${tShow(x.old.end)}` : '（这节课已不在）';
+  if (x.kind==='delete') return `删掉 ${o} 这节课`;
   const nd = x.d.date || x.old?.date, ns = x.d.start || x.old?.start, ne = x.d.end || x.old?.end;
-  const parts = [];
-  if (x.d.date || x.d.start || x.d.end) parts.push(`${o} → <b>${sMD(nd)} ${tShow(ns)}–${tShow(ne)}</b>`);
-  if (x.d.makeup!=null) parts.push(x.d.makeup ? `${o} 标为补课` : `${o} 取消补课标记`);
-  return parts.join('；') + (x.d.note && x.d.note!=='已调课' ? ` · 原因：${esc(x.d.note)}` : '');
+  const timeCh = !!(x.d.date || x.d.start || x.d.end), parts = [];
+  // 2026-11-18：以前只写时间的变化，老师改「课程」、取消调课标记时卡片是空的。现在每一种改动都写出来
+  if (x.d.kind!=null){ const ok = x.status==='pending' ? (L(x.lesson_id)?.kind || '') : '';
+    parts.push(ok && ok!==x.d.kind ? `课程「${esc(ok)}」改成 <b>「${esc(x.d.kind)}」</b>` : `课程改成 <b>「${esc(x.d.kind)}」</b>`); }
+  if (x.d.makeup!=null) parts.push(x.d.makeup ? '<b>标为补课</b>' : '<b>取消补课标记</b>');
+  if (x.d.moved===false) parts.push(timeCh ? '只改时间，不算调课' : '<b>取消「调课」标记</b>');
+  const head = timeCh ? `${o} → <b>${wd(nd)} ${tShow(ns)}–${tShow(ne)}</b>` : `${o} 这节课`;
+  return head + (parts.length ? '：' + parts.join('；') : timeCh ? '' : '：（没有具体改动）') + (x.d.note && x.d.note!=='已调课' ? ` · 原因：${esc(x.d.note)}` : '');
 }
+// 卡片左边的小标签：改了时间才叫「调课」，只改课程、补课标记这些叫「修改」
+const chLabel = x => x.kind!=='move' ? chKind[x.kind] : !(x.d.date || x.d.start || x.d.end) ? '修改' : x.d.moved===false ? '改时间' : '调课';
 // 老师看过的处理结果，点「知道了」就不再显示（记在这台设备上；7 天后也会自动消失）
 const chSeen = () => { try { return JSON.parse(localStorage.getItem('jw_chseen') || '[]'); } catch(e) { return []; } };
 const chStatus = x => x.status==='pending' ? '<span class="tag warn">等教务审批</span>' : x.status==='approved' ? `<span class="tag ok">已批准</span>` : x.status==='rejected' ? '<span class="tag seal">未批准</span>' : '<span class="tag mute">已撤回</span>';
@@ -304,7 +311,7 @@ function chClash(x){
 function chCard(x, forAdmin){
   const cl = forAdmin && x.status==='pending' ? chClash(x) : [];
   const c = course(x.course_id) || {}, who = forAdmin ? `<b>${esc(x.by_name)}</b> · ${esc(stu(c.student_id).name)} ${c.subject?subjTag(c.subject):''}` : `<b>${esc(stu(c.student_id).name)}</b> ${c.subject?subjTag(c.subject):''}`;
-  return `<div class="li li-ch ${cl.length?'li-clash':''}"><span class="tag ${x.kind==='delete'?'seal':x.kind==='add'?'blue':'warn'}">${chKind[x.kind]}</span><div class="grow">${who}<br><span class="small">${chText(x)}</span>
+  return `<div class="li li-ch ${cl.length?'li-clash':''}"><span class="tag ${x.kind==='delete'?'seal':x.kind==='add'?'blue':'warn'}">${chLabel(x)}</span><div class="grow">${who}<br><span class="small">${chText(x)}</span>
     ${cl.length ? `<div class="ch-clash">撞课：${cl.map(esc).join('；')}</div>` : ''}
     ${x.status!=='pending' && x.status!=='withdrawn' ? `<div class="xs" style="color:${x.status==='approved'?'var(--ok)':'var(--seal)'}">${x.status==='approved'?'已批准':'未批准'}（${esc(x.handled_by||'')}）${x.result?'：'+esc(x.result):''}${x.reply?'：'+esc(x.reply):''}</div>`:''}</div>
     ${x.status==='pending' ? (forAdmin ? `<span class="row"><button class="btn sm" data-act="ch-no" data-v="${x.id}">不批准</button><button class="btn pri sm" data-act="ch-ok" data-v="${x.id}">批准</button></span>` : `<span class="row">${chStatus(x)}<button class="btn sm" data-act="ch-withdraw" data-v="${x.id}">撤回</button></span>`) : (forAdmin ? '' : `<span class="row">${chStatus(x)}<button class="btn sm" data-act="ch-seen" data-v="${x.id}">知道了</button></span>`)}</div>`;
@@ -813,7 +820,7 @@ function lessonModal(id){
   <dt>本节内容</dt><dd id="tp-view">${l.topic?esc(l.topic):'<span class="muted">还没写</span>'}${canSched()?` <button class="btn sm" data-act="topic" data-v="${l.id}">${l.topic?'修改':'填写'}</button>`:''}</dd>
   <dt>状态</dt><dd>${st} ${l.makeup?'<span class="tag blue">补课</span>':''} ${l.moved?'<span class="tag warn">调过课</span>':''}${l.moved && canSched() && (!f || isTop()) ? ` <button class="btn sm" data-act="unmove" data-v="${l.id}">取消调课标记</button>` : ''}${canSched() && (!f || isTop()) ? ` <button class="btn sm" data-act="makeup" data-v="${l.id}|${l.makeup?0:1}">${l.makeup?'取消补课标记':'标为补课'}</button>` : ''}</dd>${l.note?`<dt>备注</dt><dd>${esc(l.note)}</dd>`:''}
   ${l.status==='leave'?`<dt>扣学生课时</dt><dd class="num">${l.deduct} 小时（老师照发）</dd>`:''}${l.actual_note?`<dt>时长说明</dt><dd>${esc(l.actual_note)}</dd>`:''}${(isDone(l)||isPend(l)) && !t.staff?`<dt>反馈</dt><dd>${f?(f.status==='approved'?'已审批':'待审批'):l.has_fb?'已写':'<span class="tag warn">老师未写</span>'}</dd>`:''}
-  ${q?`<dt>申请</dt><dd>${reqLine(q)}</dd>`:''}${chPendOf(l.id)?`<dt>老师申请</dt><dd><span class="tag warn">${chKind[chPendOf(l.id).kind]}待审批</span> <span class="small">${chText(chPendOf(l.id))}</span></dd>`:''}</dl>
+  ${q?`<dt>申请</dt><dd>${reqLine(q)}</dd>`:''}${chPendOf(l.id)?`<dt>老师申请</dt><dd><span class="tag warn">${chLabel(chPendOf(l.id))}待审批</span> <span class="small">${chText(chPendOf(l.id))}</span></dd>`:''}</dl>
   ${isAdmin() && l.date<=TODAY && l.status!=='leave' ? `<section class="card" style="display:flex;flex-direction:column;gap:8px"><b>上课确认</b>
     ${l.status==='cancelled' ? `<div class="row"><span class="muted small">这节课已取消，不计课时。</span><button class="btn sm" data-act="lstate" data-v="${l.id}|reset">恢复这节课</button></div>` : `
     <div class="fields"><label class="field"><span>实际上课时长（小时）</span><input type="number" id="ls-h" min="0.5" max="8" step="0.5" value="${realH(l)}"></label>
