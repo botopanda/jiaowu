@@ -95,12 +95,14 @@ document.addEventListener('click', async e => {
   const [sid, ym] = a.dataset.v.split('|'), ids = {content: 'rv-content', teacher_eval: 'rv-teacher', talk: 'rv-talk', conclusion: 'rv-concl', next_focus: 'rv-next'};
   const has = ['rv-teacher', 'rv-talk', 'rv-concl', 'rv-next'].some(id => (document.getElementById(id)?.value || '').trim());
   if (has && !confirm('框里已经有内容了，用 AI 写的草稿替换吗？（替换后不保存的话，原来的内容不会丢）')) return;
+  const before = Object.fromEntries(Object.values(ids).map(id => [id, document.getElementById(id)?.value ?? '']));   // 记下现在的，等的时候改过的不替换（2026-11-21）
   a.disabled = true; const old = a.textContent; a.textContent = 'AI 正在看材料、写草稿…（大约半分钟）';
   try {
     const j = await reviewAI(sid, ym);
     if (document.querySelector('[data-act="rv-save"]')?.dataset.v !== `${sid}|${ym}`) { toast('AI 草稿没有填：你已经换到别的学生或月份了。回到原来那份再点一次「AI 生成」', true); return; }   // 2026-11-19
-    Object.entries(ids).forEach(([k, id]) => { const el = document.getElementById(id); if (el && j.review[k]) { el.value = j.review[k]; el.style.height = 'auto'; el.style.height = el.scrollHeight + 4 + 'px'; } });   // 框跟着内容变高，方便通读
-    toast(`AI 草稿填好了${j.images ? `（看了 ${j.images} 张作业图片）` : ''}，看过改过再点「保存」`);
+    const kept = [];
+    Object.entries(ids).forEach(([k, id]) => { const el = document.getElementById(id); if (el && j.review[k] && el.value !== before[id]) { kept.push(id); return; } if (el && j.review[k]) { mroot.dataset.dirty = '1'; el.value = j.review[k]; el.style.height = 'auto'; el.style.height = el.scrollHeight + 4 + 'px'; } });   // 框跟着内容变高，方便通读
+    toast(`AI 草稿填好了${j.images ? `（看了 ${j.images} 张作业图片）` : ''}，看过改过再点「保存」${kept.length ? `。有 ${kept.length} 栏你在等的时候改过，没有替换` : ''}`);
   } catch(err) { toast('AI 没写出来：' + err.message, true); }
   finally { a.disabled = false; a.textContent = old; }
 });
@@ -109,6 +111,7 @@ document.addEventListener('click', async e => {
    AI 写月度家长反馈时，把这里当长期要求、优先遵守。存在数据库 app.settings 的 ai_review_rules */
 function pgAiRules(){
   const mine = curBook() === 'mine', txt = mine ? (RVX.rules_mine || '') : (RVX.rules || '');   // 第 59 步：两本账各一份
+  if (!RVX.ok) return `<div class="ph"><h2>AI 写法要求</h2></div><div class="note warn"><b>写法要求这次没读出来。</b>为了不把原来写的冲掉，现在先不能改。请刷新页面再看。</div><div class="row"><button class="btn" onclick="location.reload()">刷新</button></div>`;   // 2026-11-21
   return `<div class="ph"><h2>AI 写法要求</h2></div>
   <div class="note">点「AI 生成」写月度家长反馈时，AI 会把这里的要求当成长期规矩，<b>优先遵守</b>。一行写一条，比如怎么称呼学生、哪些事不要写给家长、语气。${ownerUI() ? (mine ? '<br><b>这是 Panda 学生用的一份。</b>' : '<br><b>这是 Project K 学生用的一份；Panda 学生用的切到「Panda」视图里改。</b>') : ''}</div>
   <section class="card" style="display:flex;flex-direction:column;gap:8px">
@@ -118,5 +121,6 @@ function pgAiRules(){
 }
 document.addEventListener('click', async e => {
   if (!e.target.closest('[data-act="ai-rules-save"]')) return;
+  if (!RVX.ok) { toast('写法要求没读出来，先刷新页面再改', true); return; }
   try { await act('ai_rules_save', {txt: val('ai-rules'), ...(isOwner() ? {bk: curBook()} : {})}, '已保存，下次 AI 生成就按这个写'); } catch(err) { /* act() 已经提示过 */ }
 });

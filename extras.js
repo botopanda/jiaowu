@@ -55,10 +55,12 @@ document.addEventListener('change', async e => {
   if (!el.dataset || el.dataset.change !== 'file-up' || !el.files.length) return;
   const files = [...el.files], purpose = el.dataset.purpose, ref = el.dataset.ref;
   document.body.classList.add('busy'); toast(`正在上传 ${files.length} 个文件…`);
+  const fails = [];
   try {
-    for (const f of files) await uploadOne(f, purpose, ref);
-    await load(); render(); reopenModal();
-    toast({hw: '作业已上传，老师能看到了', hwref: '作业图片已上传，学生能看到了', ck: '作品已上传', cv: '简历已上传', cvp: '照片已更新', cvw: '作品已上传'}[purpose] || '已上传，学生能看到了');
+    for (const f of files) { try { await uploadOne(f, purpose, ref); } catch(err) { fails.push(`「${f.name}」${err.message}`); } }
+    try { await load(); render(); reopenModal(); } catch(err) {}
+    if (fails.length) toast(`${files.length - fails.length} 个传上了，${fails.length} 个没传上：${fails.join('；')}。只要再选没传上的那几个就行`, true, 9000);
+    else toast({hw: '作业已上传，老师能看到了', hwref: '作业图片已上传，学生能看到了', ck: '作品已上传', cv: '简历已上传', cvp: '照片已更新', cvw: '作品已上传'}[purpose] || '已上传，学生能看到了');
   } catch(err) { toast(err.message, true); }
   finally { document.body.classList.remove('busy'); el.value = ''; }
 });
@@ -82,11 +84,12 @@ function payBadge(tid, ym){
 // 第 59 步：结算时把这个月这位老师的逐节明细存下来（时长、单价、金额），以后改了课也看得出当时发了多少
 function payDetail(tid, ym){
   const rows = lsOfT(tid).filter(l => l.date.startsWith(ym) && paidH(l) > 0).map(l => { const c = course(l.course_id);
-    return {id: l.id, d: l.date, s: l.start, e: l.end, stu: stu(c.student_id).name, subj: c.subject, h: paidH(l), rate: c.rate || 0, cur: curOf(c), st: l.status}; });
+    return {id: l.id, sid: c.student_id, d: l.date, s: l.start, e: l.end, stu: stu(c.student_id).name, subj: c.subject, h: paidH(l), rate: c.rate || 0, cur: curOf(c), st: l.status}; });
   const amt = {}; rows.forEach(r => amt[r.cur] = (amt[r.cur] || 0) + curRound(r.h * r.rate, r.cur));
   return {v: 1, h: +rows.reduce((a, r) => a + r.h, 0).toFixed(2), amt, rows};
 }
-const payAmtTxt = a => sumMoney(Object.entries(a || {}).map(([c, v]) => [v, c]));
+const payNum = x => Number.isFinite(+x) ? +x : 0, payCur = c => c === 'JPY' ? 'JPY' : 'CNY';   // 2026-11-21：明细里的数字一律当数字显示
+const payAmtTxt = a => sumMoney(Object.entries(a && typeof a === 'object' ? a : {}).map(([c, v]) => [payNum(v), payCur(c)]));
 // 结算以后又改了课（时长、单价、删课、补课）：和存下的明细比
 function payDiff(tid, ym){
   if (isOwner() && S.book === 'all') return null;   // 「全部」视图把两本账加在一起，不和单本账的明细比
@@ -99,16 +102,16 @@ function payDiff(tid, ym){
 const payDiffTag = (tid, ym) => payDiff(tid, ym) ? '<span class="tag seal">结算后有改动</span>' : '';
 function payDiffBox(tid, ym){
   const x = payDiff(tid, ym); if (!x) return '';
-  const one = r => `${sMD(r.d)} ${esc(r.s)} ${esc(r.stu)} ${esc(r.subj)} ${r.h} 小时 × ${money(r.rate, r.cur)}`;
-  return `<div class="note warn" style="margin-top:8px"><b>结算以后，这个月的课有改动。</b>结算时：${payAmtTxt(x.was.amt)}（${x.was.rows.length} 节 ${x.was.h} 小时）；现在按课表算：${payAmtTxt(x.now.amt)}（${x.now.rows.length} 节 ${x.now.h} 小时）。
+  const one = r => `${esc(sMD(String(r.d || '')))} ${esc(r.s)} ${esc(r.stu)} ${esc(r.subj)} ${payNum(r.h)} 小时 × ${money(payNum(r.rate), payCur(r.cur))}`;
+  return `<div class="note warn" style="margin-top:8px"><b>结算以后，这个月的课有改动。</b>结算时：${payAmtTxt(x.was.amt)}（${x.was.rows.length} 节 ${payNum(x.was.h)} 小时）；现在按课表算：${payAmtTxt(x.now.amt)}（${x.now.rows.length} 节 ${x.now.h} 小时）。
     ${x.gone.length ? `<div>结算时有、现在没有了：${x.gone.map(one).join('；')}</div>` : ''}${x.added.length ? `<div>结算以后多出来的：${x.added.map(one).join('；')}</div>` : ''}
-    ${x.changed.length ? `<div>改了时长或单价：${x.changed.map(r => { const w = x.was.rows.find(y => y.id === r.id); return `${sMD(r.d)} ${esc(r.stu)} ${w.h} 小时 × ${money(w.rate, w.cur)} → ${r.h} 小时 × ${money(r.rate, r.cur)}`; }).join('；')}</div>` : ''}
+    ${x.changed.length ? `<div>改了时长或单价：${x.changed.map(r => { const w = x.was.rows.find(y => y.id === r.id); return `${esc(sMD(String(r.d || '')))} ${esc(r.stu)} ${payNum(w.h)} 小时 × ${money(payNum(w.rate), payCur(w.cur))} → ${payNum(r.h)} 小时 × ${money(payNum(r.rate), payCur(r.cur))}`; }).join('；')}</div>` : ''}
     <div class="muted xs">已经发出去的按结算时的算。要按现在的重新算，点「撤销结算」再结算一次；或者差额放到下个月补。</div></div>`;
 }
 function payButtons(tid, ym){
   if (isOwner() && S.book === 'all') return '<span class="muted xs">右上角切到「Project K」或「Panda」再审核、结算</span>';
   const p = payOf(tid, ym);
-  if (p.settled_at) return `<span class="muted xs">${esc(p.settled_by || '')} ${p.settled_at.slice(5,10).replace('-','/')} 结算</span><button class="btn sm" data-act="pay" data-v="${tid}|${ym}|settled|0">撤销结算</button>`;
+  if (p.settled_at) return `<span class="muted xs">${esc(p.settled_by || '')} ${bjAt(p.settled_at).slice(5,10).replace('-','/')} 结算</span><button class="btn sm" data-act="pay" data-v="${tid}|${ym}|settled|0">撤销结算</button>`;
   if (p.reviewed_at) return `<span class="muted xs">${esc(p.reviewed_by || '')} 已审核</span><button class="btn gold sm" data-act="pay" data-v="${tid}|${ym}|settled|1">结算完成</button><button class="btn sm" data-act="pay" data-v="${tid}|${ym}|reviewed|0">撤销审核</button>`;
   return `<button class="btn pri sm" data-act="pay" data-v="${tid}|${ym}|reviewed|1">审核通过</button>`;
 }
@@ -181,7 +184,7 @@ function pgBackup(){
       <div class="stat"><small>课次</small><b>${all.lessons.length}</b></div><div class="stat"><small>课后反馈</small><b>${all.feedbacks.length}</b></div></div>
     <div class="row"><button class="btn pri" data-act="backup">导出全部数据（下载备份文件）</button>
       <span class="muted small">${last ? `上次导出：${esc(last)}` : '还没有导出过'}</span></div>
-    <div class="muted xs">包括：学生、老师、课程、课表、反馈、作业、请假申请、月计划、成绩、出愿目标、月度家长反馈（含面谈原始纪要、任课老师说的）、跟进记录、通关点检表、院校库、链接、AI 写法要求。<br>
+    <div class="muted xs">包括：学生、老师、课程、课表、反馈、作业、请假申请、月计划、成绩、出愿目标、月度家长反馈（含面谈原始纪要、任课老师说的）、跟进记录、通关点检表、院校库、链接、AI 写法要求、老师履历（照片和文件只记地址）、学生留言、单词记录、点检模板内容。<br>
       上传的照片和 PDF 本身不在这个文件里（文件里只记录它们的地址），照片仍然保存在服务器上。${isOwner() && S.book !== 'all' ? '<br><b>注意：</b>现在是「' + (S.book === 'mine' ? 'Panda' : 'Project K') + '」视图，导出的仍然是全部数据。' : ''}</div>
   </section>`;
 }
@@ -194,7 +197,9 @@ document.addEventListener('click', async e => {
     try { schools = await rpc('programs_load') || []; } catch(err) { throw new Error('院校库没读出来（' + err.message + '），请稍后再试'); }
     try { checks = await rpc('checks_load'); } catch(err) { throw new Error('通关点检表没读出来（' + err.message + '），请稍后再试'); }
     if (isAdmin()) { await rvxLoad(); if (!RVX.ok) throw new Error('面谈原始纪要没读出来，请稍后再试'); }
-    const data = {exported_at: new Date().toISOString(), by: ME().name, system: '学生教务管理系统', data: DB_ALL || DB, checklists: checks, schools, review_raw: RVX.raw || [], ai_review_rules: RVX.rules || '',
+    const need = async (fn, label) => { try { return await rpc(fn); } catch(err) { throw new Error(label + '没读出来（' + err.message + '），请稍后再试'); } };
+    const teacher_cv = await need('cv_load', '老师履历'), messages = await need('msg_load', '学生留言'), words = await need('word_load', '单词记录'), lesson_changes = await need('changes_load', '老师排课申请');
+    const data = {exported_at: new Date().toISOString(), by: ME().name, system: '学生教务管理系统', data: Object.assign({}, DB_ALL || DB, {changes: lesson_changes}), checklists: checks, schools, review_raw: RVX.raw || [], ai_review_rules: RVX.rules || '', teacher_cv, messages, words,
       ...(isOwner() ? {ai_review_rules_mine: RVX.rules_mine || ''} : {})};
     const blob = new Blob([JSON.stringify(data, null, 1)], {type: 'application/json'});
     const day = TODAY || new Date().toISOString().slice(0, 10);

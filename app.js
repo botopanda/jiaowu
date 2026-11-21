@@ -7,16 +7,27 @@ const SB_URL = 'https://euwsrpppykescwflgtgu.supabase.co';
 const SB_KEY = 'sb_publishable_Lgyp6nefs88z4X01-1v3wA_gPJNl8fW';   // 公开用的大门钥匙，本来就放在网页里
 
 /* ───────── 专属钥匙：链接里的 ?k=，本机记住一份 ───────── */
-// 「打开看看」（2026-11-19，数据库第 61 步）：教务·管理在「链接与权限」点开别人的链接，地址是 ?k=那条链接&peek=1。
-//   这一页只能看、不能改，不记那条链接的「最近打开」；本机记住的仍是管理自己的链接（不会被换掉）
-const PEEK = new URLSearchParams(location.search).get('peek') === '1';
+// 「打开看看」（2026-11-19，数据库第 61、63 步）：教务·管理在「链接与权限」点开别人的页面，地址是 ?peek=那个人的编号（不带对方的链接）。
+//   打开时先用本机记住的管理链接向数据库换对方的钥匙（只放在这一页里）；这一页只能看、不能改，不记「最近打开」，本机记住的仍是管理自己的链接
+const PEEK_PID = new URLSearchParams(location.search).get('peek') || '';
+const PEEK = !!PEEK_PID;
 let PEEK_ADMIN = ''; if (PEEK) { try { PEEK_ADMIN = localStorage.getItem('jw_k') || ''; } catch(e) {} }
 const PEEK_OK = new Set(['app_load_peek', 'changes_load', 'checks_load', 'cv_load', 'msg_load', 'word_load', 'review_raw_load', 'admin_short_links', 'programs_load', 'change_log_load', 'backup_status', 'ping']);
+// 2026-11-21：链接里带来的新钥匙先不记，打开成功了才记（打不开的不会把这台设备原来记住的身份冲掉）
+let KEY_NEW = '';
 function readKey(){
+  if (PEEK) return '';   // 「打开看看」：钥匙在 readPeek 里核对完管理身份再拿
   const q = new URLSearchParams(location.search).get('k');
-  try { if (q && !PEEK) localStorage.setItem('jw_k', q); } catch(e) {}
-  if (q) return q;
+  if (q) { KEY_NEW = q; return q; }
   try { return localStorage.getItem('jw_k') || ''; } catch(e) { return ''; }
+}
+async function readPeek(){
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/rpc/peek_key`, {method:'POST', headers:{apikey: SB_KEY, 'Content-Type':'application/json'}, body: JSON.stringify({ak: PEEK_ADMIN, pid: PEEK_PID})});
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j) return (j && j.message) || '网络不太稳定，请稍后再试';
+    KEY = j; return '';
+  } catch(e) { return '网络不太稳定，请稍后再试'; }
 }
 let KEY = readKey();
 // 短链接：?s=10 位短代号（教务·管理复制时用）；还没有短代号的就给长链接
@@ -25,13 +36,13 @@ const linkOf = key => SHORT[key] ? `${location.origin}${location.pathname}?s=${S
 // 打开短链接：先用短代号换出钥匙，本机记住
 async function readShort(){
   const sq = new URLSearchParams(location.search).get('s');
-  if (!sq) return true;
+  if (!sq || PEEK) return true;
   try {
     const r = await fetch(`${SB_URL}/rest/v1/rpc/short_key`, {method:'POST', headers:{apikey: SB_KEY, 'Content-Type':'application/json'}, body: JSON.stringify({s: sq})});
     if (!r.ok) return r.status >= 500 ? 'net' : false;   // 2026-11-19：服务器临时出错（5xx）不当成链接失效，不清掉本机记住的身份
     const k = await r.json();
     if (!k) return false;
-    KEY = k; try { localStorage.setItem('jw_k', k); } catch(e) {}
+    KEY = k; KEY_NEW = k;   // 打开成功以后才记住
     return true;
   } catch(e) { return 'net'; }   // 网络出错：不能接着用这台设备上次记住的身份
 }
@@ -215,19 +226,26 @@ function monthStats(sid, ym){
 const latestHw = sid => DB.courses.filter(c => c.student_id===sid).map(c => DB.feedbacks.filter(f => L(f.lesson_id).course_id===c.id && hasHw(f)).slice(-1)[0]).filter(Boolean);   // 2026-11-19：写「无」的不算
 
 let lastLoad = 0, LOAD_ERRS = [], LOAD_STALE = 0;
+// 有填了一半没保存的内容（弹窗里或页面上），刷新前先问一句（2026-11-21）
+const unsavedAsk = () => !((document.getElementById('modal-root')?.dataset.dirty) || (typeof S !== 'undefined' && S.dirtyMain)) || confirm('有填了一半还没保存的内容，刷新会丢掉。确定刷新吗？');
+// B低3 页面一直开着、过了北京时间半夜 12 点：自动换成新的一天（2026-11-21）
+setInterval(() => { if (typeof DB === 'undefined' || !DB || !TODAY) return; if (new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10) !== TODAY) refresh(0); }, 60000);
 // 2026-11-19：有几样没读出来、或者后台刷新失败时，顶上说一声（不然页面上看着像「没有」）
 function loadBar(){
   const old = document.getElementById('load-bar'); if (old) old.remove();
   if (!LOAD_ERRS.length && !LOAD_STALE) return;
   const d = document.createElement('div'); d.id = 'load-bar'; d.className = 'upd-bar load-bar'; d.setAttribute('role', 'status');
   d.innerHTML = `<span>${LOAD_ERRS.length ? `有几样没读出来：${esc(LOAD_ERRS.join('、'))}，页面上这几处可能是空的` : `网络不太稳定，页面上是 ${esc(new Date(LOAD_STALE + 8 * 3600e3).toISOString().slice(11, 16))} 读的，最新的改动可能还没显示`}</span><button type="button" class="upd-go">刷新</button><button type="button" class="upd-x" aria-label="先不管" title="先不管">✕</button>`;
-  d.querySelector('.upd-go').onclick = () => location.reload();
+  d.querySelector('.upd-go').onclick = () => { if (unsavedAsk()) location.reload(); };
   d.querySelector('.upd-x').onclick = () => d.remove();
   document.body.appendChild(d);
 }
+let LOAD_SEQ = 0;
 async function load(){
   // 2026-11-19：先读进 D，全部读完才一起换成 DB；读的过程中页面还用上一次筛好的数据（总管理在 K 视图不会一闪出两本账）
-  const D = await (PEEK ? rpc('app_load_peek', {ak: PEEK_ADMIN}) : rpc('app_load')); lastLoad = Date.now();
+  // 2026-11-21：每次读编个号，中途又开始了新的一次，这次就不用了（免得慢的旧数据盖掉刚保存后的新数据）
+  const my = ++LOAD_SEQ, stale = () => my !== LOAD_SEQ;
+  const D = await (PEEK ? rpc('app_load_peek', {ak: PEEK_ADMIN}) : rpc('app_load')); if (stale()) return; lastLoad = Date.now();
   D.changes = [];
   const errs = [];
   if (D.me.role==='admin' || D.me.role==='teacher'){ try { D.changes = await rpc('changes_load') || []; } catch(e) { errs.push('老师排课申请'); } }
@@ -238,11 +256,11 @@ async function load(){
   if (!S.month) S.month = TODAY.slice(0,7);
   if (!S.payMonth) S.payMonth = ymShift(TODAY.slice(0,7), -1);
   if (!S.teaMonth) S.teaMonth = TODAY.slice(0,7);
-  try { CK = await rpc('checks_load') || {templates: [], lists: []}; } catch(e) { CK = {templates: [], lists: []}; errs.push('通关点检'); }
-  if (typeof cvLoad === 'function') await cvLoad();   // 老师履历（teacher_cv.js）
-  if (typeof msgLoad === 'function') await msgLoad();   // 学生留言（msgs.js）
-  if (typeof wkLoad === 'function') await wkLoad();   // 今日单词记住的词（word.js）
-  if (typeof rvxLoad === 'function') await rvxLoad();   // 面谈原始纪要、AI 写法要求（track.js，只有教务）
+  try { const ck = await rpc('checks_load') || {templates: [], lists: []}; if (stale()) return; CK = ck; } catch(e) { if (stale()) return; CK = {templates: [], lists: []}; errs.push('通关点检'); }
+  if (typeof cvLoad === 'function') { await cvLoad(); if (stale()) return; }   // 老师履历（teacher_cv.js）
+  if (typeof msgLoad === 'function') { await msgLoad(); if (stale()) return; }   // 学生留言（msgs.js）
+  if (typeof wkLoad === 'function') { await wkLoad(); if (stale()) return; }   // 今日单词记住的词（word.js）
+  if (typeof rvxLoad === 'function') { await rvxLoad(); if (stale()) return; }   // 面谈原始纪要、AI 写法要求（track.js，只有教务）
   if (['admin','teacher'].includes(D.me.role) && typeof CVS_OK !== 'undefined' && !CVS_OK) errs.push('老师履历');
   if (typeof MSGS_OK !== 'undefined' && !MSGS_OK) errs.push('学生留言');
   if (typeof WK_OK !== 'undefined' && !WK_OK) errs.push('今日单词');
@@ -278,7 +296,7 @@ function showUpdateBar(v){
   const old = document.getElementById('upd-bar'); if (old) { old.dataset.v = v; return; }   // 提示还开着又出了新版本：记住最新的
   const d = document.createElement('div'); d.id = 'upd-bar'; d.className = 'upd-bar'; d.setAttribute('role', 'status'); d.dataset.v = v;
   d.innerHTML = '<span>系统有更新</span><button type="button" class="upd-go">点这里刷新</button><button type="button" class="upd-x" aria-label="先不刷新" title="先不刷新">✕</button>';
-  d.querySelector('.upd-go').onclick = () => location.reload();
+  d.querySelector('.upd-go').onclick = () => { if (unsavedAsk()) location.reload(); };
   d.querySelector('.upd-x').onclick = () => { verDismissed = d.dataset.v; d.remove(); };   // 点了 ✕：这个版本不再提醒，再有新版本才提醒
   document.body.appendChild(d);
 }
@@ -334,7 +352,8 @@ const chPendOf = lid => chPend().find(x => x.lesson_id===lid);
 const chStuck = x => !!(x.status==='pending' && x.kind!=='add' && L(x.lesson_id) && fbOf(L(x.lesson_id)));
 const chKind = {add:'排课', move:'调课', delete:'删课'};
 // 审批反馈时带上打开页面时看到的版本：老师在这之后改过的，数据库不批（第 60 步）
-const fbVers = ids => Object.fromEntries(ids.map(id => [id, (DB.feedbacks.find(f => f.id === id) || {}).ver]).filter(x => x[1]));
+// 2026-11-21：版本按「画在屏幕上 / 勾选的时候」的，不按点击时内存里最新的（后台刷新了但页面没重画时，按的是你看到的那一版）
+const fbVers = ids => Object.fromEntries(ids.map(id => [id, (S.selVer || {})[id] || (DB.feedbacks.find(f => f.id === id) || {}).ver]).filter(x => x[1]));
 const tShow = t => esc(t);   // 申请里的时间是老师那边发来的，显示前一定转义（体检 C-01）
 function chText(x){
   if (x.kind==='add'){ const ds = x.d.dates || []; return `${ds.length} 节：${ds.slice(0,8).map(sMD).join('、')}${ds.length>8?' 等':''} · ${tShow(x.d.st)}–${tShow(x.d.et)}${x.d.makeup?' · 补课':''}${x.d.kind?` · ${esc(x.d.kind)}`:''}${x.d.topic?` · 内容：${esc(x.d.topic)}`:''}${x.d.murl?` · 已填上课链接${ds.length>1?(x.d.mall?'（每节都用）':'（只填第一节）'):''}`:''}`; }
@@ -359,7 +378,7 @@ const chStatus = x => x.status==='pending' ? '<span class="tag warn">等教务�
 // 老师申请会不会撞课（网页先查一遍给教务看；批准时数据库还会再严格查）
 // 返回 ['11/21 老师已有 朴世珍 的课 19:00–21:00', …]；也查「两条待批申请互相撞」
 function chClash(x){
-  const all = (typeof DB_ALL !== 'undefined' && DB_ALL) || DB, cOf = id => all.courses.find(c => c.id===id), c = cOf(x.course_id);
+  const all = (ownerUI() && typeof DB_ALL !== 'undefined' && DB_ALL) || DB, cOf = id => all.courses.find(c => c.id===id), c = cOf(x.course_id);   // K 视图只看 K（2026-11-21）
   if (!c || x.kind==='delete') return [];
   const slots = x.kind==='add' ? (x.d.dates||[]).map(d => [String(d).slice(0,10), tShow(x.d.st), tShow(x.d.et), null])
     : (x.d.date || x.d.start || x.d.end) && x.old ? [[x.d.date || x.old.date, x.d.start || x.old.start, x.d.end || x.old.end, x.lesson_id]] : [];
@@ -561,14 +580,14 @@ function fbCard(f, o={}){
   const sec = (k,t) => edit ? `<label class="field"><span>${t}</span><textarea id="ed-${k}-${f.id}">${esc(f[k])}</textarea></label>` : `<div class="sec"><b>${t}</b><p>${esc(f[k])}</p></div>`;
   return `<article class="card fb">${f.status==='approved' ? `<div class="stamp" aria-label="已审批">已审</div>`:''}
     <div class="row" style="padding-right:${f.status==='approved'?'64px':'0'}">
-      ${o.check && f.status==='pending' ? `<input type="checkbox" class="chk" id="sel-${f.id}" data-act="sel" data-v="${f.id}" ${S.sel.has(f.id)?'checked':''} aria-label="选择这条">`:''}
+      ${o.check && f.status==='pending' ? `<input type="checkbox" class="chk" id="sel-${f.id}" data-act="sel" data-v="${f.id}" data-ver="${esc(f.ver||'')}" ${S.sel.has(f.id)?'checked':''} aria-label="选择这条">`:''}
       <b>${esc(stu(c.student_id).name)}</b>${subjTag(c.subject)}<span class="muted small">${esc(tea(c.teacher_id).name)} · ${fmtMD(l.date)} ${l.start}–${l.end}</span></div>
     ${tagRow(f)}${sec('content','一、本节授课内容')}${sec('perf','二、学生课堂表现')}${sec('hw','三、课后作业')}${fileList(f.id,'hwref','作业图片')}${fileList(f.id,'note','上课笔记')}${fileList(f.id,'hw','学生交的作业')}${fileList(f.id,'grade','批改文件')}
     <div class="row xs"><span class="muted">上次作业</span><span class="tag ${f.last_hw==='已完成'?'ok':f.last_hw==='未完成'?'seal':'warn'}">${esc(f.last_hw||'—')}</span>
       <span class="muted">本次作业</span><span class="tag ${f.hw_fb?'ok':f.hw_sub?'blue':'mute'}">${f.hw_fb?'已批改':f.hw_sub?'已交·待批改':'未交'}</span>
       <span class="muted">学生确认</span>${confirmTag(f)}<span class="muted">${f.status==='approved'?'家长可见':'家长暂不可见'}</span></div>
     ${o.actions ? `<div class="row">${edit ? `<button class="btn pri sm" data-act="save-edit" data-v="${f.id}">保存修改</button><button class="btn sm" data-act="cancel-edit">取消</button>`
-      : f.status==='pending' ? `<button class="btn seal sm" data-act="approve" data-v="${f.id}">审批通过</button><button class="btn sm" data-act="edit" data-v="${f.id}">先修改措辞</button>`
+      : f.status==='pending' ? `<button class="btn seal sm" data-act="approve" data-v="${f.id}" data-ver="${esc(f.ver||'')}">审批通过</button><button class="btn sm" data-act="edit" data-v="${f.id}">先修改措辞</button>`
       : `<button class="btn sm" data-act="unapprove" data-v="${f.id}">撤回审批</button>`}</div>` : ''}
   </article>`;
 }
@@ -629,9 +648,9 @@ function pgPayroll(){
   const rows = DB.teachers.filter(t => !t.staff).map(t => { const ls = lsOfT(t.id).filter(l => l.date.startsWith(ym) && paidH(l)>0);
     const parts = ls.map(l => { const c = course(l.course_id); return [paidH(l)*(c.rate||0), curOf(c)]; });
     const hr = ls.reduce((a,l)=>a+paidH(l),0);
-    return {t, ls, hr, h: +hr.toFixed(2), parts, amt: sumMoney(parts), pn: lsOfT(t.id).filter(l => l.date.startsWith(ym) && isPend(l)).length}; }).filter(r => r.ls.length || r.pn);
+    return {t, ls, hr, h: +hr.toFixed(2), parts, amt: sumMoney(parts), pn: lsOfT(t.id).filter(l => l.date.startsWith(ym) && isPend(l)).length}; }).filter(r => r.ls.length || r.pn || payOf(r.t.id, ym).snap);   // 结算过的老师：课删光了也列出来，看得到差额
   const total = sumMoney(rows.flatMap(r => r.parts));
-  const months = [...new Set(DB.lessons.map(l=>l.date.slice(0,7)).concat([TODAY.slice(0,7), ymShift(TODAY.slice(0,7),-1)]))].sort().reverse();
+  const months = [...new Set(DB.lessons.map(l=>l.date.slice(0,7)).concat([TODAY.slice(0,7), ymShift(TODAY.slice(0,7),-1)], (DB.pay||[]).map(p=>p.ym)))].sort().reverse();
   return `<div class="ph"><h2>课时与工资</h2><select id="pay-m" data-change="paym">${months.map(v=>`<option value="${v}" ${v===ym?'selected':''}>${ymLabel(v)}</option>`).join('')}</select></div>
   <div class="note">只有<b>教务 · 管理</b>能看到这一页。<b>老师写了反馈（或教务标为已上课）的课才计入课时</b>，按实际上课时长算；当天请假扣学生的课时，照样计入老师工资。单价和币种（人民币 / 日元）在学生档案 → 课程里设置。每位老师每月：<b>核对课时 → 审核通过 → 结算完成</b>。</div>
   <div class="stats"><div class="stat"><small>计费课时</small><b>${+rows.reduce((a,r)=>a+r.hr,0).toFixed(2)}</b></div><div class="stat"><small>工资合计</small><b style="font-size:18px">${total}</b></div>
@@ -640,7 +659,7 @@ function pgPayroll(){
   ${rows.map(r => `<details class="card"><summary class="row"><b style="margin-right:auto;font-family:var(--f-disp)">${esc(r.t.name)}</b><span class="num small">${r.ls.length} 节 · ${r.h} 小时</span>${r.pn?`<span class="tag warn">${r.pn} 节待确认未计入</span>`:''}<b class="num">${r.amt}</b>${payBadge(r.t.id, ym)}${payDiffTag(r.t.id, ym)}<span class="muted xs">展开明细</span></summary>
     ${payDiffBox(r.t.id, ym)}
     <div class="tw" style="margin-top:8px"><table><thead><tr><th>日期</th><th>时间（北京）</th><th>学生</th><th>科目</th><th>计费</th><th>单价</th><th>金额</th><th>备注</th></tr></thead><tbody>
-    ${r.ls.map(l=>{const c=course(l.course_id);return `<tr><td class="num">${sMD(l.date)}</td><td class="num">${l.start}–${l.end}</td><td>${esc(stu(c.student_id).name)}</td><td>${subjTag(c.subject)}</td><td class="num">${paidH(l)}h</td><td class="num">${rateTxt(c)}</td><td class="num">${money(paidH(l)*(c.rate||0), curOf(c))}</td><td class="xs">${l.status==='leave'?'<span class="tag seal">当天请假</span> ':''}${l.done_manual&&!l.has_fb&&!fbOf(l)?'<span class="tag mute">教务确认</span> ':''}${hrsTag(l)} ${esc(l.actual_note||'')} ${esc(l.note)}</td></tr>`}).join('')}
+    ${r.ls.map(l=>{const c=course(l.course_id);return `<tr><td class="num">${sMD(l.date)}</td><td class="num">${l.start}–${l.end}</td><td>${esc(stu(c.student_id).name)}</td><td>${subjTag(c.subject)}</td><td class="num">${+paidH(l).toFixed(2)}h</td><td class="num">${rateTxt(c)}</td><td class="num">${money(paidH(l)*(c.rate||0), curOf(c))}</td><td class="xs">${l.status==='leave'?'<span class="tag seal">当天请假</span> ':''}${l.done_manual&&!l.has_fb&&!fbOf(l)?'<span class="tag mute">教务确认</span> ':''}${hrsTag(l)} ${esc(l.actual_note||'')} ${esc(l.note)}</td></tr>`}).join('')}
     </tbody></table></div><div class="row" style="margin-top:8px"><button class="btn sm" data-act="copy-pay" data-v="${r.t.id}">复制课时清单（发给老师核对）</button><span style="margin-left:auto" class="row">${payButtons(r.t.id, ym)}</span></div></details>`).join('')}`;
 }
 
@@ -668,7 +687,7 @@ function pgLinks(){
       <td class="small">${esc(scopeTxt(p))}${p.role==='admin'&&p.level!=='top'?` <button class="btn sm" data-act="scope-edit" data-v="${p.id}">改范围</button>`:''}</td>
       <td class="small">${seenTxt(p)}${p.last_seen || (p.devices||[]).length ? ` <button class="btn sm" data-act="seen-clear" data-v="${p.id}" title="清掉这条链接的最近打开时间和设备">清除</button>` : ''}</td>
       <td>${p.active?'<span class="tag ok">启用</span>':'<span class="tag seal">已停用</span>'}</td>
-      <td><div class="row"><button class="btn sm" data-act="copy-link" data-v="${p.key}" ${p.active?'':'disabled'}>复制链接</button>${p.id!==ME().id && p.active ? `<button class="btn sm" data-act="peek" data-v="${p.key}" title="用这个人的身份看他的页面：只能看，不留登录记录">打开看看</button>` : ''}<button class="btn sm" data-act="link-regen" data-v="${p.id}">重新生成</button>${ownerLinkToggle(p)}
+      <td><div class="row"><button class="btn sm" data-act="copy-link" data-v="${p.key}" ${p.active?'':'disabled'}>复制链接</button>${p.id!==ME().id && p.active ? `<button class="btn sm" data-act="peek" data-v="${p.id}" title="用这个人的身份看他的页面：只能看，不留登录记录">打开看看</button>` : ''}<button class="btn sm" data-act="link-regen" data-v="${p.id}">重新生成</button>${ownerLinkToggle(p)}
         ${p.id===ME().id?'':`<button class="btn sm ${p.active?'danger':''}" data-act="link-toggle" data-v="${p.id}">${p.active?'停用':'恢复'}</button><button class="btn sm danger" data-act="link-del" data-v="${p.id}">删除</button>`}</div></td></tr>`).join('')}
   </tbody></table></div></section>` : ''; }).join('')}`;
 }
@@ -834,7 +853,7 @@ function tMe(t){
   return `${typeof meetSelfCard==='function' ? meetSelfCard(t) : ''}<h3 class="dg" style="margin-top:0">我的履历</h3>${cvView(t)}
   <section class="card"><div class="row" style="margin-bottom:4px"><h3 style="font-size:16px;margin-right:auto">课时记录</h3><select id="tea-m" data-change="team">${months.map(v=>`<option value="${v}" ${v===S.teaMonth?'selected':''}>${ymLabel(v)}</option>`).join('')}</select></div>
   <div class="muted xs" style="margin-bottom:4px">自动记录，不用再整理清单发给教务。${ls.length?` 这个月：${payBadge(t.id, S.teaMonth)}`:''}</div>
-  ${ls.length?`<div class="list">${ls.map(l=>`<div class="li small"><span class="num">${sMD(l.date)}</span><span class="num">${timeFor(l,t.tz)}</span><span class="grow">${esc(stu(course(l.course_id).student_id).name)}</span><span class="num">${paidH(l)}h</span>${l.status==='leave'?'<span class="tag seal">请假</span>':''}</div>`).join('')}</div>
+  ${ls.length?`<div class="list">${ls.map(l=>`<div class="li small"><span class="num">${sMD(l.date)}</span><span class="num">${timeFor(l,t.tz)}</span><span class="grow">${esc(stu(course(l.course_id).student_id).name)}</span><span class="num">${+paidH(l).toFixed(2)}h</span>${l.status==='leave'?'<span class="tag seal">请假</span>':''}</div>`).join('')}</div>
   <div class="row" style="justify-content:flex-end;margin-top:4px"><b class="num">共 ${h} 小时</b></div>`:'<div class="empty">这个月还没有上完的课</div>'}</section>`;
 }
 function mpView(sid, ym){
@@ -1021,7 +1040,7 @@ function stuTabBody(id, tab){
       ${editable.length?`<div class="row"><button class="btn pri sm" data-act="mp-save" data-v="${id}|${m}">保存${+m.slice(5)}月计划</button></div>`:''}</section>`;
     body = `<div class="hint" style="margin:0">每门课每月写一句，学生和家长能看到。任课老师也可以在自己的链接里写。进度快了慢了，下个月重新写就行。</div>${edit(ym)}${edit(nx)}<section class="card"><b>${ymLabel(pv)}计划</b>${mpView(id,pv)}</section>`;
   } else if (tab==='fb') body = fbOfS(id).slice().reverse().slice(0,6).map(f=>fbCard(f)).join('') || '<div class="empty">还没有反馈</div>';
-  else body = `<div class="note">私下备注只有老师和教务能看到，学生和家长看不到。</div>${DB.notes.filter(n=>n.student_id===id).slice().reverse().map(n=>`<div class="card small"><div class="row"><b>${esc(n.author)}</b> <span class="muted">${sMD(n.created_at.slice(0,10))}</span><button class="btn sm" style="margin-left:auto" data-act="note-del" data-v="${n.id}">删除</button></div><p style="margin:4px 0 0;white-space:pre-wrap">${esc(n.text)}</p></div>`).join('')||'<div class="empty">暂无备注</div>'}
+  else body = `<div class="note">私下备注只有老师和教务能看到，学生和家长看不到。</div>${DB.notes.filter(n=>n.student_id===id).slice().reverse().map(n=>`<div class="card small"><div class="row"><b>${esc(n.author)}</b> <span class="muted">${sMD(bjAt(n.created_at).slice(0,10))}</span><button class="btn sm" style="margin-left:auto" data-act="note-del" data-v="${n.id}">删除</button></div><p style="margin:4px 0 0;white-space:pre-wrap">${esc(n.text)}</p></div>`).join('')||'<div class="empty">暂无备注</div>'}
     <textarea id="note-new" placeholder="写一条备注"></textarea><div class="row"><button class="btn sm" data-act="note-add" data-v="${id}">添加备注</button></div>`;
   return body;
 }
@@ -1043,7 +1062,7 @@ function tStuModal(cid){
   ${[ym,nx].map(m=>`<label class="field"><span>${ymLabel(m)}</span><textarea id="mp-${m}-${cid}" style="min-height:52px" placeholder="这个月要完成什么，例：日本史近代收尾，每周 1 篇记述">${esc(planText(cid,m))}</textarea></label>${typeof mpTools==='function' ? mpTools(m, cid) : ''}`).join('')}
   <div class="row"><button class="btn pri sm" data-act="t-mp-save" data-v="${cid}">保存计划</button></div>
   <b class="small">私下备注 <span class="muted xs" style="font-weight:400">只有你和教务能看到</span></b>
-  ${DB.notes.filter(n=>n.student_id===s.id).map(n=>`<div class="card small row"><span class="muted">${sMD(n.created_at.slice(0,10))}</span><span class="grow">${esc(n.text)}</span>${n.teacher_id===ME().teacher_id?`<button class="btn sm" data-act="note-del" data-v="${n.id}">删除</button>`:''}</div>`).join('')}
+  ${DB.notes.filter(n=>n.student_id===s.id).map(n=>`<div class="card small row"><span class="muted">${sMD(bjAt(n.created_at).slice(0,10))}</span><span class="grow">${esc(n.text)}</span>${n.teacher_id===ME().teacher_id?`<button class="btn sm" data-act="note-del" data-v="${n.id}">删除</button>`:''}</div>`).join('')}
   <textarea id="t-note" placeholder="例：学生最近状态不好，家长比较焦虑"></textarea><div class="row"><button class="btn sm" data-act="t-note-save" data-v="${s.id}">添加备注</button></div>`);
 }
 function reqModal(lid){
@@ -1121,9 +1140,9 @@ document.addEventListener('click', async e => {
     case 'al-mk': { const on = val('al-mk')!=='1'; document.getElementById('al-mk').value = on ? '1' : '0'; a.classList.toggle('on', on); a.setAttribute('aria-pressed', on); break; }
     case 'close': case 'close-bg': if (mroot.dataset.dirty && !confirm('填的内容还没保存，确定关掉吗？')) break; closeModal(); break;
     case 'fbtab': S.fbTab=v; S.sel.clear(); S.editing=null; render(); break;
-    case 'sel': S.sel.has(v)?S.sel.delete(v):S.sel.add(v); render(); break;
+    case 'sel': S.selVer = S.selVer || {}; if (S.sel.has(v)) { S.sel.delete(v); delete S.selVer[v]; } else { S.sel.add(v); S.selVer[v] = a.dataset.ver; } render(); break;
     case 'sel-all': { const p=DB.feedbacks.filter(f=>f.status==='pending'); if (S.sel.size===p.length) S.sel.clear(); else p.forEach(f=>S.sel.add(f.id)); render(); break; }
-    case 'approve': await act('admin_feedback_approve', {ids:[v], vers:fbVers([v])}, r => r ? '已审批，家长现在能看到这条反馈' : '老师刚改过这条反馈，请重新看一遍再批'); S.sel.delete(v); break;
+    case 'approve': await act('admin_feedback_approve', {ids:[v], vers: a.dataset.ver ? {[v]: a.dataset.ver} : fbVers([v])}, r => r ? '已审批，家长现在能看到这条反馈' : '老师刚改过这条反馈，请重新看一遍再批'); S.sel.delete(v); break;
     case 'approve-sel': { const pend=new Set(DB.feedbacks.filter(f=>f.status==='pending').map(f=>f.id)), ids=[...S.sel].filter(id=>pend.has(id));
       if (!ids.length){ S.sel.clear(); render(); toast('这一页上没有选中的反馈', true); break; }
       await act('admin_feedback_approve', {ids, vers:fbVers(ids)}, r => r === ids.length ? `已审批 ${r} 条` : `已审批 ${r} 条；另外 ${ids.length - r} 条老师刚改过，请重新看一遍再批`); S.sel.clear(); render(); break; }
@@ -1200,21 +1219,28 @@ document.addEventListener('click', async e => {
       const mt = typeof meetAddVals==='function' ? meetAddVals() : {}; if (!mt) break;
       let c = alCourse();
       if (!c){ if (ME().role==='teacher'){toast('你和这位学生还没有这门课，请先联系教务老师建立',true);break;}
-        const cid = await rpc('admin_save_course', {d:{student_id:val('al-stu'), teacher_id:alTeacher(), subject:alSubj(), rate:Number(val('al-rate'))||0, cur:val('al-cur')||'CNY'}}); c = {id:cid}; }
+        if (document.body.classList.contains('busy')) break;   // 连点：第一次还没做完
+        const nk = `${val('al-stu')}|${alTeacher()}|${alSubj()}`;
+        if (S.newCourse && S.newCourse.k === nk) c = {id: S.newCourse.id};   // 上次已经建好这门课、只是排课没成功：直接用，不再建一门
+        else { document.body.classList.add('busy');
+          try { const cid = await rpc('admin_save_course', {d:{student_id:val('al-stu'), teacher_id:alTeacher(), subject:alSubj(), rate:Number(val('al-rate'))||0, cur:val('al-cur')||'CNY'}}); c = {id:cid}; S.newCourse = {k: nk, id: cid}; }
+          finally { document.body.classList.remove('busy'); } } }
       await act('admin_add_lessons', {course:c.id, kind:alKind(), ...(val('al-topic').trim()?{topic:val('al-topic').trim()}:{}), dates:lessonDates(d, val('al-rep')), st:s, et:en, ...(val('al-mk')==='1'?{makeup:true}:{}), ...mt}, r=>r.pending?'已提交排课申请，教务批准后会出现在课表上':`已排 ${r.added} 节课`+(r.skipped?`，${r.skipped} 节和老师或学生已有的课撞了，已跳过`:'')); S.month=d.slice(0,7); closeModal(); render(); break; }
     case 'req-ok': { const q=DB.requests.find(x=>x.id===v);
       const args = q.type==='改期' ? {rid:v, accept:true, reply:'', nd:val('rq-d-'+v), ns:val('rq-s-'+v), ne:val('rq-e-'+v), deduct:0} : {rid:v, accept:true, reply:'', deduct:Number(val('rq-dd-'+v))};
       await act('admin_handle_request', args, '已处理，学生和老师都能看到结果'); break; }
     case 'req-no': await act('admin_handle_request', {rid:v, accept:false, reply:val('rq-r-'+v)}, '已回复学生'); break;
     case 'mp-save': { const [sid,m]=v.split('|'); const cs=DB.courses.filter(c=>c.student_id===sid && c.active);
-      const fails = []; document.body.classList.add('busy');
-      try { for (const c of cs) { try { await rpc('plan_save', {cid:c.id, month:m, txt:val(`mp-${m}-${c.id}`)}); } catch(e){ fails.push(`${c.subject}：${e.message}`); } } }
+      const fails = [], vals = Object.fromEntries(cs.map(c => [c.id, val(`mp-${m}-${c.id}`)])), bad = []; document.body.classList.add('busy');
+      try { for (const c of cs) { try { await rpc('plan_save', {cid:c.id, month:m, txt:vals[c.id]}); } catch(e){ fails.push(`${c.subject}：${e.message}`); bad.push(c.id); } } }
       finally { document.body.classList.remove('busy'); }
-      await load(); render(); studentModal(sid,'mp'); toast(fails.length ? `有 ${fails.length} 门没存上（${fails.join('；')}），其余已保存` : '计划已保存，学生和家长能看到', !!fails.length); break; }
-    case 't-mp-save': { const ym=TODAY.slice(0,7), fails=[]; document.body.classList.add('busy');
-      try { for (const m of [ym, ymShift(ym,1)]) { try { await rpc('plan_save', {cid:v, month:m, txt:val(`mp-${m}-${v}`)}); } catch(e){ fails.push(`${ymLabel(m)}：${e.message}`); } } }
+      await load(); render(); studentModal(sid,'mp');
+      bad.forEach(id => { const el = document.getElementById(`mp-${m}-${id}`); if (el) el.value = vals[id]; }); if (bad.length) mroot.dataset.dirty = '1';   /* 没存上的留着刚写的 */ toast(fails.length ? `有 ${fails.length} 门没存上（${fails.join('；')}），其余已保存` : '计划已保存，学生和家长能看到', !!fails.length); break; }
+    case 't-mp-save': { const ym=TODAY.slice(0,7), fails=[], ms=[ym, ymShift(ym,1)], vals=Object.fromEntries(ms.map(m => [m, val(`mp-${m}-${v}`)])), bad=[]; document.body.classList.add('busy');
+      try { for (const m of ms) { try { await rpc('plan_save', {cid:v, month:m, txt:vals[m]}); } catch(e){ fails.push(`${ymLabel(m)}：${e.message}`); bad.push(m); } } }
       finally { document.body.classList.remove('busy'); }
-      await load(); render(); tStuModal(v); toast(fails.length ? `没存上：${fails.join('；')}` : '计划已保存', !!fails.length); break; }
+      await load(); render(); tStuModal(v);
+      bad.forEach(m => { const el = document.getElementById(`mp-${m}-${v}`); if (el) el.value = vals[m]; }); if (bad.length) mroot.dataset.dirty = '1'; toast(fails.length ? `没存上：${fails.join('；')}` : '计划已保存', !!fails.length); break; }
     case 'note-add': await act('note_add', {sid:v, txt:val('note-new')}, '已保存，学生和家长看不到'); studentModal(v,'note'); break;
     case 't-note-save': { const c=DB.courses.find(x=>x.student_id===v && x.teacher_id===ME().teacher_id); await act('note_add', {sid:v, txt:val('t-note')}, '已保存，只有你和教务能看到'); if(c) tStuModal(c.id); break; }
     case 't-stu': tStuModal(v); break;
@@ -1230,6 +1256,7 @@ document.addEventListener('click', async e => {
         try { for (const fl of hwFiles) await uploadOne(fl, 'hwref', nf.id); await load(); render(); toast('反馈和作业图片都提交好了，学生已经能看到了'); }
         catch(err) { toast('反馈已提交，但作业图片没传上去：' + err.message + '。可以在下面「我写过的反馈」里补传', true); }
         finally { document.body.classList.remove('busy'); } }
+      else if (hwFiles.length) toast('反馈已提交，但作业图片还没传：页面没刷新出来。请刷新以后在「我写过的反馈」里补传', true, 8000);
       break; }
     case 'lstate': { const [id,state,from]=v.split('|'); const l=L(id);
       if (state==='done' && from==='q'){ await act('admin_lesson_state', {lid:id, state:'done'}, '已标为已上课，计入课时'); break; }
@@ -1249,7 +1276,7 @@ document.addEventListener('click', async e => {
       await act('student_request', {lid:v, typ:t, reason:why, wish}, '已提交，教务老师处理后你会在这里看到结果'); closeModal(); break; }
     case 'copy-link': copyText(linkOf(v), '链接已复制，发到对方微信就行'); break;
     case 'copy-pay': { const ls=lsOfT(v).filter(l=>l.date.startsWith(S.payMonth) && paidH(l)>0); const t=tea(v);
-      copyText(`${t.name} ${ymLabel(S.payMonth)}课时\n`+ls.map(l=>`${sMD(l.date)} ${timeFor(l,t.tz)} ${stu(course(l.course_id).student_id).name} ${paidH(l)}h${l.status==='leave'?'（当天请假）':''}${l.actual_hours!=null&&isDone(l)?`（排课 ${dur(l)}h${l.actual_note?'，'+l.actual_note:''}）`:''}`).join('\n')+`\n共 ${ls.reduce((a,l)=>a+paidH(l),0)} 小时`, '已复制，发给老师核对'); break; }
+      copyText(`${t.name} ${ymLabel(S.payMonth)}课时\n`+ls.map(l=>`${sMD(l.date)} ${timeFor(l,t.tz)} ${stu(course(l.course_id).student_id).name} ${+paidH(l).toFixed(2)}h${l.status==='leave'?'（当天请假）':''}${l.actual_hours!=null&&isDone(l)?`（排课 ${+dur(l).toFixed(2)}h${l.actual_note?'，'+l.actual_note:''}）`:''}`).join('\n')+`\n共 ${ls.reduce((a,l)=>a+paidH(l),0)} 小时`, '已复制，发给老师核对'); break; }
     case 'link-regen': { const p=DB.people.find(x=>x.id===v); const isMe=p.id===ME().id;
       const nk = await act('admin_link_update', {pid:v, d:{regen:'true'}}, `已为 ${p.name} 生成新链接，旧链接已失效`);
       if (isMe && nk){ try{localStorage.setItem('jw_k', nk);}catch(e){} location.href = linkOf(nk); } break; }
@@ -1308,15 +1335,16 @@ document.addEventListener('input', e => { if (e.target.closest?.('#modal-root'))
 
 /* ───────── 启动 ───────── */
 document.addEventListener('app-ready', async function start(){
+  if (PEEK){ const pe = await readPeek(); if (pe){ app.innerHTML = `<div class="center"><h2>「打开看看」打不开</h2><p class="muted">${esc(pe)}</p></div>`; return; } }
   const sr = await readShort();
   if (sr === 'net'){ app.innerHTML = `<div class="center"><h2>暂时打不开</h2><p class="muted">网络好像不太稳定，请稍后刷新再试。</p><p><button class="btn" onclick="location.reload()">刷新</button></p></div>`; return; }
-  if (!sr){ try{ localStorage.removeItem('jw_k'); }catch(_){} app.innerHTML = `<div class="center"><h2>这个链接已失效</h2><p class="muted">链接可能已经停用或更换。请联系教务老师重新发一条链接。</p></div>`; return; }
+  if (!sr){ app.innerHTML = `<div class="center"><h2>这个链接已失效</h2><p class="muted">链接可能已经停用或更换。请联系教务老师重新发一条链接。</p></div>`; return; }
   if (!KEY){ app.innerHTML = `<div class="center"><h2>学生教务管理系统</h2><p class="muted">请用教务老师发给你的专属链接打开。</p></div>`; return; }
-  try { await load(); render(); }
+  try { await load(); render(); if (KEY_NEW && !PEEK) { try { localStorage.setItem('jw_k', KEY_NEW); } catch(_){} } }   // 打开成功了才记住新钥匙
   catch(e){
     if (PEEK){ app.innerHTML = `<div class="center"><h2>「打开看看」打不开</h2><p class="muted">${esc(e.message)}</p></div>`; return; }   // 不动本机记住的管理链接
     const bad = /无效|停用/.test(e.message);
-    if (bad){ try{ localStorage.removeItem('jw_k'); }catch(_){} }
+    if (bad && !KEY_NEW){ try{ localStorage.removeItem('jw_k'); }catch(_){} }   // 只清掉本机原来记住、现在已经失效的那一个
     app.innerHTML = `<div class="center"><h2>${bad?'这个链接已失效':'暂时打不开'}</h2><p class="muted">${bad?'链接可能已经停用或更换。请联系教务老师重新发一条链接。':'网络好像不太稳定，请稍后刷新再试。'}</p>${bad?'':'<p><button class="btn" onclick="location.reload()">刷新</button></p>'}</div>`;
   }
 });

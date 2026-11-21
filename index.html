@@ -29,9 +29,11 @@
       document.body.appendChild(sc); })(0);
   }
   // version.txt 第一行是版本号，第二行（可选）是要加载的脚本清单——以后加新文件也不怕首页被缓存
-  fetch('version.txt?t=' + Date.now(), {cache: 'no-store'}).then(function(r){ return r.ok ? r.text() : String(Date.now()); })
-    .then(function(t){ var ls = t.split(String.fromCharCode(10)).map(function(s){ return s.trim(); }); if (ls[1] && /\.js/.test(ls[1])) files = ls[1].split(',').map(function(s){ return s.trim(); }).filter(Boolean);
-      boot(ls[0].trim() || 'x'); }).catch(function(){ boot(String(Date.now())); });
+  fetch('version.txt?t=' + Date.now(), {cache: 'no-store'}).then(function(r){ return r.ok ? r.text() : null; })
+    .then(function(t){ if (t === null) { fail(); return; } var ls = t.split(String.fromCharCode(10)).map(function(s){ return s.trim(); }); if (ls[1] && /\.js/.test(ls[1])) files = ls[1].split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+      boot(ls[0].trim() || 'x'); }).catch(function(){ fail(); });
+  // 版本清单读不到（网络不稳）：不按首页里可能过时的名单硬开，提示刷新（2026-11-21）
+  function fail(){ document.getElementById('app').innerHTML = '<div class="center"><h2>暂时打不开</h2><p>网络不太稳定，请稍后刷新再试。</p><p><button onclick="location.reload()">刷新</button></p></div>'; }
 })();
 </script>
 </body>

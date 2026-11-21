@@ -11,6 +11,8 @@ const exSwitch = on => `<div class="seg ex-sw" role="group" aria-label="排课�
   <button type="button" class="${on==='exam'?'on':''}" ${on==='exam'?'':'data-act="ex-new" data-v="al"'}>加考试</button></div>`;
 
 const exTarget = tid => (DB.targets||[]).find(x => x.id===tid);
+// 一场考试的「日期｜时间｜备注」，和数据库 app.exam_key 一样（第 63 步，用来对旧窗口）
+const exKeyOf = (t, k) => `${t[k] || ''}|${((t.exam_info || {})[k] || {}).time || ''}|${((t.exam_info || {})[k] || {}).note || ''}`;
 const exKeyLabel = k => (EXAM_KEYS.find(x => x[0]===k) || [k,k])[1];
 // 这所学校的整条考试日程：一次结果 11/25 → 面试 12/5 → 最终结果 1/7
 const exChain = (t, hi) => EXAM_KEYS.filter(([k]) => t[k]).sort((a,b) => t[a[0]].localeCompare(t[b[0]]))
@@ -25,7 +27,7 @@ function examModal(tid, date){
   openModal(`${mHead(`<b class="exk">考</b> ${esc(stu(t.student_id).name)} · ${fmtMD(date)}`)}
   <div><b style="font-family:var(--f-disp);font-size:15px">${esc(t.school)}</b>${t.exam_way?`<div class="muted small">${esc(t.exam_way)}</div>`:''}</div>
   <div class="list">${items.map(e => `<div class="li"><div class="grow"><b>${e.label}</b>${e.time?` <span class="num">${esc(e.time)}</span>`:''}${e.note?`<div class="small" style="white-space:pre-wrap">${esc(e.note)}</div>`:''}</div>
-    ${isAdmin()?`<button class="btn sm" data-act="ex-edit" data-v="${tid}|${e.kind}">修改</button><button class="btn sm danger" data-act="ex-del" data-v="${tid}|${e.kind}">删除</button>`:''}</div>`).join('')}</div>
+    ${isAdmin()?`<button class="btn sm" data-act="ex-edit" data-v="${tid}|${e.kind}">修改</button><button class="btn sm danger" data-act="ex-del" data-v="${esc(`${tid}|${e.kind}|${exKeyOf(t, e.kind)}`)}">删除</button>`:''}</div>`).join('')}</div>
   <div class="small"><span class="muted">这所学校的日程</span> ${exChain(t, date)}</div>
   ${t.next_step?`<div class="small"><span class="muted">下一步</span> ${esc(t.next_step)}</div>`:''}
   ${isAdmin()?`<div class="row"><button class="btn sm" data-act="ex-new" data-v="${date}|${t.student_id}|${tid}">＋ 这所学校再加一场</button><button class="btn sm" data-act="student-tab" data-v="${t.student_id}|target">去「升学与出愿」看这所</button></div>
@@ -46,7 +48,7 @@ function examForm(o={}){
   ${editing || o.tid ? '' : exSwitch('exam')}
   <div class="muted xs">考试记在这位学生「升学与出愿」对应的学校里，课表上用红色「考」显示，不算课。学生、家长和任课老师都能看到，备注也能看到。</div>
   <div class="fields">
-    <label class="field"><span>日期</span><input type="date" id="ex-d" value="${esc(o.date||TODAY)}" data-change="ex-warn"></label>${editing ? `<input type="hidden" id="ex-was" value="${esc(o.date||'')}">` : ''}
+    <label class="field"><span>日期</span><input type="date" id="ex-d" value="${esc(o.date||TODAY)}" data-change="ex-warn"></label>${editing ? `<input type="hidden" id="ex-was" value="${esc(o.date||'')}"><input type="hidden" id="ex-keys" value="${esc(JSON.stringify(Object.fromEntries(EXAM_KEYS.map(x => [x[0], exKeyOf(t, x[0])]))))}">` : ''}
     <label class="field"><span>学生</span><select id="ex-stu" data-change="ex-stu" ${t?'disabled':''}><option value="">选择学生…</option>${studs.map(s => `<option value="${s.id}" ${s.id===sid?'selected':''}>${esc(s.name)}</option>`).join('')}</select></label>
   </div>
   <div class="field"><span>学校</span><select id="ex-tg" data-change="ex-tg" ${t?'disabled':''}>${exTgOpts(sid, o.tid)}</select>
@@ -101,7 +103,8 @@ function exWarn(){
 async function exSave(v){
   const d = {kind: val('ex-k'), date: val('ex-d'), time: val('ex-time').trim(), note: val('ex-note').trim()};
   if (!d.date) { toast('请填日期', true); return; }
-  if (v) { const [tid, old] = v.split('|'); d.target_id = tid; d.old_kind = old; d.was = val('ex-was'); }   // 打开时的日期：别人改过了就不覆盖（第 60 步）
+  if (v) { const [tid, old] = v.split('|'); d.target_id = tid; d.old_kind = old; d.was = val('ex-was');
+    try { const ks = JSON.parse(val('ex-keys') || '{}'); if (old in ks) d.was_key = ks[old]; if (d.kind !== old && d.kind in ks) d.was_to = ks[d.kind]; } catch(e) {} }   // 打开时的日期：别人改过了就不覆盖（第 60 步）
   else {
     const tg = val('ex-tg');
     if (!val('ex-stu')) { toast('请选学生', true); return; }
@@ -140,10 +143,10 @@ document.addEventListener('click', async e => {
     if (k==='ex-edit') { const [tid, kd] = v.split('|'), t = exTarget(tid); if (t) examForm({tid, kind: kd, date: t[kd]}); }
     if (k==='ex-save') await exSave(v);
     if (k==='ex-del') {
-      const [tid, kd] = v.split('|'), t = exTarget(tid); if (!t) return;
+      const [tid, kd, ...rk] = v.split('|'), wk = rk.length ? rk.join('|') : null, t = exTarget(tid); if (!t) return;
       const d = t[kd];
       if (!confirm(`删除 ${stu(t.student_id).name}「${t.school}」${sMD(d)} 的${exLabel(t,kd)}？\n这所学校还会留在「升学与出愿」里。`)) return;
-      await act('exam_clear', {xid: tid, kd, ...(d ? {was: d} : {})}, '已删除这一场');
+      await act('exam_clear', {xid: tid, kd, ...(d ? {was: d} : {}), ...(wk !== null ? {was_key: wk} : {})}, '已删除这一场');
       examModal(tid, d);
     }
   } catch(err) { /* act() 已经提示过 */ }

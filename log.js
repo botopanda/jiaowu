@@ -86,7 +86,7 @@ const LOG_ENUM = {
 // 不显示的栏目（内部编号、文件地址这些）
 // 「审批时间」「核对时间」这些和每条上面的时间重复，也不显示（「审批人」「核对」那一项还在）
 const LOG_HIDE = new Set(['id', 'skey', 'path', 'mime', 'ref', 'by_person', 'by_teacher', 'round_id', 'program_id', 'created_by', 'checklist_id', 'view_book', 'owner',
-  'approved_at', 'reviewed_at', 'settled_at', 'handled_at', 'self_at', 'read_at']);
+  'approved_at', 'reviewed_at', 'settled_at', 'handled_at', 'self_at', 'read_at', 'snap', 'uploaded_by_id']);
 // 新增 / 删除时「看内容」里不再重复的（上面那句话已经写了是哪个学生、哪节课）
 const LOG_CTXCOL = new Set(['student_id', 'teacher_id', 'course_id', 'lesson_id', 'key']);
 // 「Project K」视图：归属、Panda 标记这些也不显示（潘、金那边数据库就不给）
@@ -218,16 +218,16 @@ document.addEventListener('click', async e => {
   else if (k === 'lg-more') logFetch(true);
   else if (k === 'lg-reload') logFetch(false);
   else if (k === 'peek') {   // 「打开看看」：新开一页（第 61 步）
-    const w = window.open(`${location.origin}${location.pathname}?k=${encodeURIComponent(v)}&peek=1`, '_blank');
+    const w = window.open(`${location.origin}${location.pathname}?peek=${encodeURIComponent(v)}`, '_blank');   // 只带对方编号（第 63 步）
     if (w) w.opener = null; else toast('浏览器拦住了新窗口，请允许这个网站弹出窗口后再点', true);
   }
   else if (k === 'seen-clear') {
     const p = (DB.people || []).find(x => x.id === v); if (!p) return;
     if (!confirm(`清除「${p.name}」的登录记录（最近打开时间、设备）？\n以后有人再打开这条链接，会重新记。`)) return;
-    try { await act('admin_seen_clear', {pid: v}, r => r ? `已清除「${p.name}」的登录记录` : '本来就没有登录记录'); LOGX.at = 0; } catch(_) {}
+    try { await act('admin_seen_clear', {pid: v, ...(isOwner() && S.book !== 'all' ? {bk: S.book} : {})}, r => r ? `已清除「${p.name}」的登录记录` : '本来就没有登录记录'); LOGX.at = 0; } catch(_) {}
   }
   else if (k === 'seen-clear-all') {
-    if (!confirm('把全部链接的登录记录（最近打开时间、设备）都清掉？\n适合自己点开学生、老师的链接看过以后用。以后谁再打开链接，会重新记。' + (ownerUI() ? '\n不管现在是哪个视图，Project K 和 Panda 两边的链接都会清掉。' : '') + '\n（你现在用的这条也会清掉，然后马上重新记上）')) return;
-    try { await act('admin_seen_clear', {}, r => r ? `已清除 ${r} 条链接的登录记录` : '本来就没有登录记录'); LOGX.at = 0; } catch(_) {}
+    if (!confirm('把全部链接的登录记录（最近打开时间、设备）都清掉？\n适合自己点开学生、老师的链接看过以后用。以后谁再打开链接，会重新记。' + (ownerUI() ? (S.book === 'mine' ? '\n只清 Panda 这一边的链接。' : '\nProject K 和 Panda 两边的链接都会清掉。') : '') + '\n（你现在用的这条也会清掉，然后马上重新记上）')) return;
+    try { await act('admin_seen_clear', isOwner() && S.book !== 'all' ? {bk: S.book} : {}, r => r ? `已清除 ${r} 条链接的登录记录` : '本来就没有登录记录'); LOGX.at = 0; } catch(_) {}
   }
 });

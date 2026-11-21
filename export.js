@@ -125,7 +125,7 @@ const mrBtn = sid => `<button class="btn sm" data-act="mr" data-v="${sid}">æœˆæŠ
 
 async function mrCanvas(sid, ym){
   const s = stu(sid), [y, m] = ym.split('-').map(Number), st = monthStats(sid, ym);
-  const done = lsOfS(sid).filter(l => l.date.startsWith(ym) && isDone(l)), hrs = +done.reduce((a, l) => a + realH(l), 0).toFixed(1);
+  const done = lsOfS(sid).filter(l => l.date.startsWith(ym) && isDone(l)), hrs = +done.reduce((a, l) => a + realH(l), 0).toFixed(2);
   const fbs = fbOfS(sid).filter(f => f.status === 'approved' && L(f.lesson_id).date.startsWith(ym));
   const W = 750, P = 32, F = getComputedStyle(document.body).fontFamily || 'sans-serif', font = (px, b) => `${b ? 600 : 400} ${px}px ${F}`;
   const k = 2, cv = document.createElement('canvas'); cv.width = W * k; cv.height = 4000 * k;
