@@ -554,9 +554,8 @@ function reqChBody(){
   <section class="card"><div class="list">${cp.length ? cp.map(x => chCard(x, true)).join('') : '<div class="empty">没有待审批的老师申请</div>'}</div>
     ${cd.length ? `<details style="margin-top:6px"><summary class="muted small">最近处理过的 ${cd.length} 条</summary><div class="list">${cd.map(x => chCard(x, true)).join('')}</div></details>` : ''}</section>`;
 }
-function reqStuBody(){
-  const pend = DB.requests.filter(q=>q.status==='pending'), done = DB.requests.filter(q=>q.status!=='pending').slice().reverse().slice(0,20);
-  const card = q => { const l=L(q.lesson_id), c=course(l.course_id), at = bjAt(q.created_at), same = at.slice(0,10)===l.date;   // 2026-11-19：按北京时间的日期算当天
+// 一条改期 / 请假申请（旧版「待处理 → 改期·请假」和新版待处理右边详情共用，2026-11-22）
+function reqCard(q){ const l=L(q.lesson_id), c=course(l.course_id), at = bjAt(q.created_at), same = at.slice(0,10)===l.date;   // 2026-11-19：按北京时间的日期算当天
     return `<section class="card" style="display:flex;flex-direction:column;gap:8px">
       <div class="row"><span class="tag ${q.type==='请假'?'seal':'warn'}">${q.type}</span><b>${esc(stu(c.student_id).name)}</b>${subjTag(c.subject)}<span class="muted small">${esc(tea(c.teacher_id).name)} · ${q.status==='pending'?'原定':'课程'} ${fmtMD(l.date)} ${l.start}–${l.end} · ${+at.slice(5,7)}/${+at.slice(8,10)} ${at.slice(11)} 申请</span></div>
       <dl class="kv small"><dt>原因</dt><dd>${esc(q.reason)}</dd>${q.wish?`<dt>希望时间</dt><dd>${esc(q.wish)}</dd>`:''}</dl>
@@ -566,7 +565,9 @@ function reqStuBody(){
         : `<div class="row" style="align-items:flex-end"><label class="field"><span>扣学生课时${same?'（当天请假）':'（提前请假）'}</span><select id="rq-dd-${q.id}"><option value="0" ${same?'':'selected'}>不扣</option><option value="${dur(l)/2}" ${same?'selected':''}>扣 ${dur(l)/2} 小时（一半）</option><option value="${dur(l)}">扣全部 ${dur(l)} 小时</option></select></label><button class="btn seal sm" data-act="req-ok" data-v="${q.id}">同意请假</button></div>`}
         <div class="row"><input type="text" id="rq-r-${q.id}" placeholder="不同意的话，写一句原因回复学生" style="flex:1;min-width:180px"><button class="btn sm" data-act="req-no" data-v="${q.id}">不同意</button></div>`
       : `<div class="small" style="color:${q.status==='accepted'?'var(--ok)':'var(--seal)'}">${q.status==='accepted'?'已同意':'未同意'}（${esc(q.handled_by)}）：${esc(q.reply)}</div>`}
-    </section>`; };
+    </section>`; }
+function reqStuBody(){
+  const pend = DB.requests.filter(q=>q.status==='pending'), done = DB.requests.filter(q=>q.status!=='pending').slice().reverse().slice(0,20), card = reqCard;
   return `<div class="ph"><h2>改期 · 请假</h2></div>
   <div class="note">学生在自己的链接里申请。你们在这里处理，<b>学生和任课老师同时看到结果</b>，课表自动更新。当天请假扣不扣课时由你们决定。</div>
   ${pend.length ? pend.map(card).join('') : '<div class="card empty">没有待处理的申请</div>'}
@@ -779,14 +780,18 @@ function pdayOpen(d){
   if (all.length===1 && can.length===1) return lessonModal(can[0].id);
   document.getElementById('pday-list')?.scrollIntoView({block:'start'});
 }
+// 老师：我的排课 / 调课申请（等批准的、7 天内批过还没点「知道了」的）；旧版课表和新版课表共用（2026-11-22）
+function tChBox(){
+  const mine = (DB.changes||[]).filter(x => x.status==='pending' || (x.status!=='withdrawn' && x.handled_at && dBetween(x.handled_at.slice(0,10), TODAY) <= 7 && !chSeen().includes(x.id)));
+  const done = mine.filter(x => x.status!=='pending').map(x => x.id);
+  return mine.length ? `<section class="card"><div class="row"><h3 style="font-size:15px;margin-right:auto">我的排课 / 调课申请</h3>${done.length>1?`<button class="btn sm" data-act="ch-seen-all" data-v="${done.join(',')}">全部知道了（${done.length} 条）</button>`:''}</div><div class="muted xs">教务批准后才会改到课表上。</div><div class="list">${mine.map(x => chCard(x, false)).join('')}</div></section>` : '';
+}
 function tSchedule(t){
   const miss = needFb();
   return `<h2 style="font-size:19px">${esc(t.name)}</h2>
   ${miss.length?`<div class="note warn row" style="justify-content:space-between">有 ${miss.length} 节课还没写反馈 <button class="btn sm" data-act="tab" data-v="c">去写</button></div>`:''}
   ${typeof meetTodoNote==='function' ? meetTodoNote(t) : ''}
-  ${(() => { const mine = (DB.changes||[]).filter(x => x.status==='pending' || (x.status!=='withdrawn' && x.handled_at && dBetween(x.handled_at.slice(0,10), TODAY) <= 7 && !chSeen().includes(x.id)));
-    const done = mine.filter(x => x.status!=='pending').map(x => x.id);
-    return mine.length ? `<section class="card"><div class="row"><h3 style="font-size:15px;margin-right:auto">我的排课 / 调课申请</h3>${done.length>1?`<button class="btn sm" data-act="ch-seen-all" data-v="${done.join(',')}">全部知道了（${done.length} 条）</button>`:''}</div><div class="muted xs">教务批准后才会改到课表上。</div><div class="list">${mine.map(x => chCard(x, false)).join('')}</div></section>` : ''; })()}
+  ${tChBox()}
   <div class="row" style="justify-content:flex-end"><span class="muted xs" style="margin-right:auto">排课、调课提交后要教务批准</span><button class="btn pri sm" data-act="add-lesson">＋ 申请排课</button></div>
   ${schedule(lsOfT(t.id),t.tz,c=>stu(c.student_id).name,false,true,'',exStudentsOfTeacher(t.id))}`;
 }
@@ -940,9 +945,9 @@ function addLessonModal(){
   if (isT && !my.length){ toast('你还没有分配学生，请联系教务老师', true); return; }
   const studs = (isT ? DB.students.filter(s => my.some(c => c.student_id===s.id)) : DB.students.filter(s => s.active!==false)).slice().sort((x, y) => pyCmp(x.name, y.name));
   const teas = isT ? [tea(ME().teacher_id)] : DB.teachers.filter(t => t.active!==false).slice().sort((x, y) => pyCmp(x.name, y.name));
-  const preS = S.calType==='s' ? S.calId : '', preT = isT ? ME().teacher_id : (S.calType==='t' ? S.calId : '');
+  const pre = S.alPre; S.alPre = null;   // 周视图点空白处带来的 {日期, 开始, 结束}；新版「老师×一周」点空格还带老师（tid，2026-11-22）
+  const preS = S.calType==='s' ? S.calId : '', preT = isT ? ME().teacher_id : (pre && pre.tid) || (S.calType==='t' ? S.calId : '');
   // 老师在月历上点了哪天，日期就默认填那天（和月历下面显示的那天一致）
-  const pre = S.alPre; S.alPre = null;   // 周视图点空白处带来的 {日期, 开始, 结束}
   const ym = S.pMonth || TODAY.slice(0,7), preD = pre ? pre.d : isT && PV==='cal' ? (S.pDay && S.pDay.startsWith(ym) ? S.pDay : (TODAY.startsWith(ym) ? TODAY : `${ym}-01`)) : TODAY;
   openModal(`${mHead(isT ? '申请排课' : '排课')}
   ${isT ? '' : exSwitch('lesson')}
@@ -1120,7 +1125,7 @@ document.addEventListener('click', async e => {
     case 'todo-tab': S.todoTab=v; if (v==='fb') S.fbTab='pending'; S.sel.clear(); S.editing=null; render(); break;
     case 'sys-tab': S.sysTab=v; render(); break;
     case 'tab': S.tab=v; render(); window.scrollTo(0,0); refresh(); break;
-    case 'pview': PV=v; try{ localStorage.setItem('jw_view', v); }catch(_){} render(); break;
+    case 'pview': PV=v; if (!PEEK) { try{ localStorage.setItem('jw_view', v); }catch(_){} } render(); break;   // 「打开看看」：只在这一页换看法，不动本机记的（2026-11-22 Codex 复查）
     case 'pday': {
       const ym = S.pMonth || TODAY.slice(0,7), cur = S.pDay && S.pDay.startsWith(ym) ? S.pDay : (TODAY.startsWith(ym) ? TODAY : `${ym}-01`);
       S.pDay = v;
@@ -1209,8 +1214,8 @@ document.addEventListener('click', async e => {
       if (!confirm('退出后，这台设备要重新点专属链接才能进来。确定退出吗？')) break;
       try { localStorage.removeItem('jw_k'); } catch(e) {}
       location.href = location.origin + location.pathname; break;
-    case 'ch-seen-all': { const ids = chSeen().concat(v.split(',')).slice(-500); try { localStorage.setItem('jw_chseen', JSON.stringify(ids)); } catch(e) {} render(); break; }
-    case 'ch-seen': { const ids = chSeen().concat(v).slice(-200); try { localStorage.setItem('jw_chseen', JSON.stringify(ids)); } catch(e) {} render(); break; }
+    case 'ch-seen-all': { if (PEEK) { toast('现在是「打开看看」，只能看不能改', true); break; } const ids = chSeen().concat(v.split(',')).slice(-500); try { localStorage.setItem('jw_chseen', JSON.stringify(ids)); } catch(e) {} render(); break; }
+    case 'ch-seen': { if (PEEK) { toast('现在是「打开看看」，只能看不能改', true); break; } const ids = chSeen().concat(v).slice(-200); try { localStorage.setItem('jw_chseen', JSON.stringify(ids)); } catch(e) {} render(); break; }
     case 'ch-withdraw': if (!confirm('撤回这条申请？')) break; await act('change_withdraw', {cid:v}, '已撤回'); break;
     case 'save-lesson': { const d=val('al-d'), s=toJST(val('al-s')), en=toJST(val('al-e'));
       if(!val('al-stu')||!alTeacher()||!alSubj()){toast('请选择学生、老师和科目',true);break;}
