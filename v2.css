@@ -465,4 +465,14 @@ body.v2[data-theme="night"] .toast.err{color:#2a0f0d}
   .v2-stagebar .v2-chip{flex:none}.v2-stagebar .v2-chip.zero{opacity:.55}
   .v2-bcol.empty{display:none}
 }
+/* 链接与备份、改动记录（2026-11-23） */
+.v2-linkbar{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.v2-linkbar .v2-help{flex:1;min-width:240px}
+.v2-help{background:var(--card);border-radius:16px;padding:8px 14px}
+.v2-help summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--gold-text);list-style:none}
+.v2-help summary::-webkit-details-marker{display:none}
+.v2-help p{margin:8px 0 2px;line-height:1.7}
+.v2-lgf{display:flex;flex-direction:column;gap:6px;margin:8px 0 2px}
+.v2-lgf select{width:100%}
+.v2-det .lg-g{background:var(--paper);border-radius:14px;padding:10px 12px}
 @media print{.v2-side,.v2-tabbar,.v2-banner,.v2-top{display:none!important}.v2-app{display:block}}
