@@ -575,7 +575,7 @@ function reqStuBody(){
 }
 
 const tagRow = f => (f.tags||[]).length ? `<div class="chips">${f.tags.map(t=>`<span class="tag ${TAGS_WARN.includes(t)?'warn':'ok'}">${esc(t)}</span>`).join('')}</div>` : '';
-const confirmTag = f => f.confirm ? `<span class="tag ${f.confirm==='满意'?'ok':'seal'}">上了·${f.confirm}</span>` : '<span class="tag mute">未确认</span>';
+const confirmTag = f => f.confirm ? `<span class="tag ${f.confirm==='不满意'?'seal':'ok'}">上了·${f.confirm}</span>` : '<span class="tag mute">未确认</span>';
 function fbCard(f, o={}){
   const l = L(f.lesson_id), c = course(l.course_id), edit = S.editing===f.id;
   const sec = (k,t) => edit ? `<label class="field"><span>${t}</span><textarea id="ed-${k}-${f.id}">${esc(f[k])}</textarea></label>` : `<div class="sec"><b>${t}</b><p>${esc(f[k])}</p></div>`;
@@ -946,7 +946,7 @@ function addLessonModal(){
   const studs = (isT ? DB.students.filter(s => my.some(c => c.student_id===s.id)) : DB.students.filter(s => s.active!==false)).slice().sort((x, y) => pyCmp(x.name, y.name));
   const teas = isT ? [tea(ME().teacher_id)] : DB.teachers.filter(t => t.active!==false).slice().sort((x, y) => pyCmp(x.name, y.name));
   const pre = S.alPre; S.alPre = null;   // 周视图点空白处带来的 {日期, 开始, 结束}；新版「老师×一周」点空格还带老师（tid，2026-11-22）
-  const preS = S.calType==='s' ? S.calId : '', preT = isT ? ME().teacher_id : (pre && pre.tid) || (S.calType==='t' ? S.calId : '');
+  const preS = (pre && pre.sid) || (S.calType==='s' ? S.calId : ''), preT = isT ? ME().teacher_id : (pre && pre.tid) || (S.calType==='t' ? S.calId : '');
   // 老师在月历上点了哪天，日期就默认填那天（和月历下面显示的那天一致）
   const ym = S.pMonth || TODAY.slice(0,7), preD = pre ? pre.d : isT && PV==='cal' ? (S.pDay && S.pDay.startsWith(ym) ? S.pDay : (TODAY.startsWith(ym) ? TODAY : `${ym}-01`)) : TODAY;
   openModal(`${mHead(isT ? '申请排课' : '排课')}

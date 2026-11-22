@@ -43,7 +43,8 @@ const fusOf = sid => (DB.followups||[]).filter(x => x.student_id===sid);
 const reviewOf = (sid, ym) => reviewsOf(sid).find(r => r.ym===ym);
 const ageOf = b => { if (!b) return ''; const d=pd(b), t=pd(TODAY); let a=t.getFullYear()-d.getFullYear(); if (t.getMonth()<d.getMonth() || (t.getMonth()===d.getMonth() && t.getDate()<d.getDate())) a--; return a; };
 const fmtYMD = s => s ? `${+s.slice(5,7)}/${+s.slice(8,10)}` : '';
-const tgtLabel = ym => ym && /^\d{4}-\d{2}$/.test(ym) ? `${ym.slice(0,4)}年${+ym.slice(5)}月` : (ym || '—');
+const tgtLabel = ym => ym && /^\d{4}-\d{2}$/.test(ym) ? `${ym.slice(0,4)}年${+ym.slice(5)}月` : (String(ym || '').replace(/[<>&"'`]/g, '') || '—');   // 2026-11-22：不是年月格式的旧数据，去掉会被当成网页代码的字符
+const rvHas = r => !!(r && (r.content || r.self_eval || r.teacher_eval || r.talk || r.conclusion || r.next_focus));   // 月报有没有内容（家长那边和教务预览用同一个判断）
 
 /* ───────── 下一个要发生的出愿日期 ───────── */
 function nextEventOf(t){

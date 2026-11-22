@@ -34,13 +34,23 @@ function bookView(all){
     followups: (all.followups||[]).filter(x => sids.has(x.student_id)),
     files: (all.files||[]).filter(x => sids.has(x.student_id)),
     changes: (all.changes||[]).filter(x => cids.has(x.course_id)),
-    pay: (all.pay||[]).filter(x => (x.book || 'K') === (want ? 'mine' : 'K')),
+    pay: (all.pay||[]).filter(x => (x.book || 'K') === (want ? 'mine' : 'K')).map(x => want || !x.snap ? x : {...x, snap: kSnap(x.snap, all)}),
     people: (all.people||[]).filter(x => want
       // Panda：自己、Panda 学生和家长、Panda 老师的完整链接
       ? (x.owner || (x.student_id && sids.has(x.student_id)) || (x.teacher_id && x.full_view && tids.has(x.teacher_id)))
       // Project K：和潘、金看到的一样——没有总管理、没有完整链接、没有 Panda 学生和 Panda 老师
       : (!x.owner && !x.full_view && (!x.student_id || sids.has(x.student_id)) && (!x.teacher_id || tids.has(x.teacher_id)))),
   };
+}
+// 和数据库 app.pay_snap_k（第 63 步）同一个规则：课还在 → 看它的学生现在是不是 Panda；课删了 → 看明细里记的学生；都没有的留着
+function kSnap(s, all){
+  if (!s || !Array.isArray(s.rows)) return s;
+  const priv = new Set(all.students.filter(x => x.private).map(x => x.id)), cs = new Map(all.courses.map(c => [c.id, c.student_id]));
+  const ls = new Map(all.lessons.map(l => [l.id, cs.get(l.course_id)]));
+  const rows = s.rows.filter(r => ls.has(r.id) ? !priv.has(ls.get(r.id)) : r.sid ? !priv.has(r.sid) : true);
+  const n = x => Number.isFinite(+x) ? +x : 0, amt = {};
+  rows.forEach(r => { const c = r.cur === 'JPY' ? 'JPY' : 'CNY'; amt[c] = (amt[c] || 0) + curRound(n(r.h) * n(r.rate), c); });
+  return {...s, rows, h: +rows.reduce((a, r) => a + n(r.h), 0).toFixed(2), amt};
 }
 function bookSwitch(){
   ownerSync();

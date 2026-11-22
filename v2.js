@@ -205,7 +205,8 @@ function v2Page(){
   if (me.role === 'admin'){
     const ok = isTop() || ['overview', 'calendar', 'todo', 'students', 'student', 'checks', 'apply', 'schools', 'reviews', 'more'].includes(S.page);
     const pg = ok ? S.page : 'overview';
-    const NEW = {overview: v2Overview, calendar: v2Calendar, todo: v2Todo, students: v2Students, student: v2Students, teachers: v2Teachers, more: v2More};
+    const NEW = {overview: typeof v2Overview2 === 'function' ? v2Overview2 : v2Overview, calendar: v2Calendar, todo: v2Todo, students: v2Students, student: v2Students, teachers: v2Teachers, more: v2More,
+      ...(typeof v2Payroll === 'function' ? {payroll: v2Payroll} : {}), ...(typeof v2Reviews === 'function' ? {reviews: v2Reviews} : {})};
     if (NEW[pg]) return NEW[pg]();
     const OLD = {sys: pgSys, log: typeof pgLog === 'function' ? pgLog : pgOverview, checks: pgChecks, apply: pgApply2, reviews: pgReviews, payroll: pgPayroll, schools: pgSchools};
     return v2Legacy((OLD[pg] || pgOverview)());
@@ -218,7 +219,7 @@ function v2Page(){
   }
   const s = stu(me.student_id);
   if (S.tab === 'e') return v2Legacy(sMine(s) + v2Look() + v2UiRow() + ('<div class="row" style="justify-content:center;margin:20px 0 4px"><button class="btn sm" data-act="logout">退出这台设备</button></div><div class="muted xs" style="text-align:center;margin-bottom:12px">在别人的手机、电脑上打开过的话，看完点这里退出</div>'), true);
-  if (S.tab === 'd') return v2Legacy(v2Head('上课记录') + sFeedback2(s), true);
+  if (S.tab === 'd') return typeof v2Records === 'function' ? v2Records(s) : v2Legacy(v2Head('上课记录') + sFeedback2(s), true);
   if (S.tab === 'f') return v2Legacy(sCheck(s), true);
   if (S.tab === 'b') return v2Head('课表', '北京时间') + v2Legacy(sSched(s));
   if (S.tab === 'c') return v2SHw(s);
@@ -263,7 +264,7 @@ function v2Students(){
   if (S.page === 'student' && S.stuId){
     const tg = all.find(x => x.s.id === S.stuId);
     if (!tg){ if (S.v2jump) toast('这个学生已经不在你能看的名单里了', true); S.page = 'students'; S.stuId = null; }
-    else if (S.v2jump === S.stuId){
+    else if (S.v2jump === S.stuId && S.page === 'student'){
       if (!(F[S.v2chip.stu] || F.all)(tg)) S.v2chip.stu = 'all';
       const q = (S.v2q.stu || '').trim().toLowerCase();
       if (q && !v2QOf(tg.s).toLowerCase().includes(q)) S.v2q.stu = '';
@@ -281,7 +282,7 @@ function v2Students(){
   const chips = [['all', '全部', all.length], ['todo', '有待处理', n('todo')], ['today', '今天有课', n('today')], ...(n('off') ? [['off', '停课', n('off')]] : [])];
   return v2Head('学生档案', fmtMD(TODAY), isTop() ? `<button class="btn pri" data-act="student-form">${v2Ic('plus')}新增学生</button>` : '') + scopeNote()
     + v2Tri({id: 'stu', label: '学生名单', items, sel: cur && cur.k, search: '查学生、方向、老师…', chips, chip, count: `${items.length} 个学生 · 要处理的排前面`,
-      empty: DB.students.length ? '没有符合的学生' : '还没有学生。点右上角「新增学生」开始。', detail: cur ? `<div class="v2-card v2-stu">${pgStudent()}</div>` : ''});
+      empty: DB.students.length ? '没有符合的学生' : '还没有学生。点右上角「新增学生」开始。', detail: cur ? `<div class="v2-card v2-stu">${typeof v2StuDetail === 'function' ? v2StuDetail() : pgStudent()}</div>` : ''});
 }
 // 老师档案
 function v2Teachers(){
@@ -552,7 +553,7 @@ function v2SHome(s){
       ${v2Box(`这个月${sub === 'all' ? '' : ' · ' + esc(sub)}`, `<div class="v2-nums"><div><b>${doneN}</b><small>已上</small></div><div><b>${leftN}</b><small>还有</small></div><div><b>${hw.filter(f => !f.hw_sub).length}</b><small>作业没交</small></div></div><div class="v2-plan"><b class="xs muted">${+ym.slice(5)} 月学习计划</b>${plan}</div>`)}
     </div></div></div>`;
   const confirmBox = nc.length ? v2Box('要你确认', nc.slice(-3).reverse().map(f => { const l = L(f.lesson_id), c = course(l.course_id);
-    return `<div class="v2-cf"><b>${md(l.date)} 周${WD[pd(l.date).getDay()]} ${esc(c.subject)}，上得怎么样？</b><span class="muted xs">点一下，老师那边会看到</span><div class="row"><button class="btn pri sm" data-act="confirm" data-v="${f.id}|满意">满意</button><button class="btn sm" data-act="confirm" data-v="${f.id}|不满意">不满意</button></div></div>`; }).join(''),
+    return `<div class="v2-cf"><b>${md(l.date)} 周${WD[pd(l.date).getDay()]} ${esc(c.subject)}，上得怎么样？</b><span class="muted xs">点一下就算确认上过了；满意不满意只给教务看</span><div class="row"><button class="btn pri sm" data-act="confirm" data-v="${f.id}|满意">满意</button><button class="btn sm" data-act="confirm" data-v="${f.id}|不满意">不满意</button></div></div>`; }).join(''),
     nc.length > 3 ? `<button class="btn sm" data-act="tab" data-v="d">全部 ${nc.length} 节 ›</button>` : '', 'hot') : '';
   const soon = v2Box('接下来', up.length ? `<div class="v2-dots">${up.slice(0, 4).map(l => { const c = course(l.course_id); return `<div style="--hc:${hue(c.subject)}"><i></i><b>${v2Day(l.date)} ${l.start}</b><span>${esc(c.subject)} · ${esc(tName(c.teacher_id))}${v2Flag(l) ? ` · <em>${v2Flag(l)}</em>` : ''}</span></div>`; }).join('')}</div>` : '<div class="v2-empty">还没有排课</div>');
   return v2Head(`${esc(v2Given(s.name))}，${greet}`, `${fmtMD(TODAY)} · 北京时间`) + strip
@@ -616,10 +617,11 @@ document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a || V2.ver !== 'new' || !document.body.classList.contains('v2')) return;
   const k = a.dataset.act, v = a.dataset.v || '';
   if (a.closest('#modal-root')) return;
-  const LEAVE = ['page', 'tab', 'v2-sel', 'v2-chip', 'v2-back', 'v2-subj', 'v2-go-write', 'student', 'v2-cal', 'v2-tcal', 'v2-wk', 'v2-twk', 'book'];
-  if (LEAVE.includes(k) && v2Dirty() && !(k === 'v2-sel' && a.classList.contains('on'))
+  const LEAVE = ['page', 'tab', 'v2-sel', 'v2-chip', 'v2-back', 'v2-subj', 'v2-go-write', 'student', 'v2-cal', 'v2-tcal', 'v2-wk', 'v2-twk', 'book', 'stu-tab', 'student-tab', 'v2-ssub', 'v2-ov', 'v2-go-todo'];
+  if (LEAVE.includes(k) && v2Dirty() && !(k === 'v2-sel' && a.classList.contains('on') && !v2Phone())
       && !confirm('右边填的内容还没保存，离开会丢掉。\n\n确定离开吗？')){ e.stopImmediatePropagation(); e.preventDefault(); return; }
   if (k === 'student') S.v2jump = v;
+  if (k === 'student-tab' || k === 'stu-tab') S.v2jump = v.split('|')[0];
 }, true);
 
 /* ───────── 新版的按钮 ───────── */
@@ -632,10 +634,10 @@ document.addEventListener('click', async e => {
     S.v2open = null;
     // Codex 复查第 14 条：「学生留言」「跟进记录」直接选中那一项，手机上直接打开
     const TODO = {todo: ['all'], requests: ['req'], 'requests-ch': ['ch'], feedback: ['fb'], 'feedback-missing': ['pend'], msgs: ['other', 'msg'], followups: ['other', 'fu']};
-    if (k === 'page' && TODO[v]){ S.v2chip.todo = TODO[v][0]; S.v2idx.todo = 0; S.v2sel.todo = TODO[v][1] || null; if (TODO[v][1] && v2Phone()) S.v2open = 'todo'; }
+    if (k === 'page' && TODO[v]){ S.v2chip.todo = TODO[v][0]; S.v2idx.todo = 0; S.v2sel.todo = TODO[v][1] || null; S.v2q.todo = ''; if (TODO[v][1] && v2Phone()) S.v2open = 'todo'; }
     render(); return;
   }
-  if (k === 'student' && v2Phone()){ S.v2open = 'stu'; S.v2sel.stu = v; render(); window.scrollTo(0, 0); return; }
+  if ((k === 'student' || k === 'student-tab') && v2Phone()){ S.v2open = 'stu'; S.v2sel.stu = v.split('|')[0]; render(); window.scrollTo(0, 0); return; }
   if (!k.startsWith('v2-')) return;
   try {
   switch (k){
@@ -652,6 +654,7 @@ document.addEventListener('click', async e => {
     case 'v2-ui-seen': V2.seen = true; v2Save(); if (!PEEK) rpc('ui_pref_set', {ver: 'seen'}).catch(() => {}); document.querySelector('.v2-banner')?.remove(); break;
     case 'v2-sel': {
       const i = v.indexOf('|'), id = v.slice(0, i), key = v.slice(i + 1);
+      if (S.v2sel[id] === key && !v2Phone()) break;
       if (S.v2sel[id] !== key && id === 'tw') wTags.clear();
       S.v2sel[id] = key;
       if (id === 'stu'){ S.stuId = key; S.page = 'student'; }

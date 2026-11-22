@@ -146,7 +146,7 @@ function sFeedback2(s){
   let out = '';
   if (PRO()) { let m0 = ''; all.slice(0, 60).forEach(f => { const m = L(f.lesson_id).date.slice(0,7); if (m !== m0) { out += `<div class="dg">${ymLabel(m)}</div>`; m0 = m; } out += sFbRow(f); });
     return `<div class="muted xs">每节课后老师写的反馈，教务老师审核后显示在这里。</div>${out}`; }
-  if (pend.length) out += `<div class="dg">待确认 · ${pend.length} 节</div><div class="muted xs" style="margin-top:-4px">上完课点一下，告诉老师这节课上得怎么样。</div>` + pend.map(f => {
+  if (pend.length) out += `<div class="dg">待确认 · ${pend.length} 节</div><div class="muted xs" style="margin-top:-4px">上完课点一下，这节课上得怎么样（只给教务看）。</div>` + pend.map(f => {
     const l = L(f.lesson_id), c = course(l.course_id);
     return `<section class="card fbp" style="--hc:${hue(c.subject)}"><div class="fbx-h"><span class="num fbx-d">${sMD(l.date)}</span>${subjTag(c.subject)}<span class="muted xs">${esc(tName(c.teacher_id))}</span></div>
       <details><summary class="muted small">看老师写的反馈</summary><div class="fb">${sFbBody(f)}</div></details>
@@ -159,7 +159,7 @@ function sFeedback2(s){
 /* ───────── 我的 ───────── */
 function sMine(s){
   const ym = TODAY.slice(0,7), r = reviewOf(s.id, ym) || {};
-  const past = reviewsOf(s.id).filter(x => x.ym !== ym && (x.content || x.self_eval || x.teacher_eval || x.talk || x.next_focus)).slice().reverse();
+  const past = reviewsOf(s.id).filter(x => x.ym !== ym && rvHas(x)).slice().reverse();
   const tl = typeof meetTeacherList==='function' ? meetTeacherList(s) : '';
   const jump = [...(tl ? [['m-teacher', PRO() ? '孩子的老师' : '我的老师']] : []), ['m-target','目标大学'],['m-score','成绩'],['m-month','月度自评'],['m-profile','个人档案']], ro = PRO();
   return `<h2 style="font-size:19px">${ro ? `${esc(s.name)}同学的档案` : '我的'}</h2>${typeof sMsgBox==='function' ? sMsgBox(s) : ''}
@@ -175,7 +175,7 @@ function sMine(s){
     <div class="muted xs">这个月学得怎么样？哪里进步了、哪里还觉得吃力、下个月想加强什么。老师和教务会看到。</div>
     <textarea id="self-eval" placeholder="例：词汇有进步，但有机反应链容易混淆">${esc(r.self_eval||'')}</textarea>
     <div class="row"><button class="btn pri" data-act="self-save" data-v="${ym}">${r.self_eval?'更新':'提交'}</button>${r.self_eval?'<span class="tag ok">已写</span>':''}</div></section>`}
-  ${r.teacher_eval || r.talk || r.next_focus ? reviewCard({...r, ym, student_id: s.id}) : ''}
+  ${r.status === '已完成' && rvHas(r) ? reviewCard({...r, ym, student_id: s.id}) : ''}
   ${past.length ? `<details class="sh-more"><summary>以前的月度反馈（${past.length}）</summary>${past.map(x => reviewCard(x)).join('')}</details>` : ''}
   <h3 class="sh-sec" id="m-profile">个人档案</h3>
   <details class="card"><summary class="muted small">${ro ? '点开看孩子的档案' : '点开看我的档案'}</summary>${profilePage(s, {hideEmpty: true})}</details>`;

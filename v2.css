@@ -379,4 +379,51 @@ body.v2 .upd-bar{border-radius:999px}
   .v2-stu .sp-tabs{overflow-x:auto;flex-wrap:nowrap}
   .v2-wknav>b{min-width:0}
 }
+/* ───────── 第二批（2026-11-22）：总览、上课记录、学生档案分页、月度家长反馈、工资 ───────── */
+.v2-page.one{display:flex;flex-direction:column;gap:0;padding:10px 14px}
+.v2-tabn{font-weight:800;font-size:11.5px;background:var(--sunk);border-radius:999px;padding:0 7px;margin-left:2px}
+.v2-tabs button.on .v2-tabn{background:var(--gold);color:#fff}
+.v2-ovr{display:flex;align-items:center;gap:12px;padding:11px 4px;border:0;border-top:1px solid var(--line-2);background:none;width:100%;text-align:left;color:var(--ink);font:inherit}
+.v2-ovr:first-child{border-top:0}
+.v2-ovr.click{cursor:pointer}.v2-ovr.click:hover .tx b{color:var(--gold-text)}
+.v2-ovr .tx{flex:1;min-width:0}.v2-ovr .tx b{display:block;font-size:14px}.v2-ovr .tx span{display:block;font-size:12px;color:var(--muted)}
+.v2-ovt{min-width:96px;font-size:13.5px}
+.v2-due{font-size:12.5px;font-weight:800;color:var(--gold-text);white-space:nowrap}.v2-due.late{color:var(--seal)}
+.v2-now{display:flex;align-items:center;gap:12px;border:0;background:none;border-radius:16px;padding:10px 12px;text-align:left;cursor:pointer;color:var(--ink);width:100%}
+.v2-now>b{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;min-width:58px}
+.v2-now span b{display:block;font-size:13.5px}.v2-now small{color:var(--muted);font-size:12px}
+.v2-now.on{background:var(--gold);color:#fff}.v2-now.on small{color:rgba(255,255,255,.85)}
+.v2-recs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.v2-recm{grid-column:1/-1;font-size:12px;font-weight:800;color:var(--muted);padding:6px 4px 0}
+.v2-rec{background:var(--card);border-radius:20px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0;border-left:3px solid var(--hc)}
+.v2-rec.hot{background:var(--gold-soft)}
+.v2-rech{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.v2-rech b{font-size:14px}
+.v2-rect{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}
+.v2-say1{margin:0;font-size:14px;line-height:1.65;overflow-wrap:anywhere}
+.v2-rate{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line-2);padding-top:8px}
+.v2-stabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none;margin:4px 0 12px}
+.v2-stabs::-webkit-scrollbar{display:none}
+.v2-stabs button{border:0;background:none;border-radius:12px 12px 0 0;padding:8px 14px;font-weight:700;font-size:13.5px;color:var(--muted);cursor:pointer;white-space:nowrap;flex:none}
+.v2-stabs button.on{background:var(--pill);color:var(--pill-ink)}
+.v2-stu .sp-body{display:flex;flex-direction:column;gap:12px}
+.v2-stu .sp-body>.seg{align-self:flex-start}
+.v2-pay3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.v2-pay3>div{background:#fff;border-radius:16px;padding:10px 14px;display:flex;flex-direction:column}
+.v2-pay3 small{color:var(--muted);font-size:12px;font-weight:700}
+.v2-pay3 b{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+.v2-pay3 span{font-size:12.5px;color:var(--muted)}
+.v2-pay3 .warn b{color:var(--warn)}
+.v2-paytbl{width:100%;border-collapse:collapse;background:#fff;border-radius:16px;overflow:hidden;font-size:13px}
+.v2-paytbl th{font-size:12px;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+.v2-paytbl td{padding:8px 10px;border-bottom:1px solid var(--line-2)}
+.v2-paytbl tr.pend td{background:var(--warns)}
+.v2-paytbl tfoot td{border-bottom:0;background:var(--card)}
+.v2-prev .card{background:var(--card)}
+@media (max-width:760px){
+  .v2-recs{grid-template-columns:1fr}
+  .v2-ph .v2-acts,.v2-dh .v2-acts{width:100%;margin-left:0}
+  .v2-pt h2{font-size:20px}
+  .v2-pay3{grid-template-columns:1fr}
+  .v2-ovr{flex-wrap:wrap}.v2-ovr .tx{flex-basis:60%}
+}
 @media print{.v2-side,.v2-tabbar,.v2-banner,.v2-top{display:none!important}.v2-app{display:block}}
