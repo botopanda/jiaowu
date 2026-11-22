@@ -193,18 +193,26 @@ function v2Payroll(){
         <div><small>已确认（计入工资）</small><b>${v2HM(i.hOk)}</b><span>${i.ok.length} 节 · ${i.amtOk}</span></div>
         <div class="${i.pend.length ? 'warn' : ''}"><small>待核对（还没计入）</small><b>${v2HM(i.hPend)}</b><span>${i.pend.length} 节${i.pend.length ? ` · ${i.amtPend} · 确认后才算` : ''}</span></div>
         <div><small>合计（待核对都确认以后）</small><b>${v2HM(i.hOk + i.hPend)}</b><span>${i.amtAll}</span></div></div>
-      ${i.pend.length ? `<div class="note warn">还有 ${i.pend.length} 节没确认：${i.pend.map(l => `${md(l.date)} ${esc(stu(course(l.course_id).student_id).name)}（${hasFb(l) ? '待确认' : '老师还没写反馈'}）`).join('、')}。确认后才算进工资。${isTop() ? ' <button class="btn sm" data-act="page" data-v="feedback-missing">去处理 ›</button>' : ''}</div>` : ''}
+      ${i.pend.length ? `<div class="note warn">还有 ${i.pend.length} 节没确认：${i.pend.map(l => `${md(l.date)} ${esc(stu(course(l.course_id).student_id).name)}（${hasFb(l) ? '待确认' : '老师还没写反馈'}）`).join('、')}。确认后才算进工资。上过的可以在下面每一行点「已上课」，或者 <button class="btn sm" data-act="v2-pay-done" data-v="${t.id}|${ym}">把这 ${i.pend.length} 节都标为已上课</button>（只动 ${esc(t.name)} ${+ym.slice(5)} 月这几节）</div>` : ''}
       ${payDiffBox(t.id, ym)}
       <div class="tw"><table class="rt v2-paytbl"><thead><tr><th>日期</th><th>时间</th><th>学生</th><th>科目</th><th>时长</th><th>状态</th><th>单价</th><th>金额</th></tr></thead><tbody>
-      ${rows.map(l => { const c = course(l.course_id); return `<tr class="${isPend(l) ? 'pend' : ''}"><td class="num">${v2Wd(l.date)}</td><td class="num">${l.start}–${l.end}</td><td>${esc(stu(c.student_id).name)}</td><td>${subjTag(c.subject)}</td><td class="num">${v2HM(hrs(l))}${hrsTag(l)}</td><td>${st(l)}${why(l) ? `<div class="muted xs">${why(l)}</div>` : ''}</td><td class="num">${rateTxt(c)}</td><td class="num">${isPend(l) ? `<span class="muted">${money(hrs(l) * (c.rate || 0), curOf(c))}</span>` : money(hrs(l) * (c.rate || 0), curOf(c))}</td></tr>`; }).join('')}
+      ${rows.map(l => { const c = course(l.course_id); return `<tr class="${isPend(l) ? 'pend' : ''}"><td class="num">${v2Wd(l.date)}</td><td class="num">${l.start}–${l.end}</td><td>${esc(stu(c.student_id).name)}</td><td>${subjTag(c.subject)}</td><td class="num">${v2HM(hrs(l))}${hrsTag(l)}</td><td>${st(l)}${why(l) ? `<div class="muted xs">${why(l)}</div>` : ''}${isPend(l) ? ` <button class="btn sm" data-act="lstate" data-v="${l.id}|done|q">已上课</button>` : ''}</td><td class="num">${rateTxt(c)}</td><td class="num">${isPend(l) ? `<span class="muted">${money(hrs(l) * (c.rate || 0), curOf(c))}</span>` : money(hrs(l) * (c.rate || 0), curOf(c))}</td></tr>`; }).join('')}
       </tbody><tfoot><tr><td colspan="4"><b>已确认合计</b></td><td class="num"><b>${v2HM(i.hOk)}</b></td><td></td><td></td><td class="num"><b>${i.amtOk}</b></td></tr></tfoot></table></div>
       ${i.later.length ? `<div class="muted xs">另：${md(i.later[0].date)} 起已排 ${i.later.length} 节，上完后计入。</div>` : ''}
-      <div class="row" style="justify-content:flex-end">${payButtons(t.id, ym)}</div></div>`;
+      <div class="row" style="justify-content:flex-end">${v2PayBtns(t.id, ym, i.pend.length)}</div></div>`;
   }
   const tot = all.reduce((a, x) => a + x.i.hOk, 0);
   return v2Head('课时与工资', `${ymLabel(ym)} · 已确认 ${v2HM(tot)}`, `<select data-change="paym" aria-label="月份">${months.map(v => `<option value="${v}" ${v === ym ? 'selected' : ''}>${ymLabel(v)}</option>`).join('')}</select>`)
     + `<div class="v2-strip soft"><span>只有教务 · 管理看得到。老师写了反馈（或教务标为已上课）的课才计入，按实际时长算；当天请假扣学生课时的，照样计入老师工资。每位老师每月：核对课时 → 审核通过 → 结算完成。</span></div>`
     + v2Tri({id: 'pay', label: '老师名单', items, sel: cur && cur.k, search: '查老师…', count: `${items.length} 位老师 · 有待核对的排前面`, empty: '这个月还没有上完的课', detail});
+}
+
+// 还有待核对的课：不能审核、不能结算（撤销照样可以）
+function v2PayBtns(tid, ym, np){
+  if (!np || (isOwner() && S.book === 'all')) return payButtons(tid, ym);
+  const p = payOf(tid, ym);
+  if (p.settled_at) return payButtons(tid, ym);
+  return `<span class="muted xs">还有 ${np} 节待核对，核对完才能${p.reviewed_at ? '结算' : '审核'}</span>${p.reviewed_at ? `<button class="btn sm" data-act="pay" data-v="${tid}|${ym}|reviewed|0">撤销审核</button>` : ''}`;
 }
 
 /* ───────── 第二批的按钮 ───────── */
@@ -221,4 +229,10 @@ document.addEventListener('click', e => {
   else if (k === 'v2-rec-open'){ S.v2recOpen = v; render(); }
   else if (k === 'v2-ssub'){ S.v2ssub = v; render(); }
   else if (k === 'v2-stu-add'){ S.alPre = {d: TODAY, s: '18:00', e: '20:00', sid: v}; addLessonModal(); }
+  else if (k === 'v2-pay-done'){   // 只把这位老师这个月待核对的标成已上课
+    const [tid, ym] = v.split('|'), ls = lsOfT(tid).filter(l => l.date.startsWith(ym) && isPend(l)); if (!ls.length) return;
+    if (!confirm(`把 ${tea(tid).name} ${ymLabel(ym)} 待核对的 ${ls.length} 节课标为已上课？\n按排课时长计入学生课时和老师工资。\n\n${ls.map(l => `${md(l.date)} ${l.start} ${stu(course(l.course_id).student_id).name} ${course(l.course_id).subject}`).join('\n')}`)) return;
+    act('admin_mark_done_many', {ids: ls.map(l => l.id)}, `已标为已上课（${ls.length} 节）`).catch(() => {});
+  }
+  else if (k === 'v2-self'){ S.tab = 'e'; render(); setTimeout(() => document.getElementById('m-month')?.scrollIntoView({block: 'start'}), 50); }
 });

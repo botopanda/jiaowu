@@ -73,7 +73,8 @@ const v2UiRow = () => PEEK ? '' : `<section class="card v2-uirow"><div><b>页面
 
 /* ───────── 外观：四套配色（2026-11-22 提前做；先记在这台设备上，满意了再跟着链接存） ───────── */
 const V2_THEMES = [['notion', '白底 · 一点蓝', '默认', '#ffffff', '#f7f7f5', '#2383e2', '#37352f'], ['seaglass', '海玻璃', '清透的海水绿', '#f3f7f7', '#e8eeee', '#006f76', '#d5eeeb'],
-  ['sakura', '桜', '很浅的樱花粉', '#fdf7f8', '#f6edef', '#d45d7e', '#fbe3e8'], ['latte', '奶咖', '咖啡店的暖色', '#f6f1ea', '#ede6dd', '#b97a44', '#3b2f2a']];
+  ['sakura', '桜', '很浅的樱花粉', '#fdf7f8', '#f6edef', '#d45d7e', '#fbe3e8'], ['latte', '奶咖', '咖啡店的暖色', '#f6f1ea', '#ede6dd', '#b97a44', '#3b2f2a'],
+  ['night', '夜间', '深色，晚上看不刺眼', '#191919', '#262626', '#5aa9f0', '#e6e6e3']];
 const v2ThemeKey = () => 'jw_theme:' + (ME().id || ME().role);
 function v2Theme(){
   if (V2.theme == null){ let t = ''; if (!PEEK) { try { t = localStorage.getItem(v2ThemeKey()) || ''; } catch(e) {} } V2.theme = V2_THEMES.some(x => x[0] === t) ? t : 'notion'; }
@@ -206,7 +207,8 @@ function v2Page(){
     const ok = isTop() || ['overview', 'calendar', 'todo', 'students', 'student', 'checks', 'apply', 'schools', 'reviews', 'more'].includes(S.page);
     const pg = ok ? S.page : 'overview';
     const NEW = {overview: typeof v2Overview2 === 'function' ? v2Overview2 : v2Overview, calendar: v2Calendar, todo: v2Todo, students: v2Students, student: v2Students, teachers: v2Teachers, more: v2More,
-      ...(typeof v2Payroll === 'function' ? {payroll: v2Payroll} : {}), ...(typeof v2Reviews === 'function' ? {reviews: v2Reviews} : {})};
+      ...(typeof v2Payroll === 'function' ? {payroll: v2Payroll} : {}), ...(typeof v2Reviews === 'function' ? {reviews: v2Reviews} : {}),
+      ...(typeof v2Apply === 'function' ? {apply: v2Apply, checks: () => v2Checks(DB.students.filter(s => s.active !== false), '点学生看他完整的点检表；学生和家长在自己的链接里也能看到（只能看）')} : {})};
     if (NEW[pg]) return NEW[pg]();
     const OLD = {sys: pgSys, log: typeof pgLog === 'function' ? pgLog : pgOverview, checks: pgChecks, apply: pgApply2, reviews: pgReviews, payroll: pgPayroll, schools: pgSchools};
     return v2Legacy((OLD[pg] || pgOverview)());
@@ -214,13 +216,13 @@ function v2Page(){
   if (me.role === 'teacher'){
     const t = tea(me.teacher_id);
     if (S.tab === 'd') return v2Legacy(`<div class="v2-entry"><button type="button" class="v2-go" data-act="tab" data-v="f">${navIcon('通关点检')}<span>通关点检</span>${v2Ic('go')}</button></div>` + tMe(t) + v2Look() + v2UiRow(), true);
-    if (S.tab === 'f') return v2Legacy(tChecks(t));
+    if (S.tab === 'f') return typeof v2Checks === 'function' ? v2Checks(DB.students.filter(s => DB.courses.some(c => c.student_id === s.id && c.teacher_id === t.id)), '上完课在这里给学生打档') : v2Legacy(tChecks(t));
     return ({a: v2TSched, b: v2TStudents, c: v2TWrite}[S.tab] || v2TStudents)(t);
   }
   const s = stu(me.student_id);
   if (S.tab === 'e') return v2Legacy(sMine(s) + v2Look() + v2UiRow() + ('<div class="row" style="justify-content:center;margin:20px 0 4px"><button class="btn sm" data-act="logout">退出这台设备</button></div><div class="muted xs" style="text-align:center;margin-bottom:12px">在别人的手机、电脑上打开过的话，看完点这里退出</div>'), true);
   if (S.tab === 'd') return typeof v2Records === 'function' ? v2Records(s) : v2Legacy(v2Head('上课记录') + sFeedback2(s), true);
-  if (S.tab === 'f') return v2Legacy(sCheck(s), true);
+  if (S.tab === 'f') return typeof v2SCheck === 'function' ? v2SCheck(s) : v2Legacy(sCheck(s), true);
   if (S.tab === 'b') return v2Head('课表', '北京时间') + v2Legacy(sSched(s));
   if (S.tab === 'c') return v2SHw(s);
   return PRO() ? v2PHome(s) : v2SHome(s);
@@ -388,7 +390,7 @@ function v2Calendar(){
   const teachers = DB.teachers.filter(t => tids.has(t.id) || (t.active !== false && DB.courses.some(c => c.teacher_id === t.id && c.active !== false && (!fS || c.student_id === fS))))
     .filter(t => !fT || t.id === fT).sort((a, b) => !!a.staff - !!b.staff || pyCmp(a.name, b.name));
   const exs = examGroups(examsOf(calExSids())).filter(e => e.date >= days[0] && e.date <= days[6]);
-  const only = fS || fT ? `<span class="v2-only">只看 <b>${esc(fS ? stu(fS).name : tea(fT).name)}</b><button type="button" class="v2-link" data-act="caltype" data-v="all">看全部 ✕</button></span>` : '';
+  const only = fS || fT ? `<span class="v2-only">只看 <b>${esc(fS ? stu(fS).name : tea(fT).name)}</b><button type="button" class="v2-link" data-act="caltype" data-v="all">看全部 ✕</button></span>${fS && typeof sxBtn === 'function' ? `<button class="btn sm" data-act="v2-sx" data-v="${fS}|${addDay(mon, 3).slice(0, 7)}">导出${+addDay(mon, 3).slice(5, 7)}月课表图片</button>` : ''}` : '';
   const hours = ls.filter(l => l.status === 'scheduled').reduce((a, l) => a + dur(l), 0);
   const chipL = l => { const c = course(l.course_id), f = v2Flag(l);
     return `<button type="button" class="v2-lc ${l.status !== 'scheduled' ? 'off' : ''} ${isPend(l) ? 'pend' : ''} ${f ? 'flag' : ''}" style="--hc:${hue(c.subject)}" data-act="lesson" data-v="${l.id}" title="${esc(`${l.start}–${l.end} ${stu(c.student_id).name} ${c.subject}${l.kind ? '·' + l.kind : ''}${l.topic ? '\n本节：' + l.topic : ''}`)}"><b>${l.start}</b><span class="n">${esc(stu(c.student_id).name)}</span><span class="s">${esc(c.subject)}${l.status === 'leave' ? ' · 请假' : l.status === 'cancelled' ? ' · 取消' : ''}${l.makeup ? ' · 补' : ''}</span>${f ? `<span class="f">${f}</span>` : isPend(l) ? '<span class="f">待确认</span>' : ''}</button>`; };
@@ -474,7 +476,9 @@ function v2TStudents(t){
 function v2TWrite(t){
   const cand = v2TCand();
   const toGrade = DB.feedbacks.filter(f => f.hw_sub && !f.hw_fb);
-  const dOf = f => L(f.lesson_id).date, written = DB.feedbacks.filter(f => L(f.lesson_id) && course(L(f.lesson_id).course_id)).sort((a, b) => dOf(b).localeCompare(dOf(a))).slice(0, 60);
+  const dOf = f => L(f.lesson_id).date, allW = DB.feedbacks.filter(f => L(f.lesson_id) && course(L(f.lesson_id).course_id)).sort((a, b) => dOf(b).localeCompare(dOf(a)));
+  const wMonths = [...new Set(allW.map(f => dOf(f).slice(0, 7)))], wm = S.v2twM === 'all' || wMonths.includes(S.v2twM) ? S.v2twM : (wMonths[0] || 'all');
+  const written = allW.filter(f => wm === 'all' || dOf(f).startsWith(wm));   // Codex 复查第三批第 4 条：按月份看全部，和原来一样
   const chip = S.v2chip.tw || 'todo';
   const sName = l => stu(course(l.course_id).student_id).name;
   const items = chip === 'done'
@@ -508,8 +512,9 @@ function v2TWrite(t){
       <div class="fb"><div class="sec"><b>一、本节授课内容</b><p>${esc(f.content || '—')}</p></div>${tFbRest(f)}${fileList(f.id, 'hwref', '作业图片')}${fileList(f.id, 'note', '上课笔记')}</div>
       <div class="row">${uploadBtn('hwref', f.id, '补传作业图片')}${uploadBtn('note', f.id, '上传上课笔记')}</div><div class="muted xs">反馈内容要改，请联系教务老师。</div></div>`; }
   }
-  return v2Head('反馈批改') + v2Tri({id: 'tw', label: '反馈批改', items, sel: cur && cur.k, search: '查学生…', chips: [['todo', '要做的', cand.length + toGrade.length], ['done', '我写过的', written.length]], chip,
-    count: chip === 'done' ? `最近 ${items.length} 条 · 新的在上` : `${items.length} 件 · 早的在上`, empty: chip === 'done' ? '还没有写过反馈' : '上完的课都写好反馈了，作业也批完了 👍', detail, emptyDet: '都处理完了 👍'});
+  const top = chip === 'done' && wMonths.length ? `<select class="v2-msel" data-change="v2-twm" aria-label="月份">${wMonths.map(m => `<option value="${m}" ${m === wm ? 'selected' : ''}>${ymLabel(m)}</option>`).join('')}<option value="all" ${wm === 'all' ? 'selected' : ''}>全部月份</option></select>` : '';
+  return v2Head('反馈批改') + v2Tri({id: 'tw', label: '反馈批改', items, sel: cur && cur.k, search: '查学生…', chips: [['todo', '要做的', cand.length + toGrade.length], ['done', '我写过的', allW.length]], chip, top,
+    count: chip === 'done' ? `${wm === 'all' ? '全部月份' : ymLabel(wm)} · ${items.length} 条 · 新的在上` : `${items.length} 件 · 早的在上`, empty: chip === 'done' ? '还没有写过反馈' : '上完的课都写好反馈了，作业也批完了 👍', detail, emptyDet: '都处理完了 👍'});
 }
 
 /* ═════════════ 学生、家长 ═════════════ */
@@ -539,7 +544,8 @@ function v2SHome(s){
   const up = v2Next(lsOfS(s.id)), un = sUnHw(s), nc = sUnConfirm(s);
   // 顶上一条：最要紧的一件事
   const strip = un.length ? `<button type="button" class="v2-strip" data-act="tab" data-v="c"><span>${v2Ic('go')}有 ${un.length} 份作业还没交：${esc(String(un[0].hw || '').slice(0, 20))}</span><span class="v2-link">去交作业 ›</span></button>`
-    : nc.length ? `<button type="button" class="v2-strip" data-act="tab" data-v="d"><span>有 ${nc.length} 节课还没确认</span><span class="v2-link">去确认 ›</span></button>` : '';
+    : nc.length ? `<button type="button" class="v2-strip" data-act="tab" data-v="d"><span>有 ${nc.length} 节课还没确认</span><span class="v2-link">去确认 ›</span></button>`
+    : sSelfDue(s) ? `<button type="button" class="v2-strip" data-act="v2-self"><span>${+TODAY.slice(5, 7)} 月的自我评价还没写：这个月学得怎么样？</span><span class="v2-link">去写 ›</span></button>` : '';
   const tabs = `<div class="v2-tabs" role="tablist">${[['all', '全部'], ...subs.map(x => [x, x])].map(([k, t]) => `<button type="button" role="tab" aria-selected="${sub === k}" class="${sub === k ? 'on' : ''}" data-act="v2-subj" data-v="${esc(k)}" style="--hc:${k === 'all' ? 'var(--gold)' : hue(k)}">${k === 'all' ? '' : '<i></i>'}${esc(t)}</button>`).join('')}</div>`;
   const nx = up.find(inSub), hw = latestHw(s.id).filter(fInSub), fs = fbOfS(s.id).filter(fInSub), lastF = fs[fs.length - 1];
   const ym = TODAY.slice(0, 7), mLs = lsOfS(s.id).filter(l => l.date.startsWith(ym) && inSub(l));
@@ -617,7 +623,7 @@ document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a || V2.ver !== 'new' || !document.body.classList.contains('v2')) return;
   const k = a.dataset.act, v = a.dataset.v || '';
   if (a.closest('#modal-root')) return;
-  const LEAVE = ['page', 'tab', 'v2-sel', 'v2-chip', 'v2-back', 'v2-subj', 'v2-go-write', 'student', 'v2-cal', 'v2-tcal', 'v2-wk', 'v2-twk', 'book', 'stu-tab', 'student-tab', 'v2-ssub', 'v2-ov', 'v2-go-todo'];
+  const LEAVE = ['page', 'tab', 'v2-sel', 'v2-chip', 'v2-back', 'v2-subj', 'v2-go-write', 'student', 'v2-cal', 'v2-tcal', 'v2-wk', 'v2-twk', 'book', 'stu-tab', 'student-tab', 'v2-ssub', 'v2-ov', 'v2-go-todo', 'v2-ap', 'v2-apym', 'v2-ap-open', 'v2-go-ts'];
   if (LEAVE.includes(k) && v2Dirty() && !(k === 'v2-sel' && a.classList.contains('on') && !v2Phone())
       && !confirm('右边填的内容还没保存，离开会丢掉。\n\n确定离开吗？')){ e.stopImmediatePropagation(); e.preventDefault(); return; }
   if (k === 'student') S.v2jump = v;
@@ -666,6 +672,7 @@ document.addEventListener('click', async e => {
     case 'v2-back': S.v2open = null; render(); window.scrollTo(0, S.v2scroll[v] || 0); break;
     case 'v2-chip': { const [id, c] = v.split('|'); S.v2chip[id] = c; S.v2idx[id] = 0; if (S.v2open === id) S.v2open = null; render(); break; }
     case 'v2-cal': S.v2cal = v; render(); break;
+    case 'v2-sx': { const [sid, ym] = v.split('|'); if (typeof sxOpen === 'function') sxOpen(sid, ym); break; }
     case 'v2-wk': S.v2wk = v === '0' ? v2WkMon(TODAY) : addDay(S.v2wk || v2WkMon(TODAY), Number(v)); render(); break;
     case 'v2-day': S.v2day = v; render(); break;
     case 'v2-slot': {   // 「老师 × 一周」点空格：那位老师、那天，时间先填 18:00–20:00

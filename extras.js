@@ -122,6 +122,7 @@ document.addEventListener('click', async e => {
   try {
     if (a.dataset.act === 'file-del') { e.preventDefault(); await act('file_delete', {fid: v}, '已删除'); reopenModal(); }
     if (a.dataset.act === 'pay') { e.stopPropagation(); const [tid, ym, what, on] = v.split('|');
+      if (what === 'settled' && on === '1') { try { await load(); } catch(err) { toast('网络不稳，没读到最新的课，请稍后再点', true); return; } }   // 2026-11-23：页面开久了，别拿旧数据算结算明细
       await act('pay_mark', {tid, month: ym, what, on_: on === '1', ...(isOwner() ? {ledger: curBook()} : {}), ...(what === 'settled' && on === '1' ? {detail: payDetail(tid, ym)} : {})}, what === 'settled' ? (on === '1' ? '已标记结算完成' : '已撤销结算') : (on === '1' ? '已审核' : '已撤销审核')); }
     if (a.dataset.act === 'makeup') { const [lid, on] = v.split('|'); await act('admin_update_lesson', {lid, d: {makeup: on === '1'}}, ME().role==='teacher' ? '已提交申请，教务批准后生效' : on === '1' ? '已标为补课' : '已取消补课标记'); lessonModal(lid); }
   } catch(err) { /* act() 已经提示过 */ }
@@ -175,14 +176,15 @@ function bksLine(){
 }
 function pgBackup(){
   let last = ''; try { last = localStorage.getItem('jw_backup') || ''; } catch(e) {}
-  const all = DB_ALL || DB;
+  const all = isOwner() && S.book !== 'all' ? DB : (DB_ALL || DB);   // 2026-11-23：总管理在 K / Panda 视图里只算这个视图的
+  const canExport = !PEEK && !(isOwner() && S.book !== 'all');
   return `<div class="ph"><h2>数据备份</h2></div>
   ${bksLine()}
   <div class="note">上面的自动存档放在数据库里面，万一整个数据库出问题会一起没。所以还是建议<b>每周点一次</b>下面的按钮，把备份文件存到电脑或网盘里。万一数据被误删，可以拿这个文件找我恢复。</div>
   <section class="card" style="display:flex;flex-direction:column;gap:10px">
     <div class="stats"><div class="stat"><small>学生</small><b>${all.students.length}</b></div><div class="stat"><small>老师</small><b>${all.teachers.length}</b></div>
       <div class="stat"><small>课次</small><b>${all.lessons.length}</b></div><div class="stat"><small>课后反馈</small><b>${all.feedbacks.length}</b></div></div>
-    <div class="row"><button class="btn pri" data-act="backup">导出全部数据（下载备份文件）</button>
+    <div class="row">${canExport ? `<button class="btn pri" data-act="backup">导出全部数据（下载备份文件）</button>` : `<span class="note">${PEEK ? '「打开看看」里不能导出备份' : '备份文件包含两本账：请先把右上角切到「全部」再导出'}</span>`}
       <span class="muted small">${last ? `上次导出：${esc(last)}` : '还没有导出过'}</span></div>
     <div class="muted xs">包括：学生、老师、课程、课表、反馈、作业、请假申请、月计划、成绩、出愿目标、月度家长反馈（含面谈原始纪要、任课老师说的）、跟进记录、通关点检表、院校库、链接、AI 写法要求、老师履历（照片和文件只记地址）、学生留言、单词记录、点检模板内容。<br>
       上传的照片和 PDF 本身不在这个文件里（文件里只记录它们的地址），照片仍然保存在服务器上。${isOwner() && S.book !== 'all' ? '<br><b>注意：</b>现在是「' + (S.book === 'mine' ? 'Panda' : 'Project K') + '」视图，导出的仍然是全部数据。' : ''}</div>
@@ -190,6 +192,7 @@ function pgBackup(){
 }
 document.addEventListener('click', async e => {
   const a = e.target.closest('[data-act="backup"]'); if (!a) return;
+  if (PEEK || (isOwner() && S.book !== 'all')) { toast(PEEK ? '「打开看看」里不能导出备份' : '请先把右上角切到「全部」再导出', true); return; }
   document.body.classList.add('busy');
   try {
     // 2026-11-19：每一类都读到了才导出；有一类没读出来就不导出、不记「上次导出」
