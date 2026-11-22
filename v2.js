@@ -31,7 +31,9 @@ function v2Save(){ if (PEEK) return; try { localStorage.setItem(v2Key(), JSON.st
 async function v2Pref(){
   if (PEEK) return;
   try {
-    const r = await rpc('ui_pref_load'); if (!r || V2.touched) return;
+    const r = await rpc('ui_pref_load'); if (!r) return;
+    v2ThemeSync(r);
+    if (V2.touched) return;
     let ver = r.ver === 'old' || r.ver === 'new' ? r.ver : null;
     if (!ver && V2.local){ ver = V2.local.ver; rpc('ui_pref_set', {ver, why: null}).then(() => V2.seen && !r.seen && rpc('ui_pref_set', {ver: 'seen'})).catch(() => {}); }
     ver = ver || V2_DEFAULT;
@@ -42,6 +44,16 @@ async function v2Pref(){
       if (!busy) render();
     }
   } catch(e) {}   // 数据库还没加第 64 步：只用本机记的
+}
+// 第 66 步：配色跟着链接走。数据库里记的和这台设备不一样 → 用数据库的；数据库还没记、这台选过 → 补进数据库；读回来之前刚点过 → 以刚点的为准
+function v2ThemeSync(r){
+  if (V2.themeTouched || !('theme' in r)) return;   // 数据库还没加第 66 步（读回来没有这一项）：只用这台设备记的
+  const db = V2_THEMES.some(x => x[0] === r.theme) ? r.theme : null, cur = v2Theme();
+  if (db && db !== cur){
+    V2.theme = db; try { localStorage.setItem(v2ThemeKey(), db); } catch(e) {}
+    if (document.body.classList.contains('v2')) document.body.dataset.theme = db;
+    document.querySelectorAll('.v2-sw').forEach(b => { const on = b.dataset.v === db; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+  } else if (!db && cur !== 'notion') rpc('ui_theme_set', {theme: cur}).catch(() => {});
 }
 function v2Set(ver, why){
   V2.ver = ver; V2.seen = true; V2.touched = true; v2Save();
@@ -59,6 +71,18 @@ const v2OldBar = () => `<div class="v2-oldbar" role="status"><span>现在是旧�
 const v2Banner = () => V2.seen || PEEK ? '' : `<div class="v2-banner" role="status"><span><b>这是新版页面</b><span class="muted"> · 不习惯的话可以切回旧版</span></span><span class="v2-banner-acts"><button type="button" class="v2-link" data-act="v2-ui-old-ask">切回旧版</button><button type="button" class="btn sm" data-act="v2-ui-seen">知道了</button></span></div>`;
 const v2UiRow = () => PEEK ? '' : `<section class="card v2-uirow"><div><b>页面样子</b><div class="muted xs">现在用的是新版。不习惯可以切回旧版，以后随时能换回来。</div></div><button class="btn sm" data-act="v2-ui-old-ask">切回旧版</button></section>`;
 
+/* ───────── 外观：四套配色（2026-11-22 提前做；先记在这台设备上，满意了再跟着链接存） ───────── */
+const V2_THEMES = [['notion', '白底 · 一点蓝', '默认', '#ffffff', '#f7f7f5', '#2383e2', '#37352f'], ['seaglass', '海玻璃', '清透的海水绿', '#f3f7f7', '#e8eeee', '#006f76', '#d5eeeb'],
+  ['sakura', '桜', '很浅的樱花粉', '#fdf7f8', '#f6edef', '#d45d7e', '#fbe3e8'], ['latte', '奶咖', '咖啡店的暖色', '#f6f1ea', '#ede6dd', '#b97a44', '#3b2f2a']];
+const v2ThemeKey = () => 'jw_theme:' + (ME().id || ME().role);
+function v2Theme(){
+  if (V2.theme == null){ let t = ''; if (!PEEK) { try { t = localStorage.getItem(v2ThemeKey()) || ''; } catch(e) {} } V2.theme = V2_THEMES.some(x => x[0] === t) ? t : 'notion'; }
+  return V2.theme;
+}
+const v2Look = () => `<section class="card v2-look"><div><b>外观</b><div class="muted xs">选一套自己喜欢的颜色，只改你自己看到的样子。科目颜色、完成 / 等待 / 要跟进这些颜色不变。</div></div>
+  <div class="v2-sws" role="radiogroup" aria-label="配色">${V2_THEMES.map(([k, t, d, b, c, a, p]) => `<button type="button" role="radio" aria-checked="${v2Theme() === k}" class="v2-sw ${v2Theme() === k ? 'on' : ''}" data-act="v2-theme" data-v="${k}" style="--b:${b};--c:${c};--a:${a};--p:${p}"><span class="pv"><i></i><span><em></em></span></span><span>${t}</span><small>${d}</small></button>`).join('')}</div></section>`;
+const v2LookModal = () => openModal(`${mHead('外观')}${v2Look()}<div class="row" style="justify-content:flex-end"><button class="btn pri" data-act="close">好了</button></div>`);
+
 /* ───────── 接管画页面 ───────── */
 const renderOld = render;
 render = function(){
@@ -70,7 +94,7 @@ render = function(){
     if (!PEEK) app.insertAdjacentHTML('afterbegin', v2OldBar());
     return;
   }
-  document.body.classList.add('v2');
+  document.body.classList.add('v2'); document.body.dataset.theme = v2Theme();
   S.dirtyMain = false;
   if (!S.v2init){ S.v2init = true; if (ME().role === 'teacher' && S.tab === 'a') S.tab = 'b'; }   // 老师打开先看「我的学生」
   setTimeout(labelTables);
@@ -163,6 +187,7 @@ function v2Shell(){
   const sd = ['student', 'parent'].includes(me.role) ? sSide(stu(me.student_id)) : null;
   const foot = `<div class="v2-foot">${sd ? `<div class="v2-tea">${sd.bottom}</div>` : ''}
     <div class="v2-me">${v2Ava(me.role === 'parent' ? stu(me.student_id).name : me.name)}<span class="v2-nl"><b>${esc(nm)}</b><small>${esc(label || '')}</small></span></div>
+    ${me.role === 'admin' ? `<button type="button" class="v2-link v2-nl" data-act="v2-look">外观</button>` : ''}
     ${PEEK ? '' : `<button type="button" class="v2-link v2-nl" data-act="v2-ui-old-ask">切回旧版</button>`}
     ${['student', 'parent'].includes(me.role) ? '' : `<button type="button" class="v2-link v2-nl" data-act="logout" title="让这台设备忘掉你的链接">退出</button>`}</div>`;
   const curT = (nv.groups.flatMap(g => g[1]).find(x => x[0] === nv.cur) || [])[1] || (nv.cur === 'more' ? '更多' : '');
@@ -187,12 +212,12 @@ function v2Page(){
   }
   if (me.role === 'teacher'){
     const t = tea(me.teacher_id);
-    if (S.tab === 'd') return v2Legacy(`<div class="v2-entry"><button type="button" class="v2-go" data-act="tab" data-v="f">${navIcon('通关点检')}<span>通关点检</span>${v2Ic('go')}</button></div>` + tMe(t) + v2UiRow(), true);
+    if (S.tab === 'd') return v2Legacy(`<div class="v2-entry"><button type="button" class="v2-go" data-act="tab" data-v="f">${navIcon('通关点检')}<span>通关点检</span>${v2Ic('go')}</button></div>` + tMe(t) + v2Look() + v2UiRow(), true);
     if (S.tab === 'f') return v2Legacy(tChecks(t));
     return ({a: v2TSched, b: v2TStudents, c: v2TWrite}[S.tab] || v2TStudents)(t);
   }
   const s = stu(me.student_id);
-  if (S.tab === 'e') return v2Legacy(sMine(s) + v2UiRow() + ('<div class="row" style="justify-content:center;margin:20px 0 4px"><button class="btn sm" data-act="logout">退出这台设备</button></div><div class="muted xs" style="text-align:center;margin-bottom:12px">在别人的手机、电脑上打开过的话，看完点这里退出</div>'), true);
+  if (S.tab === 'e') return v2Legacy(sMine(s) + v2Look() + v2UiRow() + ('<div class="row" style="justify-content:center;margin:20px 0 4px"><button class="btn sm" data-act="logout">退出这台设备</button></div><div class="muted xs" style="text-align:center;margin-bottom:12px">在别人的手机、电脑上打开过的话，看完点这里退出</div>'), true);
   if (S.tab === 'd') return v2Legacy(v2Head('上课记录') + sFeedback2(s), true);
   if (S.tab === 'f') return v2Legacy(sCheck(s), true);
   if (S.tab === 'b') return v2Head('课表', '北京时间') + v2Legacy(sSched(s));
@@ -201,7 +226,7 @@ function v2Page(){
 }
 function v2More(){
   const nv = v2Nav(), list = nv.groups.flatMap(g => g[1]).filter(([k]) => !['overview', 'calendar', 'todo', 'students'].includes(k));
-  return v2Head('更多') + `<div class="v2-entry">${list.map(([k, t]) => `<button type="button" class="v2-go" data-act="page" data-v="${k}">${navIcon(t)}<span>${t}</span>${v2Ic('go')}</button>`).join('')}</div>` + v2UiRow();
+  return v2Head('更多') + `<div class="v2-entry">${list.map(([k, t]) => `<button type="button" class="v2-go" data-act="page" data-v="${k}">${navIcon(t)}<span>${t}</span>${v2Ic('go')}</button>`).join('')}</div>` + v2Look() + v2UiRow();
 }
 
 /* ═════════════ 教务 ═════════════ */
@@ -615,6 +640,13 @@ document.addEventListener('click', async e => {
   try {
   switch (k){
     case 'v2-ui-old-ask': v2OldAsk(); break;
+    case 'v2-look': v2LookModal(); break;
+    case 'v2-theme': {   // 换配色：马上生效；「打开看看」时只换这一页，不记
+      V2.theme = V2_THEMES.some(x => x[0] === v) ? v : 'notion'; document.body.dataset.theme = V2.theme;
+      if (!PEEK) { V2.themeTouched = true; try { localStorage.setItem(v2ThemeKey(), V2.theme); } catch(e) {}
+        rpc('ui_theme_set', {theme: V2.theme}).catch(() => toast('网络不稳，这次只在这台设备上换了；换别的手机、电脑打开可能还是原来的颜色', true, 6000)); }
+      document.querySelectorAll('.v2-sw').forEach(b => { const on = b.dataset.v === V2.theme; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+      break; }
     case 'v2-ui-old': v2Set('old', val('v2-why').trim()); break;
     case 'v2-ui-new': v2Set('new'); break;
     case 'v2-ui-seen': V2.seen = true; v2Save(); if (!PEEK) rpc('ui_pref_set', {ver: 'seen'}).catch(() => {}); document.querySelector('.v2-banner')?.remove(); break;
@@ -666,9 +698,11 @@ async function v2Stats(){
   const since = addDay(TODAY, -30), recent = P.filter(x => x.last_seen && x.last_seen.slice(0, 10) >= since);
   const rows = Object.keys(RN).map(k => { const xs = recent.filter(x => x.role === k); return xs.length ? `<tr><td>${RN[k]}</td><td class="num">${xs.filter(x => x.ver !== 'old').length}</td><td class="num">${xs.filter(x => x.ver === 'old').length}</td></tr>` : ''; }).join('');
   const why = E.filter(x => x.ver === 'old' && x.why);
+  const themes = V2_THEMES.map(([k, t]) => [t, recent.filter(x => (x.theme || 'notion') === k && x.ver !== 'old').length]);
   openModal(`${mHead('新版使用情况')}
   <div class="muted xs">最近 30 天打开过的人里，现在用新版、旧版的各有几位（没选过的算新版）。只有总管理看得到。</div>
   ${rows ? `<div class="tw"><table class="rt"><thead><tr><th>身份</th><th>用新版</th><th>用旧版</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="empty">最近 30 天还没有人打开过</div>'}
+  ${rows ? `<div class="small"><b>用新版的人选的配色：</b>${themes.map(([t, n]) => `${t} ${n} 人`).join(' · ')}</div>` : ''}
   <b class="small">切回旧版时写的原因（${why.length} 条）</b>
   ${why.length ? `<div class="list">${why.slice(0, 50).map(x => `<div class="li small"><span class="muted num">${esc(bjAt(x.at).slice(5, 16))}</span><span class="grow"><b>${esc(x.name)}</b>（${RN[x.role] || ''}）：${esc(x.why)}</span></div>`).join('')}</div>` : '<div class="muted small">还没有人写</div>'}
   <div class="row" style="justify-content:flex-end"><button class="btn pri" data-act="close">知道了</button></div>`, true);
