@@ -51,27 +51,47 @@ function pgSchools(){
   <div id="pg-list">${progList()}</div>`;
 }
 // 搜索用的内容（简繁日汉字统一、带上学校的中文名 / 英文名 / 简称），算一次记住
-const progHay = p => p._hay || (p._hay = fz([p.school, p.faculty, p.dept, p.field, p.region, ...Object.values(p.info || {})].join(' ')) + ' ' + fzAliases(p.school + p.faculty));
+const progHay = p => p._hay || (p._hay = fz([p.school, p.faculty, p.dept, p.field, p.region, ...Object.entries(p.info || {}).filter(([k]) => k !== 'school_ord').map(([, v]) => v)].join(' ')) + ' ' + fzAliases(p.school + p.faculty));
+/* 排列（2026-11-23）：学校按拼音（有中文校名用中文校名）；同一所学校里：类别（学部→大学院…）→ 校内分类 → 校内顺序 → 学部、学科名 → 年度新到旧。
+   校内分类之间的先后：这一组里最小的「校内顺序」，用整个院校库算（筛选掉几个专业，组的位置也不变）；都没填顺序就按拼音，没分类的排最后。 */
+const PROG_LV = ['学部', '大学院', '研究生', '专门学校'];
+const progOrd = p => { const n = parseFloat(String(pv(p, 'school_ord')).replace(/[０-９．]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))); return isFinite(n) ? n : Infinity; };
+function progIdx(){   // 学校的排序名、各组的位置：整个院校库算一次，PROG 换了就重算
+  if (PROG._idx) return PROG._idx;
+  const cn = {}, gr = {};
+  PROG.forEach(p => { if (!cn[p.school] && pv(p, 'school_cn')) cn[p.school] = pv(p, 'school_cn');
+    const g = [p.school, p.level, pv(p, 'school_group')].join('|'); gr[g] = Math.min(gr[g] ?? Infinity, progOrd(p)); });
+  return (PROG._idx = {cn, gr});
+}
+const progSchoolKey = p => progIdx().cn[p.school] || p.school;
+function progCmpIn(a, b){
+  const lv = p => { const i = PROG_LV.indexOf(p.level); return i < 0 ? 9 : i; }, ga = pv(a, 'school_group'), gb = pv(b, 'school_group');
+  const gr = p => progIdx().gr[[p.school, p.level, pv(p, 'school_group')].join('|')];
+  return (lv(a) - lv(b)) || (ga === gb ? 0 : !ga ? 1 : !gb ? -1 : (gr(a) - gr(b)) || pyCmp(ga, gb))
+    || ((progOrd(a) - progOrd(b)) || 0) || pyCmp(a.faculty || '', b.faculty || '') || pyCmp(a.dept || '', b.dept || '') || (b.year - a.year);
+}
+const progCmpAll = (a, b) => pyCmp(progSchoolKey(a), progSchoolKey(b)) || (a.school < b.school ? -1 : a.school > b.school ? 1 : 0) || progCmpIn(a, b);
 function progFiltered(){
   return PROG.filter(p => ['year','level','field','school_type'].every(k => !PF[k] || String(pv(p, k)) === PF[k]) && fzHit(PF.q, progHay(p)));
 }
 function progList(){
+  if (typeof v2ProgList === 'function' && document.body.classList.contains('v2')) return v2ProgList();   // 新版：按学校分块、可切换排序（v2d.js）
   if (!PROG.length) return `<div class="card empty">院校库还是空的。点右上角「下载 Excel 模板」，填好后「导入 Excel」；也可以「添加专业」一个个录。</div>`;
   const list = progFiltered();
   if (!list.length) return '<div class="card empty">没有符合条件的专业</div>';
   return `<div class="muted xs" style="margin:2px 0 6px">共 ${list.length} 个专业</div>` + list.map(progCard).join('');
 }
-const SHOWN_IN_HEAD = ['year','level','field','school','school_cn','school_en','region','faculty','dept','school_type','intake','campus','url','url2'];
-function progCard(p){
+const SHOWN_IN_HEAD = ['year','level','field','school','school_cn','school_en','region','school_group','faculty','dept','school_ord','school_type','intake','campus','url','url2'];
+function progCard(p, o = {}){   // o.inSchool：放在新版「学校块」里，校名、国公私、地区在块头上，卡片不再重复
   const used = (DB.targets||[]).filter(t => t.program_id===p.id).length, rs = p.rounds || [];
   const rExtra = SF_R.filter(f => !f.core);
   const groups = P_GROUPS.map(g => {
     const items = SF_P.filter(f => f.g === g && !SHOWN_IN_HEAD.includes(f.k) && pv(p, f.k));
     return items.length ? `<div class="pg-grp"><div class="pg-gt">${g}</div><dl class="kv small">${items.map(f => `<dt>${f.l}</dt><dd style="white-space:pre-wrap">${esc(String(pv(p, f.k)))}</dd>`).join('')}</dl></div>` : '';
   }).join('');
-  return `<details class="card pg-card"><summary><div class="row"><b class="pg-school" title="${esc([pv(p,'school_cn'), pv(p,'school_en')].filter(Boolean).join(' / '))}">${esc(p.school)}</b><span>${esc(progName(p))}</span>
+  return `<details class="card pg-card"><summary><div class="row">${o.inSchool ? `<b class="pg-prog">${esc(progName(p) || '（没填学部学科）')}</b>` : `<b class="pg-school" title="${esc([pv(p,'school_cn'), pv(p,'school_en')].filter(Boolean).join(' / '))}">${esc(p.school)}</b>${pv(p,'school_group')?`<span class="muted">${esc(pv(p,'school_group'))}</span>`:''}<span>${esc(progName(p))}</span>`}
       <span class="tag mute">${p.year}${pv(p,'intake')&&pv(p,'intake')!=='4月'?' · '+esc(pv(p,'intake'))+'入学':''}</span><span class="tag blue">${esc(p.level)}</span>${p.field?`<span class="tag gold">${esc(p.field)}</span>`:''}
-      ${pv(p,'school_type')?`<span class="tag mute">${esc(pv(p,'school_type'))}</span>`:''}${p.region?`<span class="tag mute">${esc(p.region)}</span>`:''}
+      ${!o.inSchool && pv(p,'school_type')?`<span class="tag mute">${esc(pv(p,'school_type'))}</span>`:''}${!o.inSchool && p.region?`<span class="tag mute">${esc(p.region)}</span>`:''}
       ${used?`<span class="tag ok">${used} 位学生在报</span>`:''}${staleTag(p)}<span style="margin-left:auto">${nextRound(p)}</span></div></summary>
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
       ${rs.length ? `<div class="tw"><table class="rt"><thead><tr><th>入试</th><th>出愿</th><th>材料必着</th><th>一次发表</th><th>笔试</th><th>面试</th><th>合格发表</th><th>手续截止</th><th>考试内容</th></tr></thead><tbody>
@@ -94,7 +114,8 @@ function sfInput(f, val, cls){
   if (f.t === 'select') return `<label class="field"><span>${f.l}</span><select ${id} ${c}><option value="">—</option>${f.o.map(o => `<option ${o===val?'selected':''}>${esc(o)}</option>`).join('')}${val && !f.o.includes(val) ? `<option selected>${esc(val)}</option>` : ''}</select></label>`;
   if (f.t === 'date') return `<label class="field"><span>${f.l}</span><input type="date" ${id} ${c} value="${esc(val||'')}"></label>`;
   if (f.t === 'area') return `<label class="field"><span>${f.l}</span><textarea ${id} ${c} style="min-height:48px" ${ph}>${esc(val||'')}</textarea></label>`;
-  return `<label class="field"><span>${f.l}</span><input type="text" ${id} ${c} value="${esc(val??'')}" ${ph}></label>`;
+  if (f.k === 'school_group') return `<label class="field"><span>${f.l}</span><input type="text" ${id} ${c} value="${esc(val??'')}" ${ph} list="dl-sgrp"><datalist id="dl-sgrp">${[...new Set((PROG || []).map(p => pv(p, 'school_group')).filter(Boolean))].sort(pyCmp).map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>`;
+  return `<label class="field"><span>${f.l}</span><input type="text" ${id} ${c} value="${esc(val??'')}" ${f.k === 'school_ord' ? 'inputmode="decimal"' : ''} ${ph}></label>`;
 }
 function progForm(p){
   p = p || {year: (+TODAY.slice(0,4) + (TODAY.slice(5,7) >= '04' ? 1 : 0)), level:'学部', info:{}, rounds:[{}]};
@@ -129,7 +150,7 @@ async function progPicker(sid, tid){
   openModal(`${mHead('从院校库选')}
   <input type="search" id="pk-q" placeholder="搜学校、学部、学科（中文、日文、英文都行）">
   <div class="muted xs">点某一轮，就把这一轮的日期和要求带进出愿目标；带进去以后还可以改。</div>
-  <div id="pk-list" style="display:flex;flex-direction:column;gap:6px">${PROG.length ? PROG.map(p => `<div class="card small pk-item" data-s="${esc(progHay(p))}">
+  <div id="pk-list" style="display:flex;flex-direction:column;gap:6px">${PROG.length ? PROG.slice().sort(progCmpAll).map(p => `<div class="card small pk-item" data-s="${esc(progHay(p))}">
     <div class="row"><b>${esc(p.school)}</b><span>${esc(progName(p))}</span><span class="tag mute">${p.year}</span>${p.field?`<span class="tag gold">${esc(p.field)}</span>`:''}</div>
     <div class="row" style="margin-top:4px">${(p.rounds||[]).length ? p.rounds.map(r => `<button class="btn sm" data-act="pk-pick" data-v="${p.id}|${r.id}">${esc(r.name||'（未命名）')}${r.apply_end?` · ${dS(r.apply_end)} 截止`:''}</button>`).join('') : `<button class="btn sm" data-act="pk-pick" data-v="${p.id}|">带入（还没有轮次）</button>`}</div></div>`).join('') : '<div class="empty">院校库还是空的，先到左侧「院校库」导入</div>'}</div>
   <div class="row"><button class="btn sm" data-act="pk-back">返回</button></div>`, true);
@@ -275,7 +296,13 @@ async function progImportFile(file){
     const {list, warn} = rowsToPrograms(rows);
     if (!list.length) { toast('表里没有可以导入的内容', true); return; }
     await progLoad().catch(() => {});
-    const exist = new Set((PROG||[]).map(p => [p.year, p.school, p.faculty, p.dept].join('|')));
+    const old = new Map((PROG||[]).map(p => [[p.year, p.school, p.faculty, p.dept].join('|'), p]));
+    list.forEach(p => {
+      const o = old.get([p.year, p.school, p.faculty||'', p.dept||''].join('|'));
+      ['school_group', 'school_ord'].forEach(k => { if (!p.info[k] && o && pv(o, k)) p.info[k] = pv(o, k); });
+      if (p.info.school_ord && !isFinite(progOrd(p))) { warn.push(`${p.school} ${progName(p)}：「校内顺序」写的是「${p.info.school_ord}」，不是数字，没有导入这一项`); delete p.info.school_ord; }
+    });
+    const exist = new Set(old.keys());
     const nUpd = list.filter(p => exist.has([p.year, p.school, p.faculty||'', p.dept||''].join('|'))).length;
     IMPORT_PENDING = list;
     openModal(`${mHead('导入院校库')}
@@ -302,6 +329,7 @@ document.addEventListener('click', async e => {
     }
     if (k === 'prog-save') {
       const d = progCollect(); if (!d.school) { toast('请填写学校', true); return; }
+      if (d.info.school_ord && !isFinite(progOrd(d))) { toast('「校内顺序」请填数字，例如 10、20、30', true); return; }
       d.rounds = d.rounds.filter(r => r.name || R_DATES.some(x => r[x]) || Object.keys(r.info).length);
       if (v) d.id = v;
       await act('program_save', {d}, '已保存'); await progLoad(true); closeModal(); render();

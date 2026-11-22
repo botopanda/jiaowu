@@ -505,4 +505,39 @@ body.v2[data-theme="night"] .toast.err{color:#2a0f0d}
   .v2-lr{grid-template-columns:1fr;gap:8px}
   .v2-lsearch .v2-search{min-width:0;width:100%}
 }
+/* 院校库（2026-11-23）：结构不变，只换样子 */
+.v2-scbar{display:flex;flex-direction:column;gap:8px;position:sticky;top:0;z-index:6;background:var(--bg);padding:6px 0}
+.v2-scsel{display:flex;gap:8px;flex-wrap:wrap}.v2-scsel select{min-width:140px}
+.v2-schools{display:flex;flex-direction:column;gap:8px}
+.v2-schools>.muted.xs{font-weight:700;margin:2px 6px 0!important}
+.v2-schools .pg-card{background:var(--card);border:0;border-radius:18px;padding:0;overflow:hidden}
+.v2-schools .pg-card>summary{list-style:none;cursor:pointer;padding:12px 16px}
+.v2-schools .pg-card>summary::-webkit-details-marker{display:none}
+.v2-schools .pg-card>summary:hover{background:var(--card2)}
+.v2-schools .pg-card[open]>summary{border-bottom:1px solid var(--line-2)}
+.v2-schools .pg-card>summary .row{gap:6px 8px;align-items:center}
+.v2-schools .pg-school{font-size:15px;font-weight:800}
+.v2-scsec{font-weight:800;font-size:14px;margin:10px 6px 0;padding-bottom:4px;border-bottom:2px solid var(--line)}
+.v2-sccount{align-items:center;margin:0 6px}
+.v2-scblk{background:var(--paper);border-radius:20px;padding:4px 10px}
+.v2-scblk[open]{padding-bottom:10px}
+.v2-schd{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;padding:8px 6px;cursor:pointer;list-style:none}
+.v2-schd::-webkit-details-marker{display:none}
+.v2-scarr{display:inline-block;width:14px;color:var(--muted);font-weight:800;transition:transform .15s}
+.v2-scblk[open]>.v2-schd .v2-scarr{transform:rotate(90deg)}
+.v2-schd .pg-school{font-size:16px}
+.v2-scn{margin-left:auto}
+.v2-scin{display:flex;flex-direction:column;gap:6px}
+.v2-scgrp{font-weight:800;font-size:13px;color:var(--muted);margin:6px 6px 0}
+.v2-scblk .pg-card{border-radius:14px}
+.v2-scblk .pg-prog{font-size:14px;font-weight:700}
+@media (max-width:760px){.v2-scn{margin-left:20px;flex-basis:100%}}
+.v2-schools .pg-card>div{padding:0 16px 14px}
+.v2-schools .pg-card table.rt{background:var(--paper);border-radius:14px;overflow:hidden;font-size:13px;border-collapse:collapse;width:100%}
+.v2-schools .pg-card table.rt th{font-size:12px;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+.v2-schools .pg-card table.rt td{padding:8px 10px;border-bottom:1px solid var(--line-2)}
+.v2-schools .pg-grps{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.v2-schools .pg-grp{background:var(--paper);border-radius:14px;padding:10px 12px}
+.v2-schools .pg-gt{font-weight:800;font-size:13px;margin-bottom:4px}
+@media (max-width:760px){.v2-scsel select{min-width:0;flex:1 1 45%}}
 @media print{.v2-side,.v2-tabbar,.v2-banner,.v2-top{display:none!important}.v2-app{display:block}}

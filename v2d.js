@@ -138,6 +138,89 @@ async function v2LgAuto(){
   finally { v2LgAuto.run = false; v2LgFilter(); }
 }
 
+/* ═════════════ 院校库（2026-11-23）：结构不变——上面搜索＋四个筛选，下面一个专业一张卡片、点开看各轮日期和全部资料；只换样子 ═════════════ */
+function v2Schools(){
+  const acts = `<a class="btn sm" href="院校库导入模板.xlsx" download>下载 Excel 模板</a><label class="btn sm" for="prog-file">导入 Excel</label><input type="file" id="prog-file" accept=".xlsx,.csv" data-change="prog-import" hidden><button class="btn pri sm" data-act="prog-new">${v2Ic('plus')}添加专业</button>`;
+  const help = `<details class="v2-help"><summary>怎么用 ›</summary><div class="small"><p>一个专业一张卡片，点开看全部资料和各轮入试日期。学生的「大学与出愿」可以直接从这里带入。导入 Excel 时，同年度、同学校、同学部学科的会更新，其他的新增。</p></div></details>`;
+  if (!PROG){
+    progLoad().then(() => { if (S.page === 'schools') render(); }).catch(e => toast(e.message, true));
+    return v2Head('院校库', '', acts) + help + '<div class="v2-empty big">正在读取院校库…</div>';
+  }
+  const uniq = k => [...new Set(PROG.map(p => String(pv(p, k))).filter(Boolean))].sort();
+  const sel = (k, label) => `<select id="pf-${k}" aria-label="${label}"><option value="">${label}：全部</option>${uniq(k).map(x => `<option ${x === PF[k] ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`;
+  return v2Head('院校库', `${v2Uniq(PROG)} 个专业`, acts) + help
+    + `<div class="v2-scbar"><label class="v2-search big">${v2Ic('search')}<input type="search" id="pf-q" placeholder="搜学校、学部、学科、关键词；中文、日文、英文都行，例：早稻田 / waseda" value="${esc(PF.q)}" aria-label="搜院校库"></label>
+      <div class="v2-scsel"><select id="pf-sort" aria-label="排序">${V2_SC_SORT.map(([v, l]) => `<option value="${v}" ${v === (PF.sort || '') ? 'selected' : ''}>排序：${l}</option>`).join('')}</select>${sel('year', '年度')}${sel('level', '类别')}${sel('field', '方向')}${sel('school_type', '学校类型')}</div></div>
+    <div id="pg-list" class="v2-schools">${progList()}</div>`;
+}
+
+/* ───────── 院校库：排序＋按学校分块（2026-11-23） ─────────
+   学校名（默认）：拼音 A→Z，有中文校名用中文校名排；地区：北→南（都道府县顺序）；国公立私立：国立→公立→私立；
+   这三种都是一所学校一个块，块里放这所学校的专业。出愿截止近的：不分块，按下一轮出愿截止日从近到远平铺。 */
+const V2_SC_SORT = [['', '学校名'], ['region', '地区'], ['type', '国公立私立'], ['due', '出愿截止近的']];
+const V2_PREF = ['北海道','青森','岩手','宮城|宫城','秋田','山形','福島|福岛','茨城','栃木','群馬|群马','埼玉','千葉|千叶','東京|东京','神奈川','新潟','富山','石川','福井','山梨','長野|长野','岐阜','静岡|静冈','愛知|爱知','三重','滋賀|滋贺','京都','大阪','兵庫|兵库','奈良','和歌山','鳥取|鸟取','島根|岛根','岡山|冈山','広島|广岛','山口','徳島|德岛','香川','愛媛|爱媛','高知','福岡|福冈','佐賀|佐贺','長崎|长崎','熊本','大分','宮崎|宫崎','鹿児島|鹿儿岛','沖縄|冲绳'];
+const v2PrefNo = r => { const s = String(r || ''); return V2_PREF.findIndex(x => x.split('|').some(n => s.includes(n))); };   // 「东京都」先碰上「东京」，不会被当成京都
+const v2PrefLabel = i => i < 0 ? '' : V2_PREF[i].split('|').pop();
+const V2_TYPE = ['国立', '公立', '私立'];
+// 下一次出愿截止：所有轮次里今天以后最早的截止日；没公布日期的排在有日期的后面（9998），各轮都过了排最后（9999）
+function v2ScDue(p){
+  const rs = p.rounds || [], ds = rs.map(r => r.apply_end).filter(d => d && d >= TODAY).sort();
+  if (ds.length) return ds[0];
+  return !rs.length || rs.some(r => !r.apply_end && (r.apply_start || r.result_date || '9999') >= TODAY) ? '9998' : '9999';
+}
+const v2ScDueLabel = d => d === '9998' ? '日期还没公布' : d === '9999' ? '本年度各轮已截止' : (d.slice(0, 4) === TODAY.slice(0, 4) ? '' : d.slice(0, 4) + ' 年 ') + (+d.slice(5, 7)) + ' 月截止';
+// 一所学校的国公私、地区：用整个院校库里这所学校最常见的写法（筛选掉几个专业，学校也不会换位置）
+function v2ScInfo(school){
+  const c = PROG._sc || (PROG._sc = {});
+  if (c[school]) return c[school];
+  const top = k => { const n = {}; PROG.forEach(p => { if (p.school === school && pv(p, k)) n[pv(p, k)] = (n[pv(p, k)] || 0) + 1; }); return Object.keys(n).sort((a, b) => n[b] - n[a])[0] || ''; };
+  const one = PROG.find(p => p.school === school) || {};
+  return (c[school] = {type: top('school_type'), region: top('region'), alias: [pv(one, 'school_cn'), pv(one, 'school_en')].filter(x => x && x !== school)});
+}
+const v2Uniq = ps => new Set(ps.map(p => [p.school, p.level, p.faculty, p.dept].join('|'))).size;   // 同一个专业的不同年度只算一个
+function v2ProgList(){
+  if (!PROG.length) return `<div class="v2-empty big">院校库还是空的。点右上角「下载 Excel 模板」，填好后「导入 Excel」；也可以「添加专业」一个个录。</div>`;
+  const list = progFiltered();
+  if (!list.length) return '<div class="v2-empty big">没有符合条件的专业</div>';
+  const mode = PF.sort || '';
+  if (mode === 'due'){   // 不分学校，按截止日平铺；按月份分小标题
+    const xs = list.slice().sort((a, b) => v2ScDue(a).localeCompare(v2ScDue(b)) || progCmpAll(a, b));
+    let last = null, out = `<div class="muted xs">共 ${list.length} 个专业 · 按下一次出愿截止日，从近到远</div>`;
+    xs.forEach(p => { const l = v2ScDueLabel(v2ScDue(p)); if (l !== last){ out += `<div class="v2-scsec">${esc(l)}</div>`; last = l; } out += progCard(p); });
+    return out;
+  }
+  // 一所学校一个块
+  const by = new Map(); list.slice().sort(progCmpAll).forEach(p => { if (!by.has(p.school)) by.set(p.school, []); by.get(p.school).push(p); });
+  const blocks = [...by.entries()].map(([school, ps]) => ({school, ps, ...v2ScInfo(school)}));
+  const sec = b => mode === 'region' ? v2PrefNo(b.region) : mode === 'type' ? V2_TYPE.indexOf(b.type) : 0;
+  if (mode) blocks.sort((a, b) => { const x = sec(a), y = sec(b); return (x < 0 ? 99 : x) - (y < 0 ? 99 : y); });   // 稳定排序：同一地区 / 类型里还是学校名顺序
+  const secName = b => mode === 'region' ? (v2PrefLabel(v2PrefNo(b.region)) || (b.region ? '其他地区' : '没填地区')) : mode === 'type' ? (V2_TYPE.includes(b.type) ? b.type : '没填学校类型') : '';
+  const q = (PF.q || '').trim(), open = S.v2scOpen || {};
+  const isOpen = b => q ? true : (open[b.school] ?? S.v2scAll ?? blocks.length <= 3);   // 搜索时全部展开；学校不多时也展开
+  let last = null, out = `<div class="row v2-sccount"><span class="muted xs">共 ${v2Uniq(list)} 个专业 · ${blocks.length} 所学校</span>${q || blocks.length < 2 ? '' : `<span class="row" style="margin-left:auto"><button class="btn xs" data-act="v2-sc-all" data-v="1">全部展开</button><button class="btn xs" data-act="v2-sc-all" data-v="0">全部收起</button></span>`}</div>`;
+  blocks.forEach(b => {
+    const s = secName(b);
+    if (mode && s !== last){ out += `<div class="v2-scsec">${esc(s)} <span class="muted xs">${blocks.filter(x => secName(x) === s).length} 所</span></div>`; last = s; }
+    const multiLv = new Set(b.ps.map(p => p.level)).size > 1, lvGrp = lv => b.ps.some(p => p.level === lv && pv(p, 'school_group'));
+    const label = p => [multiLv ? p.level : '', pv(p, 'school_group') || (lvGrp(p.level) ? '未分类' : '')].filter(Boolean).join(' · ');
+    const due = b.ps.map(v2ScDue).filter(d => d < '9998').sort()[0], u = v2Uniq(b.ps);
+    let inner = '', gl = null;
+    b.ps.forEach(p => { const l = label(p); if (l && l !== gl){ inner += `<div class="v2-scgrp">${esc(l)} <span class="muted xs">${v2Uniq(b.ps.filter(x => label(x) === l))}</span></div>`; } gl = l; inner += progCard(p, {inSchool: true}); });
+    out += `<details class="v2-scblk" data-s="${esc(b.school)}" ${isOpen(b) ? 'open' : ''}><summary class="v2-schd"><span class="v2-scarr">›</span><b class="pg-school">${esc(b.school)}</b>${b.alias.length ? `<span class="muted small">${esc(b.alias.join(' / '))}</span>` : ''}
+      ${b.type ? `<span class="tag mute">${esc(b.type)}</span>` : ''}${b.region ? `<span class="tag mute">${esc(b.region)}</span>` : ''}
+      <span class="muted xs v2-scn">${u} 个专业${b.ps.length > u ? `（${b.ps.length} 条，含不同年度）` : ''}${due ? ` · 最近截止 ${dS(due)}` : ''}</span></summary>
+      <div class="v2-scin">${inner}</div></details>`;
+  });
+  return out;
+}
+const v2ScRedraw = () => { const box = document.getElementById('pg-list'); if (box) { box.innerHTML = progList(); labelTables(); } };
+document.addEventListener('change', e => { if (e.target.id === 'pf-sort'){ PF.sort = e.target.value; v2ScRedraw(); } });
+// 学校块：自己点开 / 收起的记住（筛选、换排序以后还是那样）；「全部展开 / 全部收起」
+document.addEventListener('click', e => {
+  const s = e.target.closest('.v2-scblk > summary'); if (s){ (S.v2scOpen ||= {})[s.parentElement.dataset.s] = !s.parentElement.open; return; }
+  const a = e.target.closest('[data-act="v2-sc-all"]'); if (a){ S.v2scAll = a.dataset.v === '1'; S.v2scOpen = {}; v2ScRedraw(); }
+});
+
 /* ───────── 搜索框、按钮 ───────── */
 document.addEventListener('input', e => {
   const a = e.target.closest?.('[data-v2ln]'); if (a) { S.v2lnQ = a.value; v2LnFilter(); S.dirtyMain = false; return; }

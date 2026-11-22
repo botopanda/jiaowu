@@ -208,7 +208,7 @@ function v2Page(){
     const pg = ok ? S.page : 'overview';
     const NEW = {overview: typeof v2Overview2 === 'function' ? v2Overview2 : v2Overview, calendar: v2Calendar, todo: v2Todo, students: v2Students, student: v2Students, teachers: v2Teachers, more: v2More,
       ...(typeof v2Payroll === 'function' ? {payroll: v2Payroll} : {}), ...(typeof v2Reviews === 'function' ? {reviews: v2Reviews} : {}),
-      ...(typeof v2Sys === 'function' ? {sys: v2Sys, log: v2Log} : {}),
+      ...(typeof v2Sys === 'function' ? {sys: v2Sys, log: v2Log} : {}), ...(typeof v2Schools === 'function' ? {schools: v2Schools} : {}),
       ...(typeof v2Apply === 'function' ? {apply: v2Apply, checks: () => v2Checks(DB.students.filter(s => s.active !== false), '点学生看他完整的点检表；学生和家长在自己的链接里也能看到（只能看）')} : {})};
     if (NEW[pg]) return NEW[pg]();
     const OLD = {sys: pgSys, log: typeof pgLog === 'function' ? pgLog : pgOverview, checks: pgChecks, apply: pgApply2, reviews: pgReviews, payroll: pgPayroll, schools: pgSchools};
