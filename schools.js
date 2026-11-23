@@ -44,8 +44,7 @@ function pgSchools(){
     progLoad().then(() => { if (S.page==='schools') render(); }).catch(e => toast(e.message, true));
     return head + '<div class="card empty">正在读取院校库…</div>';
   }
-  const uniq = k => [...new Set(PROG.map(p => String(pv(p, k))).filter(Boolean))].sort();
-  const sel = (k, label) => `<select id="pf-${k}" aria-label="${label}"><option value="">${label}：全部</option>${uniq(k).map(x => `<option ${x===PF[k]?'selected':''}>${esc(x)}</option>`).join('')}</select>`;
+  const sel = (k, label) => `<select id="pf-${k}" aria-label="${label}"><option value="">${label}：全部</option>${pfOpts(k).map(x => `<option ${x===PF[k]?'selected':''}>${esc(x)}</option>`).join('')}</select>`;
   return head + `<div class="row"><input type="search" id="pf-q" placeholder="搜学校、学部、学科、关键词；中文、日文、英文都行，例：早稻田 / waseda" value="${esc(PF.q)}" style="flex:1;min-width:200px">
     ${sel('year','年度')}${sel('level','类别')}${sel('field','方向')}${sel('school_type','学校类型')}</div>
   <div id="pg-list">${progList()}</div>`;
@@ -71,8 +70,11 @@ function progCmpIn(a, b){
     || ((progOrd(a) - progOrd(b)) || 0) || pyCmp(a.faculty || '', b.faculty || '') || pyCmp(a.dept || '', b.dept || '') || (b.year - a.year);
 }
 const progCmpAll = (a, b) => pyCmp(progSchoolKey(a), progSchoolKey(b)) || (a.school < b.school ? -1 : a.school > b.school ? 1 : 0) || progCmpIn(a, b);
+// 筛选用的值：「方向」可能写了两个（「机械、工学」），拆开算，选「工学」也能筛出来
+const pfVals = (p, k) => k === 'field' ? String(pv(p, k)).split(/[、,，\/／]/).map(s => s.trim()).filter(Boolean) : [String(pv(p, k))];
+const pfOpts = k => [...new Set(PROG.flatMap(p => pfVals(p, k)).filter(Boolean))].sort(k === 'field' ? pyCmp : undefined);
 function progFiltered(){
-  return PROG.filter(p => ['year','level','field','school_type'].every(k => !PF[k] || String(pv(p, k)) === PF[k]) && fzHit(PF.q, progHay(p)));
+  return PROG.filter(p => ['year','level','field','school_type'].every(k => !PF[k] || pfVals(p, k).includes(PF[k])) && fzHit(PF.q, progHay(p)));
 }
 function progList(){
   if (typeof v2ProgList === 'function' && document.body.classList.contains('v2')) return v2ProgList();   // 新版：按学校分块、可切换排序（v2d.js）
@@ -184,31 +186,32 @@ async function readXlsx(buf){
     return await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
   };
   const xml = s => new DOMParser().parseFromString(s, 'application/xml');
+  const tags = (n, name) => n.getElementsByTagNameNS('*', name);   // 2026-11-23：<row> 和 <x:row> 都认
   // 共享文字（跳过日文注音 rPh）
   const shared = [];
   const ss = await read('xl/sharedStrings.xml');
-  if (ss) for (const si of xml(ss).getElementsByTagName('si')) {
+  if (ss) for (const si of tags(xml(ss), 'si')) {
     let t = '';
-    for (const ch of si.childNodes) { if (ch.nodeName === 't') t += ch.textContent; else if (ch.nodeName === 'r') for (const x of ch.childNodes) if (x.nodeName === 't') t += x.textContent; }
+    for (const ch of si.childNodes) { if (ch.localName === 't') t += ch.textContent; else if (ch.localName === 'r') for (const x of ch.childNodes) if (x.localName === 't') t += x.textContent; }
     shared.push(t);
   }
   // 找工作表：优先叫「出愿数据库」「院校库」的，否则第一张
   const wb = xml(await read('xl/workbook.xml')), rels = xml(await read('xl/_rels/workbook.xml.rels') || '<x/>');
-  const sheets = [...wb.getElementsByTagName('sheet')];
+  const sheets = [...tags(wb, 'sheet')];
   const pick = sheets.find(s => /出愿数据库|院校库/.test(s.getAttribute('name'))) || sheets[0];
   let target = 'xl/worksheets/sheet1.xml';
-  if (pick) { const rid = pick.getAttribute('r:id'); const rel = [...rels.getElementsByTagName('Relationship')].find(r => r.getAttribute('Id') === rid);
+  if (pick) { const rid = pick.getAttribute('r:id') || pick.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id'); const rel = [...tags(rels, 'Relationship')].find(r => r.getAttribute('Id') === rid);
     if (rel) { const t = rel.getAttribute('Target'); target = t.startsWith('/') ? t.slice(1) : 'xl/' + t.replace(/^\.\//, ''); } }
   const sh = await read(target); if (!sh) throw new Error('Excel 里找不到工作表');
   const colIdx = ref => { let n = 0; for (const ch of ref.replace(/\d+/g, '')) n = n * 26 + ch.charCodeAt(0) - 64; return n - 1; };
   const rows = [];
-  for (const row of xml(sh).getElementsByTagName('row')) {
+  for (const row of tags(xml(sh), 'row')) {
     const arr = [];
-    for (const c of row.getElementsByTagName('c')) {
-      const t = c.getAttribute('t'), v = c.getElementsByTagName('v')[0]?.textContent ?? '';
+    for (const c of tags(row, 'c')) {
+      const t = c.getAttribute('t'), v = tags(c, 'v')[0]?.textContent ?? '';
       let val = v;
       if (t === 's') val = shared[+v] ?? '';
-      else if (t === 'inlineStr') val = [...c.getElementsByTagName('t')].map(x => x.textContent).join('');
+      else if (t === 'inlineStr') val = [...tags(c, 't')].map(x => x.textContent).join('');
       else if (t === 'n' || !t) val = v === '' ? '' : {num: v};
       arr[colIdx(c.getAttribute('r') || 'A1')] = val;
     }

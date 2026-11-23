@@ -146,8 +146,7 @@ function v2Schools(){
     progLoad().then(() => { if (S.page === 'schools') render(); }).catch(e => toast(e.message, true));
     return v2Head('院校库', '', acts) + help + '<div class="v2-empty big">正在读取院校库…</div>';
   }
-  const uniq = k => [...new Set(PROG.map(p => String(pv(p, k))).filter(Boolean))].sort();
-  const sel = (k, label) => `<select id="pf-${k}" aria-label="${label}"><option value="">${label}：全部</option>${uniq(k).map(x => `<option ${x === PF[k] ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`;
+  const sel = (k, label) => `<select id="pf-${k}" aria-label="${label}"><option value="">${label}：全部</option>${pfOpts(k).map(x => `<option ${x === PF[k] ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`;
   return v2Head('院校库', `${v2Uniq(PROG)} 个专业`, acts) + help
     + `<div class="v2-scbar"><label class="v2-search big">${v2Ic('search')}<input type="search" id="pf-q" placeholder="搜学校、学部、学科、关键词；中文、日文、英文都行，例：早稻田 / waseda" value="${esc(PF.q)}" aria-label="搜院校库"></label>
       <div class="v2-scsel"><select id="pf-sort" aria-label="排序">${V2_SC_SORT.map(([v, l]) => `<option value="${v}" ${v === (PF.sort || '') ? 'selected' : ''}>排序：${l}</option>`).join('')}</select>${sel('year', '年度')}${sel('level', '类别')}${sel('field', '方向')}${sel('school_type', '学校类型')}</div></div>
