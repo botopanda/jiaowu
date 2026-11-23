@@ -303,6 +303,8 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
   .sm-nav .nav{width:auto;white-space:nowrap;flex:none}
 }
 
+/* 文理艺标签（旧版） */
+.tag.trk-w{background:#e3ecfb;color:#2f5aa8;border-color:#c9d8f3}.tag.trk-l{background:#e2f3ea;color:#1f7a4d;border-color:#c4e3d1}.tag.trk-y{background:#f6e6f3;color:#9a3a86;border-color:#ebcbe4}.tag.trk-wl{background:#efe9fb;color:#5b46a8;border-color:#dbd1f3}
 /* 院校库 */
 .pg-card summary{cursor:pointer;list-style:none}
 .pg-card summary::-webkit-details-marker{display:none}

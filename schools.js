@@ -6,7 +6,7 @@
    读 Excel 不用外部插件：.xlsx 本身是个压缩包，用浏览器自带的解压读里面的表格
    ══════════════════════════════════════════════════════════════ */
 let PROG = null;                       // 院校库数据，用到时才读
-const PF = {q:'', field:'', level:'', year:'', school_type:''};
+const PF = {q:'', field:'', level:'', year:'', school_type:'', track:''};
 const P_CORE = SF_P.filter(f => f.core).map(f => f.k), R_CORE = SF_R.filter(f => f.core).map(f => f.k);
 const R_DATES = SF_R.filter(f => f.t === 'date').map(f => f.k);
 const P_GROUPS = [...new Set(SF_P.map(f => f.g))];
@@ -73,8 +73,9 @@ const progCmpAll = (a, b) => pyCmp(progSchoolKey(a), progSchoolKey(b)) || (a.sch
 // 筛选用的值：「方向」可能写了两个（「机械、工学」），拆开算，选「工学」也能筛出来
 const pfVals = (p, k) => k === 'field' ? String(pv(p, k)).split(/[、,，\/／]/).map(s => s.trim()).filter(Boolean) : [String(pv(p, k))];
 const pfOpts = k => [...new Set(PROG.flatMap(p => pfVals(p, k)).filter(Boolean))].sort(k === 'field' ? pyCmp : undefined);
+const trkHit = (p, t) => !t || pv(p, 'track') === t || (pv(p, 'track') === '文理皆可' && (t === '文科' || t === '理科'));   // 文理艺：选文科、理科时「文理皆可」两边都算
 function progFiltered(){
-  return PROG.filter(p => ['year','level','field','school_type'].every(k => !PF[k] || pfVals(p, k).includes(PF[k])) && fzHit(PF.q, progHay(p)));
+  return PROG.filter(p => ['year','level','field','school_type'].every(k => !PF[k] || pfVals(p, k).includes(PF[k])) && trkHit(p, PF.track) && fzHit(PF.q, progHay(p)));
 }
 function progList(){
   if (typeof v2ProgList === 'function' && document.body.classList.contains('v2')) return v2ProgList();   // 新版：按学校分块、可切换排序（v2d.js）
@@ -83,7 +84,7 @@ function progList(){
   if (!list.length) return '<div class="card empty">没有符合条件的专业</div>';
   return `<div class="muted xs" style="margin:2px 0 6px">共 ${list.length} 个专业</div>` + list.map(progCard).join('');
 }
-const SHOWN_IN_HEAD = ['year','level','field','school','school_cn','school_en','region','school_group','faculty','dept','school_ord','school_type','intake','campus','url','url2'];
+const SHOWN_IN_HEAD = ['year','level','track','field','school','school_cn','school_en','region','school_group','faculty','dept','school_ord','school_type','intake','campus','url','url2'];
 function progCard(p, o = {}){   // o.inSchool：放在新版「学校块」里，校名、国公私、地区在块头上，卡片不再重复
   const used = (DB.targets||[]).filter(t => t.program_id===p.id).length, rs = p.rounds || [];
   const rExtra = SF_R.filter(f => !f.core);
@@ -92,7 +93,7 @@ function progCard(p, o = {}){   // o.inSchool：放在新版「学校块」里�
     return items.length ? `<div class="pg-grp"><div class="pg-gt">${g}</div><dl class="kv small">${items.map(f => `<dt>${f.l}</dt><dd style="white-space:pre-wrap">${esc(String(pv(p, f.k)))}</dd>`).join('')}</dl></div>` : '';
   }).join('');
   return `<details class="card pg-card"><summary><div class="row">${o.inSchool ? `<b class="pg-prog">${esc(progName(p) || '（没填学部学科）')}</b>` : `<b class="pg-school" title="${esc([pv(p,'school_cn'), pv(p,'school_en')].filter(Boolean).join(' / '))}">${esc(p.school)}</b>${pv(p,'school_group')?`<span class="muted">${esc(pv(p,'school_group'))}</span>`:''}<span>${esc(progName(p))}</span>`}
-      <span class="tag mute">${p.year}${pv(p,'intake')&&pv(p,'intake')!=='4月'?' · '+esc(pv(p,'intake'))+'入学':''}</span><span class="tag blue">${esc(p.level)}</span>${p.field?`<span class="tag gold">${esc(p.field)}</span>`:''}
+      <span class="tag mute">${p.year}${pv(p,'intake')&&pv(p,'intake')!=='4月'?' · '+esc(pv(p,'intake'))+'入学':''}</span><span class="tag blue">${esc(p.level)}</span>${pv(p,'track')?`<span class="tag trk trk-${{'文科':'w','理科':'l','艺术':'y','文理皆可':'wl'}[pv(p,'track')]||'x'}">${esc(pv(p,'track'))}</span>`:''}${p.field?`<span class="tag gold">${esc(p.field)}</span>`:''}
       ${!o.inSchool && pv(p,'school_type')?`<span class="tag mute">${esc(pv(p,'school_type'))}</span>`:''}${!o.inSchool && p.region?`<span class="tag mute">${esc(p.region)}</span>`:''}
       ${used?`<span class="tag ok">${used} 位学生在报</span>`:''}${staleTag(p)}<span style="margin-left:auto">${nextRound(p)}</span></div></summary>
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
@@ -302,7 +303,7 @@ async function progImportFile(file){
     const old = new Map((PROG||[]).map(p => [[p.year, p.school, p.faculty, p.dept].join('|'), p]));
     list.forEach(p => {
       const o = old.get([p.year, p.school, p.faculty||'', p.dept||''].join('|'));
-      ['school_group', 'school_ord'].forEach(k => { if (!p.info[k] && o && pv(o, k)) p.info[k] = pv(o, k); });
+      ['school_group', 'school_ord', 'track'].forEach(k => { if (!p.info[k] && o && pv(o, k)) p.info[k] = pv(o, k); });
       if (p.info.school_ord && !isFinite(progOrd(p))) { warn.push(`${p.school} ${progName(p)}：「校内顺序」写的是「${p.info.school_ord}」，不是数字，没有导入这一项`); delete p.info.school_ord; }
     });
     const exist = new Set(old.keys());

@@ -519,6 +519,17 @@ body.v2[data-theme="night"] .toast.err{color:#2a0f0d}
 .v2-schools .pg-school{font-size:15px;font-weight:800}
 .v2-scsec{font-weight:800;font-size:14px;margin:10px 6px 0;padding-bottom:4px;border-bottom:2px solid var(--line)}
 .v2-sccount{align-items:center;margin:0 6px}
+.v2-sctrk{display:flex;gap:8px;flex-wrap:wrap}
+.v2-sctrk .v2-chip{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:999px;border:0;background:var(--card2);color:var(--ink);font-weight:800;font-size:14px;cursor:pointer}
+.v2-sctrk .v2-chip .n{font-size:11px;font-weight:700;color:var(--muted)}
+.v2-sctrk .v2-chip.on{background:var(--pill);color:var(--pill-ink)}
+.v2-sctrk .v2-chip.on .n{color:inherit;opacity:.75}
+/* 文理艺标签（新版的 .tag 用了 !important，这里也要） */
+body.v2 .tag.trk{font-weight:800}
+body.v2 .tag.trk-w{background:#e3ecfb!important;color:#2f5aa8!important}body.v2 .tag.trk-l{background:#e2f3ea!important;color:#1f7a4d!important}
+body.v2 .tag.trk-y{background:#f6e6f3!important;color:#9a3a86!important}body.v2 .tag.trk-wl{background:#efe9fb!important;color:#5b46a8!important}
+body.v2[data-theme="night"] .tag.trk-w{background:#22324d!important;color:#9dbdf2!important}body.v2[data-theme="night"] .tag.trk-l{background:#1f3a2d!important;color:#8fd6b0!important}
+body.v2[data-theme="night"] .tag.trk-y{background:#3d2438!important;color:#e7a6d8!important}body.v2[data-theme="night"] .tag.trk-wl{background:#2e2747!important;color:#c3b5f2!important}
 .v2-scblk{background:var(--paper);border-radius:20px;padding:4px 10px}
 .v2-scblk[open]{padding-bottom:10px}
 .v2-schd{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;padding:8px 6px;cursor:pointer;list-style:none}

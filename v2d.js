@@ -149,6 +149,7 @@ function v2Schools(){
   const sel = (k, label) => `<select id="pf-${k}" aria-label="${label}"><option value="">${label}：全部</option>${pfOpts(k).map(x => `<option ${x === PF[k] ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`;
   return v2Head('院校库', `${v2Uniq(PROG)} 个专业`, acts) + help
     + `<div class="v2-scbar"><label class="v2-search big">${v2Ic('search')}<input type="search" id="pf-q" placeholder="搜学校、学部、学科、关键词；中文、日文、英文都行，例：早稻田 / waseda" value="${esc(PF.q)}" aria-label="搜院校库"></label>
+      <div class="v2-sctrk" role="group" aria-label="文理艺">${V2_TRK.map(t => `<button class="v2-chip ${(PF.track || '') === t ? 'on' : ''}" data-act="v2-sc-trk" data-v="${t}">${t || '全部'}<span class="n">${v2Uniq(t ? PROG.filter(p => trkHit(p, t)) : PROG)}</span></button>`).join('')}</div>
       <div class="v2-scsel"><select id="pf-sort" aria-label="排序">${V2_SC_SORT.map(([v, l]) => `<option value="${v}" ${v === (PF.sort || '') ? 'selected' : ''}>排序：${l}</option>`).join('')}</select>${sel('year', '年度')}${sel('level', '类别')}${sel('field', '方向')}${sel('school_type', '学校类型')}</div></div>
     <div id="pg-list" class="v2-schools">${progList()}</div>`;
 }
@@ -156,6 +157,7 @@ function v2Schools(){
 /* ───────── 院校库：排序＋按学校分块（2026-11-23） ─────────
    学校名（默认）：拼音 A→Z，有中文校名用中文校名排；地区：北→南（都道府县顺序）；国公立私立：国立→公立→私立；
    这三种都是一所学校一个块，块里放这所学校的专业。出愿截止近的：不分块，按下一轮出愿截止日从近到远平铺。 */
+const V2_TRK = ['', '文科', '理科', '艺术'];   // 文理艺：大块按考试方式分（「文理皆可」在文科、理科里都算）
 const V2_SC_SORT = [['', '学校名'], ['region', '地区'], ['type', '国公立私立'], ['due', '出愿截止近的']];
 const V2_PREF = ['北海道','青森','岩手','宮城|宫城','秋田','山形','福島|福岛','茨城','栃木','群馬|群马','埼玉','千葉|千叶','東京|东京','神奈川','新潟','富山','石川','福井','山梨','長野|长野','岐阜','静岡|静冈','愛知|爱知','三重','滋賀|滋贺','京都','大阪','兵庫|兵库','奈良','和歌山','鳥取|鸟取','島根|岛根','岡山|冈山','広島|广岛','山口','徳島|德岛','香川','愛媛|爱媛','高知','福岡|福冈','佐賀|佐贺','長崎|长崎','熊本','大分','宮崎|宫崎','鹿児島|鹿儿岛','沖縄|冲绳'];
 const v2PrefNo = r => { const s = String(r || ''); return V2_PREF.findIndex(x => x.split('|').some(n => s.includes(n))); };   // 「东京都」先碰上「东京」，不会被当成京都
@@ -218,6 +220,7 @@ document.addEventListener('change', e => { if (e.target.id === 'pf-sort'){ PF.so
 document.addEventListener('click', e => {
   const s = e.target.closest('.v2-scblk > summary'); if (s){ (S.v2scOpen ||= {})[s.parentElement.dataset.s] = !s.parentElement.open; return; }
   const a = e.target.closest('[data-act="v2-sc-all"]'); if (a){ S.v2scAll = a.dataset.v === '1'; S.v2scOpen = {}; v2ScRedraw(); }
+  const t = e.target.closest('[data-act="v2-sc-trk"]'); if (t){ PF.track = t.dataset.v; document.querySelectorAll('[data-act="v2-sc-trk"]').forEach(b => b.classList.toggle('on', b === t)); v2ScRedraw(); }
 });
 
 /* ───────── 搜索框、按钮 ───────── */
