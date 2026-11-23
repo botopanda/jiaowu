@@ -519,6 +519,24 @@ body.v2[data-theme="night"] .toast.err{color:#2a0f0d}
 .v2-schools .pg-school{font-size:15px;font-weight:800}
 .v2-scsec{font-weight:800;font-size:14px;margin:10px 6px 0;padding-bottom:4px;border-bottom:2px solid var(--line)}
 .v2-sccount{align-items:center;margin:0 6px}
+/* 待处理：全部摊开（2026-11-23） */
+.v2-tdbar{display:flex;flex-direction:column;gap:10px;position:sticky;top:0;z-index:6;background:var(--bg);padding:6px 0 8px}
+.v2-tdbar .v2-search{max-width:520px}
+.v2-td{display:flex;flex-direction:column;gap:18px}
+.v2-tds{display:flex;flex-direction:column;gap:8px}
+.v2-tdh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 4px}
+.v2-tdh>b{font-size:17px;font-weight:800}
+.v2-tdn{background:var(--sunk);color:var(--muted);border-radius:999px;padding:0 9px;font-size:12px;font-weight:800;line-height:22px}
+.v2-tdh .v2-bulk{margin-left:auto}
+.v2-tdnote{margin:0 4px;font-size:12.5px;color:var(--muted)}
+.v2-tdl{display:flex;flex-direction:column;gap:8px}
+.v2-tdi{border-radius:18px;transition:box-shadow .3s}
+.v2-tdi>.list{background:var(--card);border-radius:16px;padding:4px 12px;margin:0}
+.v2-tdi>.list>.li{border:0}
+.v2-tdi>.card,.v2-tdi>article.card{margin:0}
+.v2-tdi.v2-tdfocus{box-shadow:0 0 0 3px var(--pill)}
+@media (min-width:761px){.v2-tdi .li-pend{flex-wrap:nowrap;align-items:center}.v2-tdi .li-pend .grow{flex:1 1 auto;min-width:0}.v2-tdi .li-pend .grow .muted{white-space:nowrap}}
+@media (max-width:760px){.v2-tdh .v2-bulk{margin-left:0;width:100%}}
 .v2-sctrk{display:flex;gap:8px;flex-wrap:wrap}
 .v2-sctrk .v2-chip{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:999px;border:0;background:var(--card2);color:var(--ink);font-weight:800;font-size:14px;cursor:pointer}
 .v2-sctrk .v2-chip .n{font-size:11px;font-weight:700;color:var(--muted)}

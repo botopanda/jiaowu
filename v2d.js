@@ -223,8 +223,25 @@ document.addEventListener('click', e => {
   const t = e.target.closest('[data-act="v2-sc-trk"]'); if (t){ PF.track = t.dataset.v; document.querySelectorAll('[data-act="v2-sc-trk"]').forEach(b => b.classList.toggle('on', b === t)); v2ScRedraw(); }
 });
 
+/* ───────── 待处理：搜索（只隐藏、不重画，按钮里填了一半的不会丢）＋ 从总览「去处理」跳过来时定位那一件 ───────── */
+function v2TdFilter(){
+  const box = document.querySelector('.v2-td'); if (!box) return;
+  const q = (S.v2q.todo || '').trim(); let shown = 0;
+  box.querySelectorAll('.v2-tdi').forEach(el => { const hit = fzHit(q, el.dataset.q || ''); el.hidden = !hit; if (hit) shown++; });
+  box.querySelectorAll('.v2-tds[data-g]').forEach(sec => { const its = [...sec.querySelectorAll('.v2-tdi')]; if (!its.length) return; const k = its.filter(x => !x.hidden).length; sec.hidden = !k; const c = sec.querySelector('.v2-tdn'); if (c) c.textContent = k; });
+  box.querySelectorAll('.v2-bulk').forEach(b => b.hidden = !!q);   // 搜索时不显示「全部…」，免得以为只处理搜出来的
+  const none = box.querySelector('.v2-tdnone'); if (none){ none.hidden = !q || shown > 0 || !box.querySelector('.v2-tdi'); const sp = none.querySelector('span'); if (sp) sp.textContent = q; }
+}
+function v2TdFocus(){
+  const k = S.page === 'todo' && S.v2sel.todo; if (!k) return;
+  S.v2sel.todo = null;
+  const el = document.getElementById('td-' + k); if (!el) return;
+  el.scrollIntoView({block: 'center'}); el.classList.add('v2-tdfocus'); setTimeout(() => el.classList.remove('v2-tdfocus'), 2400);
+}
+
 /* ───────── 搜索框、按钮 ───────── */
 document.addEventListener('input', e => {
+  const td = e.target.closest?.('[data-v2td]'); if (td) { S.v2q.todo = td.value; v2TdFilter(); S.dirtyMain = false; return; }
   const a = e.target.closest?.('[data-v2ln]'); if (a) { S.v2lnQ = a.value; v2LnFilter(); S.dirtyMain = false; return; }
   const b = e.target.closest?.('[data-v2lg]'); if (b) { S.v2lgQ = b.value; v2LgFilter(); S.dirtyMain = false; if (b.value.trim() && !e.isComposing) setTimeout(v2LgAuto, 400); }
 });
@@ -234,7 +251,7 @@ document.addEventListener('focusin', e => { if (e.target.closest?.('[data-v2lg]'
 document.addEventListener('focusout', e => { if (e.target.closest?.('[data-v2lg]')) setTimeout(() => { if (!document.activeElement?.closest?.('[data-v2lg]')) S.v2lgFocus = false; }, 0); });
 // 画完页面以后按搜索框里的字筛一遍
 const v2AfterD = v2After;
-v2After = function(){ v2AfterD(); v2LnFilter(); v2LgFilter();
+v2After = function(){ v2AfterD(); v2LnFilter(); v2LgFilter(); v2TdFilter(); v2TdFocus();
   const i = document.querySelector('[data-v2lg]'); if (i && S.v2lgFocus){ i.focus(); i.setSelectionRange(i.value.length, i.value.length); } };
 document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a || V2.ver !== 'new' || !document.body.classList.contains('v2')) return;

@@ -353,30 +353,56 @@ function v2TodoDone(){
     out.push({k: 'f:' + f.id, g: 'done', sid: w.sid, name: w.name, line: `${esc(tea(course(l.course_id).teacher_id).name)} · ${md(l.date)} ${esc(w.subj)}的反馈 · 家长可见`, flag: ['已审批', 'ok']}); });
   return out;
 }
+// 待处理（2026-11-23 用户要求改回「全部摊开」）：今天要一起处理的事全部列出来，每一条直接带按钮处理，不用一条条点进去；
+// 上面一个搜索框，输学生或老师名字就只看相关的（S.v2q.todo）；分类按钮照旧（全部 / 改期请假 / 老师申请 / 反馈审批 / 待确认的课 / 留言·跟进 / 最近处理过的）
+function v2TdWho(t, id){   // 搜索用：学生、老师、科目、申请人
+  let c = null, extra = '';
+  if (t === 'q'){ const q = DB.requests.find(y => y.id === id), l = q && L(q.lesson_id); c = l && course(l.course_id); extra = q ? q.type : ''; }
+  else if (t === 'c'){ const x = (DB.changes || []).find(y => y.id === id); c = x && course(x.course_id); extra = x ? `${x.by_name || ''} ${chLabel(x)}` : ''; }
+  else if (t === 'f'){ const f = DB.feedbacks.find(y => y.id === id), l = f && L(f.lesson_id); c = l && course(l.course_id); extra = '反馈'; }
+  else if (t === 'l'){ const l = L(id); c = l && course(l.course_id); extra = '待确认'; }
+  return [c && stu(c.student_id).name, c && tea(c.teacher_id).name, c && c.subject, extra].filter(Boolean).join(' ');
+}
+function v2TdCard(x){   // 一件事：直接用原来那几种卡片（带按钮），外面包一层，搜索时按 data-q 显示 / 隐藏
+  const [t, id] = x.k.split(':'); let h = '';
+  if (t === 'q'){ const q = DB.requests.find(y => y.id === id); h = q ? reqCard(q) : ''; }
+  else if (t === 'c'){ const c = (DB.changes || []).find(y => y.id === id); h = c ? `<div class="list">${chCard(c, true)}</div>` : ''; }
+  else if (t === 'f'){ const f = DB.feedbacks.find(y => y.id === id); h = f ? fbCard(f, {actions: true}) : ''; }
+  else if (t === 'l'){ const l = L(id); h = l ? `<div class="list">${pendRow(l)}</div>` : ''; }
+  return h ? `<div class="v2-tdi" id="td-${esc(x.k)}" data-q="${esc(fz(v2TdWho(t, id)))}">${h}</div>` : '';
+}
 function v2Todo(){
   const all = v2TodoItems(), chip = S.v2chip.todo === 'done' && !isTop() ? 'all' : (S.v2chip.todo || 'all');
-  const items = (chip === 'done' ? v2TodoDone() : all.filter(x => chip === 'all' || x.g === chip)).map(x => ({...x, q: x.name + ' ' + x.line.replace(/<[^>]+>/g, '')}));
-  // 分组小标题：已经过了的 → 接下来的 → 留言 · 跟进
-  let last = ''; if (chip !== 'done') items.forEach(x => { const g = x.g === 'other' ? '留言 · 跟进' : x.d < TODAY ? '已经过了的' : '接下来的'; if (g !== last){ x.sep = g; last = g; } });
-  const cur = v2Pick('todo', items), n = g => all.filter(x => x.g === g).length;
+  const n = g => all.filter(x => x.g === g).length;
   const chips = [['all', '全部', v2TodoTotal(all)], ...(isTop() ? [['req', '改期请假', n('req')], ['ch', '老师申请', n('ch')], ['fb', '反馈审批', n('fb')], ['pend', '待确认的课', n('pend')]] : []), ['other', '留言 · 跟进'], ...(isTop() ? [['done', '最近处理过的']] : [])];
-  const cpOk = chPend().filter(x => !chStuck(x)).length, fbN = n('fb'), miss = n('pend');
-  const bulk = chip === 'fb' && fbN > 1 ? `<button class="btn sm v2-bulk" data-act="v2-fb-all">全部审批通过（${fbN} 条）</button>`
-    : chip === 'ch' && cpOk > 1 ? `<button class="btn sm v2-bulk" data-act="ch-ok-all">全部批准（${cpOk} 条）</button>`
-    : chip === 'pend' && miss > 1 ? `<button class="btn sm v2-bulk" data-act="done-all">全部标为已上课（${miss} 节）</button>` : '';
-  let detail = '';
-  if (cur){
-    const [t, id] = cur.k.split(':');
-    const head = (title, sub) => `<div class="v2-dh">${v2Ava(cur.ava || cur.name, true)}<div class="v2-pt"><h2>${esc(title)}</h2><p>${sub}</p></div>${cur.sid ? `<div class="v2-acts"><button class="btn sm" data-act="student" data-v="${cur.sid}">学生档案 ›</button></div>` : ''}</div>`;
-    if (t === 'q'){ const q = DB.requests.find(x => x.id === id); detail = `<div class="v2-card">${head(cur.name, `${q.type}申请 · 由教务处理，学生和任课老师同时看到结果`)}${reqCard(q)}</div>`; }
-    else if (t === 'c'){ const x = (DB.changes || []).find(y => y.id === id); detail = `<div class="v2-card">${head(cur.name, `老师排课申请 · 批准后才会改到课表上`)}<div class="list">${chCard(x, true)}</div></div>`; }
-    else if (t === 'f'){ const f = DB.feedbacks.find(y => y.id === id); detail = `<div class="v2-card">${head(cur.name, f.status === 'approved' ? '已审批 · 家长能看到；发现措辞不对可以撤回审批' : '反馈审批 · 审批通过后家长才能看到')}${fbCard(f, {actions: true})}</div>`; }
-    else if (t === 'l'){ const l = L(id); detail = `<div class="v2-card">${head(cur.name, '待确认的课 · 上课时间过了、老师还没写反馈，暂时不计课时和工资')}<div class="list">${pendRow(l)}</div></div>`; }
-    else if (cur.k === 'msg') detail = v2Legacy(pgMsgs());
-    else if (cur.k === 'fu') detail = v2Legacy(pgFollowups());
+  const cpOk = chPend().filter(x => !chStuck(x)).length;
+  const GROUPS = [
+    ['req', '改期 · 请假', '学生在自己的链接里申请；在这里处理，学生和任课老师同时看到结果，课表自动更新', ''],
+    ['ch', '老师排课申请', '批准后才会改到课表上', cpOk > 1 ? `<button class="btn sm v2-bulk" data-act="ch-ok-all">全部批准（${cpOk} 条）</button>` : ''],
+    ['fb', '反馈审批', '审批通过后家长才能看到；措辞不合适可以先改再通过', n('fb') > 1 ? `<button class="btn sm v2-bulk" data-act="v2-fb-all">全部审批通过（${n('fb')} 条）</button>` : ''],
+    ['pend', '待确认的课', '上课时间过了、老师还没写反馈，暂时不计课时和工资。上了就点「已上课」，没上或时长不对点「改时长 / 取消」', n('pend') > 1 ? `<button class="btn sm v2-bulk" data-act="done-all">全部标为已上课（${n('pend')} 节）</button>` : ''],
+  ];
+  const sec = (g, title, note, bulk, cards) => cards ? `<section class="v2-tds" data-g="${g}"><div class="v2-tdh"><b>${title}</b><span class="v2-tdn">${(cards.match(/class="v2-tdi"/g) || []).length}</span>${bulk}</div>${note ? `<p class="v2-tdnote">${note}</p>` : ''}<div class="v2-tdl">${cards}</div></section>` : '';
+  let body = '';
+  if (chip === 'done'){
+    const done = v2TodoDone();
+    body = sec('done', '最近处理过的', '新的在上；误批的反馈可以在这里撤回审批', '', done.map(v2TdCard).join(''));
+  } else if (chip === 'other'){
+    body = (typeof pgMsgs === 'function' ? `<section class="v2-tds" id="td-msg"><div class="v2-tdh"><b>学生留言</b></div>${v2Legacy(pgMsgs())}</section>` : '')
+      + `<section class="v2-tds" id="td-fu"><div class="v2-tdh"><b>跟进记录</b></div>${v2Legacy(pgFollowups())}</section>`;
+  } else {
+    body = GROUPS.filter(([g]) => chip === 'all' || chip === g).map(([g, title, note, bulk]) => sec(g, title, note, bulk, all.filter(x => x.g === g).map(v2TdCard).join(''))).join('');
+    if (chip === 'all'){   // 留言、跟进：有新的才提一句，点进去看
+      const others = all.filter(x => x.g === 'other' && x.n);
+      if (others.length) body += `<section class="v2-tds" data-g="other"><div class="v2-tdh"><b>留言 · 跟进</b></div><div class="v2-tdl">${others.map(x => `<div class="v2-tdi" id="td-${x.k}" data-q="${esc(fz(x.name))}"><div class="list"><div class="li"><span class="tag ${x.flag ? x.flag[1] : 'mute'}">${esc(x.name)}</span><div class="grow">${x.line}</div><button class="btn sm" data-act="v2-chip" data-v="todo|other">去看 ›</button></div></div></div>`).join('')}</div></section>`;
+    }
   }
-  return v2Head('待处理', '一件事一行 · 先逾期，再按日期') + v2Tri({id: 'todo', label: '待处理', items, sel: cur && cur.k, search: '查学生、老师…', chips, chip,
-    count: chip === 'done' ? `最近处理过的 ${items.length} 条 · 新的在上` : `${v2TodoTotal(items)} 件要处理`, bulk, empty: chip === 'done' ? '还没有处理过的' : '这一类没有要处理的', detail, emptyDet: '都处理完了 👍'});
+  const total = chip === 'done' || chip === 'other' ? '' : `${v2TodoTotal(chip === 'all' ? all : all.filter(x => x.g === chip))} 件要处理`;
+  return v2Head('待处理', '今天要处理的事都在这一页，直接在每一条上处理')
+    + `<div class="v2-tdbar"><label class="v2-search">${v2Ic('search')}<input type="search" data-v2td placeholder="查学生、老师、科目…" value="${esc(S.v2q.todo || '')}" aria-label="查学生、老师"></label>
+      <div class="v2-chips">${chips.map(([k, t, c]) => `<button type="button" class="v2-chip ${chip === k ? 'on' : ''}" data-act="v2-chip" data-v="todo|${k}">${t}${c != null ? ` <b>${c}</b>` : ''}</button>`).join('')}</div>
+      ${total ? `<span class="muted xs">${total}</span>` : ''}</div>
+    <div class="v2-td">${body || `<div class="v2-empty big">${chip === 'done' ? '还没有处理过的' : '都处理完了 👍'}</div>`}<div class="v2-empty big v2-tdnone" hidden>没有找到和「<span></span>」有关的事</div></div>`;
 }
 // 课表与排课：老师 × 一周（点空格＝给这位老师这天排课）；也能切回原来的月历 / 时间轴
 function v2Calendar(){
