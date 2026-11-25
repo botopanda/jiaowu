@@ -444,7 +444,10 @@ function v2Calendar(){
 }
 
 /* ═════════════ 老师 ═════════════ */
-const v2TCand = () => DB.lessons.filter(l => (l.date < TODAY || (l.date === TODAY && l.start <= bjHM())) && l.status === 'scheduled' && !fbOf(l));   // 老师要写反馈的课（左边数字、首页提示、反馈批改都用这个）
+const v2TCanWrite = () => DB.lessons.filter(l => (l.date < TODAY || (l.date === TODAY && l.start <= bjHM())) && l.status === 'scheduled' && !fbOf(l));   // 老师能写反馈的课：上过（或正在上）、还没有反馈
+// 2026-11-26：教务已经标了「已上课」的课不算「待写」（和旧版一样，不催老师）；放到「教务已确认」那一类里，想补写还能写
+const v2TCand = () => v2TCanWrite().filter(l => !l.done_manual);   // 老师要写反馈的课（左边数字、首页提示、反馈批改都用这个）
+const v2TExtra = () => v2TCanWrite().filter(l => l.done_manual).reverse();   // 教务确认上过、老师没写的：可以补写，新的在上
 const v2TLesson = l => { const c = course(l.course_id), f = fbOf(l), fl = v2Flag(l);
   return `<button type="button" class="v2-tl ${l.status !== 'scheduled' ? 'off' : ''}" style="--hc:${hue(c.subject)}" data-act="${f ? 't-fb' : 'lesson'}" data-v="${f ? f.id : l.id}"><b>${l.start}–${l.end}</b><span class="n">${esc(stu(c.student_id).name)} · ${esc(c.subject)}${l.kind ? ` · ${esc(l.kind)}` : ''}</span>
     <span class="tags">${l.makeup ? '<span class="tag blue">补课</span>' : ''}${l.status === 'leave' ? '<span class="tag seal">请假</span>' : ''}${l.status === 'cancelled' ? '<span class="tag mute">已取消</span>' : ''}${isPend(l) ? '<span class="tag warn">待写反馈</span>' : f ? '<span class="tag ok">已反馈</span>' : ''}${fl ? `<span class="tag warn">${fl}</span>` : ''}</span>${l.topic ? `<span class="tp">本节：${esc(l.topic)}</span>` : ''}</button>`; };
@@ -463,7 +466,7 @@ function v2TSched(t){
     ${exs.filter(e => e.date === d).map(e => exLine(e, true)).join('')}${ls.filter(l => l.date === d).map(v2TLesson).join('')}
     <button type="button" class="v2-add" data-act="v2-tslot" data-v="${d}" title="申请这天排课">${v2Ic('plus')}<span>排课</span></button></div>`).join('');
   return v2Head('课表', '北京时间', acts)
-    + (miss.length ? `<div class="v2-strip warn"><span>有 ${miss.length} 节课还没写反馈</span><button class="v2-link" data-act="tab" data-v="c">去写 ›</button></div>` : '')
+    + (miss.length ? `<div class="v2-strip warn"><span>有 ${miss.length} 节课还没写反馈</span><button class="v2-link" data-act="tab" data-v="c" data-todo="1">去写 ›</button></div>` : '')
     + (typeof meetTodoNote === 'function' ? meetTodoNote(t) : '') + tChBox() + nav
     + (shown.length ? `<div class="v2-week">${cols}</div>` : '<div class="v2-empty big">这周没有课</div>');
 }
@@ -498,7 +501,7 @@ function v2TStudents(t){
       </div></div>`;
   }
   const todoN = cand.length, gN = DB.feedbacks.filter(f => f.hw_sub && !f.hw_fb).length;
-  const today = todoN + gN ? `<button type="button" class="v2-strip warn v2-today" data-act="tab" data-v="c"><span><b>今天要处理的</b> · ${[todoN ? `${todoN} 节课待写反馈` : '', gN ? `${gN} 份作业待批改` : ''].filter(Boolean).join(' · ')}</span><span class="v2-link">去处理 ›</span></button>` : '';
+  const today = todoN + gN ? `<button type="button" class="v2-strip warn v2-today" data-act="tab" data-v="c" data-todo="1"><span><b>今天要处理的</b> · ${[todoN ? `${todoN} 节课待写反馈` : '', gN ? `${gN} 份作业待批改` : ''].filter(Boolean).join(' · ')}</span><span class="v2-link">去处理 ›</span></button>` : '';
   return v2Head('我的学生', fmtMD(TODAY)) + today + (typeof msgTeacherBox === 'function' ? `<div class="v2-msgs">${msgTeacherBox()}</div>` : '')
     + v2Tri({id: 'ts', label: '我的学生', items, sel: cur && cur.k, search: '查学生…', chips: [['all', '全部', all.length], ['todo', '有要处理的', all.filter(x => x.i.pl + x.i.g > 0).length]], chip,
       count: `${items.length} 个学生`, empty: sids.length ? '没有要处理的学生' : '还没有分配学生', detail});
@@ -509,9 +512,13 @@ function v2TWrite(t){
   const dOf = f => L(f.lesson_id).date, allW = DB.feedbacks.filter(f => L(f.lesson_id) && course(L(f.lesson_id).course_id)).sort((a, b) => dOf(b).localeCompare(dOf(a)));
   const wMonths = [...new Set(allW.map(f => dOf(f).slice(0, 7)))], wm = S.v2twM === 'all' || wMonths.includes(S.v2twM) ? S.v2twM : (wMonths[0] || 'all');
   const written = allW.filter(f => wm === 'all' || dOf(f).startsWith(wm));   // Codex 复查第三批第 4 条：按月份看全部，和原来一样
+  const extra = v2TExtra();
+  if (S.v2chip.tw === 'extra' && !extra.length){ S.v2chip.tw = 'todo'; wTags.clear(); }   // 这一类空了就回「要做的」，并且记住（不然以后教务再确认一节，页面会自己跳回这一类）；给上一节课点的学生状态不带到别的课（Codex 复查）
   const chip = S.v2chip.tw || 'todo';
   const sName = l => stu(course(l.course_id).student_id).name;
-  const items = chip === 'done'
+  const items = chip === 'extra'
+    ? extra.map(l => ({k: 'w:' + l.id, name: sName(l), line: `${md(l.date)} ${l.start} ${esc(course(l.course_id).subject)} · 教务已确认上过`, flag: ['可补写', 'mute'], q: sName(l) + course(l.course_id).subject}))
+    : chip === 'done'
     ? written.map(f => { const l = L(f.lesson_id), c = course(l.course_id); return {k: 'd:' + f.id, name: sName(l), line: `${md(l.date)} ${esc(c.subject)} · ${esc(String(f.content || '').slice(0, 16))}`, flag: f.status === 'approved' ? ['家长可见', 'ok'] : ['待审核', 'mute'], q: sName(l) + c.subject + (f.content || '')}; })
     : [...cand.map(l => { const on = !lesEnded(l); return {k: 'w:' + l.id, name: sName(l), line: `${md(l.date)} ${l.start} ${esc(course(l.course_id).subject)} · ${on ? '上课中，可以先写' : l.date === TODAY ? '今天下的课' : `下课 ${dBetween(l.date, TODAY)} 天`}`, flag: on ? ['上课中', 'blue'] : ['待写', 'warn'], q: sName(l) + course(l.course_id).subject}; }),
        ...toGrade.map(f => { const l = L(f.lesson_id); return {k: 'g:' + f.id, name: sName(l), line: `${md(l.date)} 布置 · ${esc(String(f.hw || '').slice(0, 14))}`, flag: ['待批改', 'blue'], q: sName(l) + (f.hw || '')}; })];
@@ -521,6 +528,7 @@ function v2TWrite(t){
     const [k, id] = cur.k.split(':');
     if (k === 'w'){ const l = L(id), c = course(l.course_id);
       detail = `<div class="v2-card"><div class="v2-dh">${v2Ava(cur.name, true)}<div class="v2-pt"><h2>${esc(cur.name)}</h2><p>${fmtMD(l.date)} ${l.start}–${l.end} · ${subjTag(c.subject)}${l.kind ? ` · ${esc(l.kind)}` : ''}</p></div></div>
+      ${l.done_manual ? '<div class="note">这节课教务已经确认上过了，<b>不写也可以</b>。想补一条反馈，照常填就行。</div>' : ''}
       <div class="note warn">这条反馈学生会马上看到，<b>教务审核后家长也能看到</b>，请注意用词。不方便让家长看的内容，写到「我的学生 → 私下备注」。</div>
       <input type="hidden" id="w-lesson" value="${l.id}">
       <label class="field"><span>一、本节授课内容</span><textarea id="w-content" placeholder="例：听解练习，要求学生用日语复述听力内容">${esc(l.topic || '')}</textarea></label>
@@ -543,8 +551,8 @@ function v2TWrite(t){
       <div class="row">${uploadBtn('hwref', f.id, '补传作业图片')}${uploadBtn('note', f.id, '上传上课笔记')}</div><div class="muted xs">反馈内容要改，请联系教务老师。</div></div>`; }
   }
   const top = chip === 'done' && wMonths.length ? `<select class="v2-msel" data-change="v2-twm" aria-label="月份">${wMonths.map(m => `<option value="${m}" ${m === wm ? 'selected' : ''}>${ymLabel(m)}</option>`).join('')}<option value="all" ${wm === 'all' ? 'selected' : ''}>全部月份</option></select>` : '';
-  return v2Head('反馈批改') + v2Tri({id: 'tw', label: '反馈批改', items, sel: cur && cur.k, search: '查学生…', chips: [['todo', '要做的', cand.length + toGrade.length], ['done', '我写过的', allW.length]], chip, top,
-    count: chip === 'done' ? `${wm === 'all' ? '全部月份' : ymLabel(wm)} · ${items.length} 条 · 新的在上` : `${items.length} 件 · 早的在上`, empty: chip === 'done' ? '还没有写过反馈' : '上完的课都写好反馈了，作业也批完了 👍', detail, emptyDet: '都处理完了 👍'});
+  return v2Head('反馈批改') + v2Tri({id: 'tw', label: '反馈批改', items, sel: cur && cur.k, search: '查学生…', chips: [['todo', '要做的', cand.length + toGrade.length], ...(extra.length ? [['extra', '教务已确认', extra.length]] : []), ['done', '我写过的', allW.length]], chip, top,
+    count: chip === 'extra' ? `${items.length} 节 · 不写也可以 · 新的在上` : chip === 'done' ? `${wm === 'all' ? '全部月份' : ymLabel(wm)} · ${items.length} 条 · 新的在上` : `${items.length} 件 · 早的在上`, empty: chip === 'done' ? '还没有写过反馈' : '上完的课都写好反馈了，作业也批完了 👍', detail, emptyDet: '都处理完了 👍'});
 }
 
 /* ═════════════ 学生、家长 ═════════════ */
@@ -671,6 +679,8 @@ document.addEventListener('click', async e => {
     // Codex 复查第 14 条：「学生留言」「跟进记录」直接选中那一项，手机上直接打开
     const TODO = {todo: ['all'], requests: ['req'], 'requests-ch': ['ch'], feedback: ['fb'], 'feedback-missing': ['pend'], msgs: ['other', 'msg'], followups: ['other', 'fu']};
     if (k === 'page' && TODO[v]){ S.v2chip.todo = TODO[v][0]; S.v2idx.todo = 0; S.v2sel.todo = TODO[v][1] || null; S.v2q.todo = ''; if (TODO[v][1] && v2Phone()) S.v2open = 'todo'; }
+    // 2026-11-26（Codex 复查）：老师点「有 N 节课还没写反馈 · 去写」「今天要处理的 · 去处理」：一定打开「要做的」，不留上次看的分类和搜索的名字
+    if (k === 'tab' && a.dataset.todo){ if ((S.v2chip.tw || 'todo') !== 'todo') wTags.clear(); S.v2chip.tw = 'todo'; S.v2q.tw = ''; S.v2idx.tw = 0; }
     render(); return;
   }
   if ((k === 'student' || k === 'student-tab') && v2Phone()){ S.v2open = 'stu'; S.v2sel.stu = v.split('|')[0]; render(); window.scrollTo(0, 0); return; }
@@ -719,7 +729,7 @@ document.addEventListener('click', async e => {
     case 'v2-tslot': S.alPre = {d: v, s: '18:00', e: '20:00'}; addLessonModal(); break;
     case 'v2-go-write': {   // 老师「我的学生」→ 反馈批改，直接选中这个学生的第一件
       S.tab = 'c'; S.v2chip.tw = 'todo'; S.v2q.tw = '';   // 2026-11-25：反馈页搜索框里留着别的学生名字时，会选到别人的课——跳过去先清搜索
-      const l = DB.lessons.find(x => (x.date < TODAY || (x.date === TODAY && x.start <= bjHM())) && x.status === 'scheduled' && !fbOf(x) && course(x.course_id).student_id === v);
+      const l = DB.lessons.find(x => (x.date < TODAY || (x.date === TODAY && x.start <= bjHM())) && x.status === 'scheduled' && !fbOf(x) && !x.done_manual && course(x.course_id).student_id === v);
       const f = !l && DB.feedbacks.find(x => x.hw_sub && !x.hw_fb && cOfF(x)?.student_id === v);
       S.v2sel.tw = l ? 'w:' + l.id : f ? 'g:' + f.id : null; wTags.clear();
       if (v2Phone() && S.v2sel.tw) S.v2open = 'tw';

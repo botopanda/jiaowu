@@ -175,12 +175,17 @@ function v2Payroll(){
     const money_ = ls => ls.map(l => { const c = course(l.course_id); return [(l.status === 'scheduled' && !isDone(l) ? dur(l) : paidH(l)) * (c.rate || 0), curOf(c)]; });
     const hOk = +ok.reduce((a, l) => a + paidH(l), 0).toFixed(2), hPend = +pend.reduce((a, l) => a + dur(l), 0).toFixed(2);
     const rawOk = ok.reduce((a, l) => a + paidH(l), 0), rawPend = pend.reduce((a, l) => a + dur(l), 0);   // 2026-11-25：合计用没取整的课时加（3 节 50 分钟＝2 小时 30 分，不是 2 小时 29 分）
-    return {ok, pend, later, hOk, hPend, rawOk, rawPend, amtOk: sumMoney(money_(ok)), amtPend: sumMoney(money_(pend)), amtAll: sumMoney(money_([...ok, ...pend])), snap: (DB.pay || []).some(p => p.teacher_id === t.id && p.ym === ym && p.snap)}; };
+    return {ok, pend, later, hOk, hPend, rawOk, rawPend, partsOk: money_(ok), amtOk: sumMoney(money_(ok)), amtPend: sumMoney(money_(pend)), amtAll: sumMoney(money_([...ok, ...pend])), snap: (DB.pay || []).some(p => p.teacher_id === t.id && p.ym === ym && p.snap)}; };
   const all = DB.teachers.filter(t => !t.staff).map(t => ({t, i: info(t)})).filter(x => x.i.ok.length || x.i.pend.length || x.i.snap);
-  const PS = t => { if (isOwner() && S.book === 'all'){ const st = payBooks(t.id, ym).map(b => payOfBook(t.id, ym, b)); if (!st.length) return null;   // 「全部」：两本账都结算了才算已结算
+  // 2026-11-26（Codex 复查）：「全部」视图里，这位老师这个月牵涉到哪几本账——有计入工资的课、有待核对的课、结算时存过明细的都算。
+  // 只看「有计入的课」的话：课删光只剩存档的老师会被算成没结算；另一本账还有课待核对的老师会被算成全结算了
+  const bkOf = l => stu(course(l.course_id).student_id).private ? 'mine' : 'K';
+  const booksAll = (t, i) => [...new Set([...payBooks(t.id, ym), ...i.pend.map(bkOf), ...(DB.pay || []).filter(p => p.teacher_id === t.id && p.ym === ym && p.snap).map(p => p.book || 'K')])].sort();
+  const done = (t, i, f) => isOwner() && S.book === 'all' ? (bs => bs.length > 0 && bs.every(b => payOfBook(t.id, ym, b)[f]))(booksAll(t, i)) : !!payOf(t.id, ym)[f];
+  const PS = (t, i) => { if (isOwner() && S.book === 'all'){ const st = booksAll(t, i).map(b => payOfBook(t.id, ym, b)); if (!st.length) return null;   // 「全部」：两本账都结算了才算已结算
       return st.every(p => p.settled_at) ? ['已结算', 'ok'] : st.every(p => p.reviewed_at) ? ['已审核', 'blue'] : st.some(p => p.settled_at || p.reviewed_at) ? ['部分审核', 'blue'] : null; }
     const p = payOf(t.id, ym); return p.settled_at ? ['已结算', 'ok'] : p.reviewed_at ? ['已审核', 'blue'] : null; };
-  const items = all.sort((a, b) => b.i.pend.length - a.i.pend.length || pyCmp(a.t.name, b.t.name)).map(({t, i}) => ({k: t.id, name: t.name, line: `${i.ok.length} 节 · ${v2HM(i.hOk)} · ${i.amtOk}`, flag: i.pend.length ? [`待核对 ${i.pend.length}`, 'warn'] : PS(t) || ['未审核', 'mute'], q: t.name}));
+  const items = all.sort((a, b) => b.i.pend.length - a.i.pend.length || pyCmp(a.t.name, b.t.name)).map(({t, i}) => ({k: t.id, name: t.name, line: `${i.ok.length} 节 · ${v2HM(i.hOk)} · ${i.amtOk}`, flag: i.pend.length ? [`待核对 ${i.pend.length}`, 'warn'] : PS(t, i) || ['未审核', 'mute'], q: t.name}));
   const cur = v2Pick('pay', items);
   let detail = '';
   if (cur){
@@ -204,8 +209,13 @@ function v2Payroll(){
       <div class="row" style="justify-content:flex-end">${v2PayBtns(t.id, ym, i.pend.length)}</div></div>`;
   }
   const tot = all.reduce((a, x) => a + x.i.rawOk, 0);
+  // 2026-11-26：页头加回旧版的三个数——全体工资合计、已审核几人、已结算几人（只算名单里列出来的老师，也就是当前账本看得到的）
+  const pendN = all.reduce((a, x) => a + x.i.pend.length, 0);
+  const sums = all.length ? `<div class="v2-nums v2-paysum"><div><small>工资合计（已确认的课）</small><b>${sumMoney(all.flatMap(x => x.i.partsOk))}</b></div>
+    <div><small>已审核</small><b>${all.filter(x => done(x.t, x.i, 'reviewed_at')).length} / ${all.length} 位</b></div>
+    <div><small>已结算</small><b>${all.filter(x => done(x.t, x.i, 'settled_at')).length} / ${all.length} 位</b></div></div>${pendN ? `<div class="muted xs v2-paysum-n">另有 ${pendN} 节待核对，还没算进合计。</div>` : ''}` : '';
   return v2Head('课时与工资', `${ymLabel(ym)} · 已确认 ${v2HM(tot)}`, `<select data-change="paym" aria-label="月份">${months.map(v => `<option value="${v}" ${v === ym ? 'selected' : ''}>${ymLabel(v)}</option>`).join('')}</select>`)
-    + `<div class="v2-strip soft"><span>只有教务 · 管理看得到。老师写了反馈（或教务标为已上课）的课才计入，按实际时长算；当天请假扣学生课时的，照样计入老师工资。每位老师每月：核对课时 → 审核通过 → 结算完成。</span></div>`
+    + sums + `<div class="v2-strip soft"><span>只有教务 · 管理看得到。老师写了反馈（或教务标为已上课）的课才计入，按实际时长算；当天请假扣学生课时的，照样计入老师工资。每位老师每月：核对课时 → 审核通过 → 结算完成。</span></div>`
     + v2Tri({id: 'pay', label: '老师名单', items, sel: cur && cur.k, search: '查老师…', count: `${items.length} 位老师 · 有待核对的排前面`, empty: '这个月还没有上完的课', detail});
 }
 
