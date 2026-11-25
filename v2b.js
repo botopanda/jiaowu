@@ -87,7 +87,8 @@ function v2StuDetail(){
   const s = DB.students.find(x => x.id === S.stuId); if (!s) return '';
   const id = s.id, ym = TODAY.slice(0, 7);
   // 原来的分页名对到新的（从别处点「去写」「看全部」带来的）
-  const OLD = {tl: ['rec', 'rec'], fb: ['rec', ''], score: ['data', 'score'], parent: ['data', 'parent'], profile: ['data', ''], mp: ['month', ''], review: ['month', ''], board: ['data', 'parent'], pfview: ['data', 'parent'], info: ['home', '']};
+  // 2026-11-25：tl 不再强行切回「上课记录」卡片——在「按时间看全部」里点时间段、筛选、写私下备注，都会带着 tl 回来，以前每次都被踢回卡片
+  const OLD = {tl: ['rec', ''], fb: ['rec', ''], score: ['data', 'score'], parent: ['data', 'parent'], profile: ['data', ''], mp: ['month', ''], review: ['month', ''], board: ['data', 'parent'], pfview: ['data', 'parent'], info: ['home', '']};
   if (OLD[S.stuTab]){ const [t, sub] = OLD[S.stuTab]; S.stuTab = t; if (sub) S.v2ssub = sub; }
   const tab = V2_STABS.some(x => x[0] === S.stuTab) ? S.stuTab : 'home';
   const ps = personOf('student', 'student_id', id), pp = personOf('parent', 'student_id', id);
@@ -173,7 +174,8 @@ function v2Payroll(){
     const ok = ms.filter(l => paidH(l) > 0), pend = ms.filter(isPend), later = ms.filter(l => l.status === 'scheduled' && !isDone(l) && !isPend(l));
     const money_ = ls => ls.map(l => { const c = course(l.course_id); return [(l.status === 'scheduled' && !isDone(l) ? dur(l) : paidH(l)) * (c.rate || 0), curOf(c)]; });
     const hOk = +ok.reduce((a, l) => a + paidH(l), 0).toFixed(2), hPend = +pend.reduce((a, l) => a + dur(l), 0).toFixed(2);
-    return {ok, pend, later, hOk, hPend, amtOk: sumMoney(money_(ok)), amtPend: sumMoney(money_(pend)), amtAll: sumMoney(money_([...ok, ...pend])), snap: (DB.pay || []).some(p => p.teacher_id === t.id && p.ym === ym && p.snap)}; };
+    const rawOk = ok.reduce((a, l) => a + paidH(l), 0), rawPend = pend.reduce((a, l) => a + dur(l), 0);   // 2026-11-25：合计用没取整的课时加（3 节 50 分钟＝2 小时 30 分，不是 2 小时 29 分）
+    return {ok, pend, later, hOk, hPend, rawOk, rawPend, amtOk: sumMoney(money_(ok)), amtPend: sumMoney(money_(pend)), amtAll: sumMoney(money_([...ok, ...pend])), snap: (DB.pay || []).some(p => p.teacher_id === t.id && p.ym === ym && p.snap)}; };
   const all = DB.teachers.filter(t => !t.staff).map(t => ({t, i: info(t)})).filter(x => x.i.ok.length || x.i.pend.length || x.i.snap);
   const PS = t => { if (isOwner() && S.book === 'all'){ const st = payBooks(t.id, ym).map(b => payOfBook(t.id, ym, b)); if (!st.length) return null;   // 「全部」：两本账都结算了才算已结算
       return st.every(p => p.settled_at) ? ['已结算', 'ok'] : st.every(p => p.reviewed_at) ? ['已审核', 'blue'] : st.some(p => p.settled_at || p.reviewed_at) ? ['部分审核', 'blue'] : null; }
@@ -192,7 +194,7 @@ function v2Payroll(){
       <div class="v2-pay3">
         <div><small>已确认（计入工资）</small><b>${v2HM(i.hOk)}</b><span>${i.ok.length} 节 · ${i.amtOk}</span></div>
         <div class="${i.pend.length ? 'warn' : ''}"><small>待核对（还没计入）</small><b>${v2HM(i.hPend)}</b><span>${i.pend.length} 节${i.pend.length ? ` · ${i.amtPend} · 确认后才算` : ''}</span></div>
-        <div><small>合计（待核对都确认以后）</small><b>${v2HM(i.hOk + i.hPend)}</b><span>${i.amtAll}</span></div></div>
+        <div><small>合计（待核对都确认以后）</small><b>${v2HM(i.rawOk + i.rawPend)}</b><span>${i.amtAll}</span></div></div>
       ${i.pend.length ? `<div class="note warn">还有 ${i.pend.length} 节没确认：${i.pend.map(l => `${md(l.date)} ${esc(stu(course(l.course_id).student_id).name)}（${hasFb(l) ? '待确认' : '老师还没写反馈'}）`).join('、')}。确认后才算进工资。上过的可以在下面每一行点「已上课」，或者 <button class="btn sm" data-act="v2-pay-done" data-v="${t.id}|${ym}">把这 ${i.pend.length} 节都标为已上课</button>（只动 ${esc(t.name)} ${+ym.slice(5)} 月这几节）</div>` : ''}
       ${payDiffBox(t.id, ym)}
       <div class="tw"><table class="rt v2-paytbl"><thead><tr><th>日期</th><th>时间</th><th>学生</th><th>科目</th><th>时长</th><th>状态</th><th>单价</th><th>金额</th></tr></thead><tbody>
@@ -201,7 +203,7 @@ function v2Payroll(){
       ${i.later.length ? `<div class="muted xs">另：${md(i.later[0].date)} 起已排 ${i.later.length} 节，上完后计入。</div>` : ''}
       <div class="row" style="justify-content:flex-end">${v2PayBtns(t.id, ym, i.pend.length)}</div></div>`;
   }
-  const tot = all.reduce((a, x) => a + x.i.hOk, 0);
+  const tot = all.reduce((a, x) => a + x.i.rawOk, 0);
   return v2Head('课时与工资', `${ymLabel(ym)} · 已确认 ${v2HM(tot)}`, `<select data-change="paym" aria-label="月份">${months.map(v => `<option value="${v}" ${v === ym ? 'selected' : ''}>${ymLabel(v)}</option>`).join('')}</select>`)
     + `<div class="v2-strip soft"><span>只有教务 · 管理看得到。老师写了反馈（或教务标为已上课）的课才计入，按实际时长算；当天请假扣学生课时的，照样计入老师工资。每位老师每月：核对课时 → 审核通过 → 结算完成。</span></div>`
     + v2Tri({id: 'pay', label: '老师名单', items, sel: cur && cur.k, search: '查老师…', count: `${items.length} 位老师 · 有待核对的排前面`, empty: '这个月还没有上完的课', detail});
@@ -232,7 +234,7 @@ document.addEventListener('click', e => {
   else if (k === 'v2-pay-done'){   // 只把这位老师这个月待核对的标成已上课
     const [tid, ym] = v.split('|'), ls = lsOfT(tid).filter(l => l.date.startsWith(ym) && isPend(l)); if (!ls.length) return;
     if (!confirm(`把 ${tea(tid).name} ${ymLabel(ym)} 待核对的 ${ls.length} 节课标为已上课？\n按排课时长计入学生课时和老师工资。\n\n${ls.map(l => `${md(l.date)} ${l.start} ${stu(course(l.course_id).student_id).name} ${course(l.course_id).subject}`).join('\n')}`)) return;
-    act('admin_mark_done_many', {ids: ls.map(l => l.id)}, `已标为已上课（${ls.length} 节）`).catch(() => {});
+    act('admin_mark_done_many', {ids: ls.map(l => l.id)}, r => Number.isFinite(+r) && +r !== ls.length ? `已标为已上课 ${+r} 节；另外 ${ls.length - r} 节刚才已经被处理过了` : `已标为已上课（${ls.length} 节）`).catch(() => {});
   }
   else if (k === 'v2-self'){ S.tab = 'e'; render(); setTimeout(() => document.getElementById('m-month')?.scrollIntoView({block: 'start'}), 50); }
 });

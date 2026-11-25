@@ -101,6 +101,7 @@ document.addEventListener('click', e => {
   else if (k === 'v2-ap-jump'){ document.getElementById('v2-st-' + v)?.scrollIntoView({behavior: 'smooth', block: 'start'}); }
   else if (k === 'v2-go-ts'){ S.tab = 'b'; S.v2sel.ts = v; S.v2q.ts = ''; S.v2chip.ts = 'all'; if (v2Phone()) S.v2open = 'ts'; render(); window.scrollTo(0, 0); }
   else if (k === 'v2-ap-open'){   // 看板上点一张卡片：切到「按学生」，打开这个学生
-    S.v2ap = 'stu'; S.v2sel.ap = v; S.v2q.ap = ''; if (v2Phone()) S.v2open = 'ap'; render(); window.scrollTo(0, 0);
+    S.v2ap = 'stu'; S.v2sel.ap = v; S.v2q.ap = ''; S.v2chip.ap = 'has'; S.v2idx.ap = 0;   // 2026-11-25：名单停在「还没有目标」时，会打开别的学生——切回「有目标学校」
+    if (v2Phone()) S.v2open = 'ap'; render(); window.scrollTo(0, 0);
   }
 });

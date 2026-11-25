@@ -16,6 +16,9 @@ async function logFetch(older){
     const args = {};
     if (older && LOGX.rows.length) args.upto = LOGX.rows[LOGX.rows.length - 1].id;
     if (sid) args.stu = sid;
+    // 2026-11-25（数据库第 69 步）：院校库导入一次会记几千条，把别的改动全挤到后面去了——
+    //   不点「院校库与设置」时，让数据库不要给院校库那两类的记录
+    if (LOGX.cat !== 'etc') args.nosch = true;
     r = await rpc('change_log_load', args) || [];
   } catch(e) { err = e.message; }
   if (my !== LOGX.seq) return;
@@ -31,6 +34,7 @@ const LOG_TBL = {students:'学生', teachers:'老师', courses:'课程', lessons
   month_plans:'月计划', reviews:'月度家长反馈', review_raw:'面谈纪要', scores:'成绩', targets:'目标学校', followups:'跟进记录', checklists:'通关点检表',
   check_items:'点检关卡', check_templates:'点检模板', student_msgs:'学生留言', files:'文件', teacher_files:'老师资料', teacher_notes:'老师备注',
   pay_status:'工资', people:'链接', programs:'院校库', program_rounds:'院校日程', settings:'设置'};
+// 「全部」和前几类不含院校库的改动（2026-11-25），要看院校库的点最后一类「院校库与设置」
 const LOG_CATS = [['', '全部'], ['les', '课表', ['courses','lessons','lesson_changes','requests']], ['fb', '反馈与计划', ['feedbacks','month_plans','reviews','review_raw']],
   ['stu', '学生档案', ['students','scores','targets','followups','checklists','check_items','student_msgs','teacher_notes','files']],
   ['tea', '老师与工资', ['teachers','teacher_files','pay_status']], ['link', '链接', ['people']], ['etc', '院校库与设置', ['programs','program_rounds','check_templates','settings']]];
@@ -86,7 +90,8 @@ const LOG_ENUM = {
 // 不显示的栏目（内部编号、文件地址这些）
 // 「审批时间」「核对时间」这些和每条上面的时间重复，也不显示（「审批人」「核对」那一项还在）
 const LOG_HIDE = new Set(['id', 'skey', 'path', 'mime', 'ref', 'by_person', 'by_teacher', 'round_id', 'program_id', 'created_by', 'checklist_id', 'view_book', 'owner',
-  'approved_at', 'reviewed_at', 'settled_at', 'handled_at', 'self_at', 'read_at', 'snap', 'uploaded_by_id']);
+  'approved_at', 'reviewed_at', 'settled_at', 'handled_at', 'self_at', 'read_at', 'snap', 'uploaded_by_id',
+  'ui_ver', 'ui_theme', 'ui_seen_at']);   // 2026-11-25：删掉一条链接时，这个人选的版本、配色不用列出来
 // 新增 / 删除时「看内容」里不再重复的（上面那句话已经写了是哪个学生、哪节课）
 const LOG_CTXCOL = new Set(['student_id', 'teacher_id', 'course_id', 'lesson_id', 'key']);
 // 「Project K」视图：归属、Panda 标记这些也不显示（潘、金那边数据库就不给）
@@ -214,7 +219,7 @@ document.addEventListener('change', e => {
 document.addEventListener('click', async e => {
   const a = e.target.closest('[data-act]'); if (!a) return;
   const k = a.dataset.act, v = a.dataset.v;
-  if (k === 'lg-cat') { LOGX.cat = v; render(); }
+  if (k === 'lg-cat') { const re = (v === 'etc') !== (LOGX.cat === 'etc'); LOGX.cat = v; if (re) { LOGX.rows = []; LOGX.more = false; logFetch(false).then(() => { if (typeof v2LgAuto === 'function' && (S.v2lgQ || '').trim() && document.querySelector('[data-v2lg]')) v2LgAuto(); }); } render(); }   // 进出「院校库与设置」要重新读（别的分类不带院校库的记录）
   else if (k === 'lg-more') logFetch(true);
   else if (k === 'lg-reload') logFetch(false);
   else if (k === 'peek') {   // 「打开看看」：新开一页（第 61 步）

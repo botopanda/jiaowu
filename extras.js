@@ -58,7 +58,9 @@ document.addEventListener('change', async e => {
   const fails = [];
   try {
     for (const f of files) { try { await uploadOne(f, purpose, ref); } catch(err) { fails.push(`「${f.name}」${err.message}`); } }
-    try { await load(); render(); reopenModal(); } catch(err) {}
+    // 2026-11-25：上传完会重画页面——同一条记录上已经写了、还没提交的字（比如批改意见）先记下，画完放回去
+    const keep = ref ? [...document.querySelectorAll('#app textarea[id], #app input[type="text"][id]')].filter(x => x.id.includes(ref) && x.value !== x.defaultValue).map(x => [x.id, x.value]) : [];
+    try { await load(); render(); reopenModal(); keep.forEach(([id, v]) => { const x = document.getElementById(id); if (x && x.value !== v) { x.value = v; S.dirtyMain = true; const d = x.closest('.v2-det'); if (d) d.dataset.dirty = '1'; } }); } catch(err) {}
     if (fails.length) toast(`${files.length - fails.length} 个传上了，${fails.length} 个没传上：${fails.join('；')}。只要再选没传上的那几个就行`, true, 9000);
     else toast({hw: '作业已上传，老师能看到了', hwref: '作业图片已上传，学生能看到了', ck: '作品已上传', cv: '简历已上传', cvp: '照片已更新', cvw: '作品已上传'}[purpose] || '已上传，学生能看到了');
   } catch(err) { toast(err.message, true); }

@@ -116,6 +116,8 @@ document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a || a.dataset.act !== 'book') return;
   S.book = a.dataset.v; try { localStorage.setItem('jw_book', S.book); } catch(err) {}
   S.sel.clear(); if (typeof LOGX !== 'undefined') LOGX.who = '';   // 2026-11-19：另一边勾的、筛的不带过来
+  // 2026-11-25：另一边搜过的名字（搜索框会原样显示）、课表「只看某个学生 / 老师」也不带过来
+  if (S.v2q) S.v2q = {}; S.v2lnQ = ''; S.v2lgQ = ''; if (S.calId) { S.calType = 'all'; S.calId = ''; }
   DB = bookView(DB_ALL); render(); ownerSync(true);
 });
 // 告诉数据库总管理现在在哪一边：在 Panda 视图做的事记成「Panda」，其余记成「潘老师」（第 28 步）

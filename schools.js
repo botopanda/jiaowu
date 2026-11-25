@@ -18,19 +18,29 @@ const rv = (r, k) => R_CORE.includes(k) ? (r[k] ?? '') : ((r.info || {})[k] ?? '
 
 /* 没有留学签证能不能考（2026-11-25）：每一轮一个答案。另外按合格发表日自动算：没签证的学生考上后办 COE＋签证（通常 2〜3 个月）来不来得及 */
 const VISA_TAG = {'能，不用来日本': ['没签证也能考 · 不用来日本', 'vz-ok'], '能，要来日本考': ['没签证也能考 · 要来日本考', 'vz-come'],
-  '不能，报名时要有留学签证': ['报名时要有留学签证', 'vz-no'], '只收海外考生': ['只收海外考生', 'vz-abroad']};
+  '不能，报名时要有留学签证': ['报名时要有留学签证', 'vz-no'], '只收海外考生': ['只收海外考生', 'vz-abroad'],
+  '只收海外考生，要来日本考': ['只收海外考生 · 要来日本考', 'vz-abroad']};   // 2026-11-25：只收住在海外的人，但考试要到日本现场考（Codex 第三次复查第 4 条）
 const VISA_SIT = [['', '学生情况：全部'], ['has', '有留学签证（在日本）'], ['come', '没签证、能来日本考'], ['remote', '没签证、不来日本']];
-const progEntry = p => `${p.year}-${({'9月': '09', '10月': '10'})[pv(p, 'intake')] || '04'}-01`;   // 入学日：年度＋入学时期，没写按 4 月
+// 入学时期（2026-11-25 全面检查）：同一个专业可能既有 4 月入学、又有 9 月入学的轮次，这一轮自己写了「本轮入学时期」就用它，没写用专业的
+const roundIntake = (p, r) => (r && rv(r, 'r_intake')) || pv(p, 'intake') || '';
+const progIntakes = p => [...new Set((p.rounds || []).map(r => roundIntake(p, r)).concat((p.rounds || []).length ? [] : [pv(p, 'intake')]).filter(Boolean))].sort((a, b) => intakeNo(a) - intakeNo(b));
+function intakeNo(it){ const m = /^\s*(\d{1,2})\s*月\s*$/.exec(it); return m && +m[1] >= 1 && +m[1] <= 12 ? +m[1] : 99; }   // 月份从小到大，「其他」和认不出来的排最后
+function progEntry(p, r){   // 入学日：年度＋入学时期，没写按 4 月；写「其他」的不知道是哪天，返回空
+  const it = roundIntake(p, r);
+  const m = /^\s*(\d{1,2})\s*月\s*$/.exec(it);   // 整格只写了一个月份才算（「4月或9月」这种不算）   // 写了几月就按几月算（表里也可能写「7月」）；写了别的认不出来的，不算时间；空着按 4 月
+  if (m && +m[1] >= 1 && +m[1] <= 12) return `${p.year}-${String(+m[1]).padStart(2, '0')}-01`;
+  return it ? '' : `${p.year}-04-01`;
+}
 function visaLate(p, r){   // 0 来得及 / 1 时间紧（合格发表到入学不到 3 个月）/ 2 很可能来不及（不到 2 个月）
-  const v = rv(r, 'r_visa'); if (!r.result_date || !v || v.startsWith('不能')) return 0;
-  const d = dBetween(r.result_date, progEntry(p));
+  const v = rv(r, 'r_visa'), ent = progEntry(p, r); if (!r.result_date || !v || v.startsWith('不能') || !ent) return 0;
+  const d = dBetween(r.result_date, ent);
   return d < 60 ? 2 : d < 90 ? 1 : 0;
 }
 function visaOk(r, sit){   // 这一轮，这种情况的学生能不能考（没填的：有签证的算能考，没签证的不算）
   const v = rv(r, 'r_visa');
   if (!sit) return true;
-  if (sit === 'has') return v !== '只收海外考生';
-  return (sit === 'come' ? ['能，不用来日本', '能，要来日本考', '只收海外考生'] : ['能，不用来日本', '只收海外考生']).includes(v);
+  if (sit === 'has') return !v.startsWith('只收海外考生');
+  return (sit === 'come' ? ['能，不用来日本', '能，要来日本考', '只收海外考生', '只收海外考生，要来日本考'] : ['能，不用来日本', '只收海外考生']).includes(v);
 }
 const visaHit = (p, sit) => !sit || (p.rounds || []).some(r => visaOk(r, sit));
 function visaTags(p, r){
@@ -47,20 +57,28 @@ async function progLoad(force){
 }
 const dS = d => !d ? '' : d.slice(0,4)===TODAY.slice(0,4) ? `${+d.slice(5,7)}/${+d.slice(8,10)}` : `${d.slice(2,4)}/${+d.slice(5,7)}/${+d.slice(8,10)}`;
 const progName = p => [p.faculty, p.dept].filter(Boolean).join(' ');
-// 下一轮：还没过截止的第一轮
+// 这一轮过了没有：有出愿截止日看截止日；截止日没填的，看后面的日子（材料必着 / 考试 / 合格发表）过了没有——只知道「出愿已经开始」不能算截止（2026-11-25）
+const roundOver = r => r.apply_end ? r.apply_end < TODAY : [r.docs_due, r.written_date, r.interview_date, r.result_date].some(d => d && d < TODAY);
+// 下一轮：先看正在出愿的（截止最近的那一轮），没有就看最快开始出愿的；表里的轮次不一定按日期排，所以按日期挑，不按先后挑（2026-11-25）
 function nextRound(p){
-  const r = (p.rounds||[]).find(r => (r.apply_end || r.apply_start || r.result_date || '9999') >= TODAY);
-  if (!r) return (p.rounds||[]).length ? '<span class="tag mute">本年度各轮已截止</span>' : '';
-  const open = r.apply_start && r.apply_start <= TODAY && (!r.apply_end || r.apply_end >= TODAY);
-  if (open) return `<span class="tag seal">${esc(r.name||'')} 出愿中 · ${dS(r.apply_end)} 截止（还有 ${dBetween(TODAY, r.apply_end)} 天）</span>`;
+  const rs = p.rounds || []; if (!rs.length) return '';
+  const live = rs.filter(r => !roundOver(r));
+  if (!live.length) return '<span class="tag mute">本年度各轮已截止</span>';
+  const by = f => (a, b) => f(a).localeCompare(f(b));
+  const open = live.filter(r => r.apply_start && r.apply_start <= TODAY).sort(by(r => r.apply_end || '9999'))[0];
+  if (open) return open.apply_end ? `<span class="tag seal">${esc(open.name||'')} 出愿中 · ${dS(open.apply_end)} 截止（还有 ${dBetween(TODAY, open.apply_end)} 天）</span>`
+    : `<span class="tag seal">${esc(open.name||'')} 出愿中 · 截止日没填</span>`;
+  const r = live.filter(r => r.apply_start || r.apply_end).sort(by(r => r.apply_start || r.apply_end))[0] || live[0];
   if (r.apply_start) return `<span class="tag warn">${esc(r.name||'')} · ${dS(r.apply_start)} 开始出愿</span>`;
+  if (r.apply_end) return `<span class="tag warn">${esc(r.name||'')} · ${dS(r.apply_end)} 截止</span>`;
   return `<span class="tag mute">${esc(r.name||'')}</span>`;
 }
 const staleTag = p => { const v = pv(p, 'verified_on'); return v && dBetween(v, TODAY) > 180 ? '<span class="tag warn">超过半年没核验</span>' : ''; };
 
 /* ───────── 页面 ───────── */
 function pgSchools(){
-  const head = `<div class="ph"><h2>院校库</h2><span class="row"><a class="btn sm" href="院校库导入模板.xlsx" download>下载 Excel 模板</a>
+  PF.track = ''; PF.sort = '';   // 旧版没有「文理艺」按钮和排序：从新版切回来时，不能还留着看不见、清不掉的筛选（2026-11-25）
+  const head =`<div class="ph"><h2>院校库</h2><span class="row"><a class="btn sm" href="院校库导入模板.xlsx" download>下载 Excel 模板</a>
     <label class="btn sm" for="prog-file">导入 Excel</label><input type="file" id="prog-file" accept=".xlsx,.csv" data-change="prog-import" hidden>
     <button class="btn pri" data-act="prog-new">＋ 添加专业</button></span></div>
   <div class="hint">一个专业一张卡片，点开看全部资料和各轮入试日期。学生的「大学与出愿」可以直接从这里带入。导入时，同年度、同学校、同学部学科的会更新，其他的新增。</div>`;
@@ -112,30 +130,44 @@ function progList(){
   return `<div class="muted xs" style="margin:2px 0 6px">共 ${list.length} 个专业</div>` + list.map(progCard).join('');
 }
 const SHOWN_IN_HEAD = ['year','level','track','field','school','school_cn','school_en','region','school_group','faculty','dept','school_ord','school_type','intake','campus','url','url2'];
+/* 2026-11-25 全面检查：院校库到了 3,900 个专业、7,300 轮以后，每张卡片连里面的表格一起画，整页有 38 万个格子、13MB，每敲一个字要卡 1 秒多。
+   改成：卡片先只画标题那一行，点开的时候才画里面（各轮日期、全部资料、编辑 / 删除按钮）。卡片上记着专业编号 data-pid。 */
 function progCard(p, o = {}){   // o.inSchool：放在新版「学校块」里，校名、国公私、地区在块头上，卡片不再重复
-  const used = (DB.targets||[]).filter(t => t.program_id===p.id).length, rs = p.rounds || [];
-  const rExtra = SF_R.filter(f => !f.core);
+  const used = (DB.targets||[]).filter(t => t.program_id===p.id).length, its = progIntakes(p);
+  const itTag = its.length > 1 ? ' · ' + esc(its.join(' / ')) + '入学' : its[0] && its[0] !== '4月' ? ' · ' + esc(its[0]) + '入学' : '';
+  return `<details class="card pg-card" data-pid="${p.id}"><summary><div class="row">${o.inSchool ? `<b class="pg-prog">${esc(progName(p) || '（没填学部学科）')}</b>` : `<b class="pg-school" title="${esc([pv(p,'school_cn'), pv(p,'school_en')].filter(Boolean).join(' / '))}">${esc(p.school)}</b>${pv(p,'school_group')?`<span class="muted">${esc(pv(p,'school_group'))}</span>`:''}<span>${esc(progName(p))}</span>`}
+      <span class="tag mute">${p.year}${itTag}</span><span class="tag blue">${esc(p.level)}</span>${pv(p,'track')?`<span class="tag trk trk-${{'文科':'w','理科':'l','艺术':'y','文理皆可':'wl'}[pv(p,'track')]||'x'}">${esc(pv(p,'track'))}</span>`:''}${artByField(p)?`<span class="tag trk trk-y" title="考试按${esc(pv(p,'track')||'文科 / 理科')}考，学的是艺术类内容（设计、美术、音乐等）">艺术</span>`:''}${p.field?`<span class="tag gold">${esc(p.field)}</span>`:''}
+      ${!o.inSchool && pv(p,'school_type')?`<span class="tag mute">${esc(pv(p,'school_type'))}</span>`:''}${!o.inSchool && p.region?`<span class="tag mute">${esc(p.region)}</span>`:''}
+      ${used?`<span class="tag ok">${used} 位学生在报</span>`:''}${staleTag(p)}<span style="margin-left:auto">${nextRound(p)}</span></div></summary></details>`;
+}
+function progBody(p){
+  const rs = p.rounds || [], rExtra = SF_R.filter(f => !f.core), mixIt = progIntakes(p).length > 1;
   const groups = P_GROUPS.map(g => {
     const items = SF_P.filter(f => f.g === g && !SHOWN_IN_HEAD.includes(f.k) && pv(p, f.k));
     return items.length ? `<div class="pg-grp"><div class="pg-gt">${g}</div><dl class="kv small">${items.map(f => `<dt>${f.l}</dt><dd style="white-space:pre-wrap">${esc(String(pv(p, f.k)))}</dd>`).join('')}</dl></div>` : '';
   }).join('');
-  return `<details class="card pg-card"><summary><div class="row">${o.inSchool ? `<b class="pg-prog">${esc(progName(p) || '（没填学部学科）')}</b>` : `<b class="pg-school" title="${esc([pv(p,'school_cn'), pv(p,'school_en')].filter(Boolean).join(' / '))}">${esc(p.school)}</b>${pv(p,'school_group')?`<span class="muted">${esc(pv(p,'school_group'))}</span>`:''}<span>${esc(progName(p))}</span>`}
-      <span class="tag mute">${p.year}${pv(p,'intake')&&pv(p,'intake')!=='4月'?' · '+esc(pv(p,'intake'))+'入学':''}</span><span class="tag blue">${esc(p.level)}</span>${pv(p,'track')?`<span class="tag trk trk-${{'文科':'w','理科':'l','艺术':'y','文理皆可':'wl'}[pv(p,'track')]||'x'}">${esc(pv(p,'track'))}</span>`:''}${artByField(p)?`<span class="tag trk trk-y" title="考试按${esc(pv(p,'track')||'文科 / 理科')}考，学的是艺术类内容（设计、美术、音乐等）">艺术</span>`:''}${p.field?`<span class="tag gold">${esc(p.field)}</span>`:''}
-      ${!o.inSchool && pv(p,'school_type')?`<span class="tag mute">${esc(pv(p,'school_type'))}</span>`:''}${!o.inSchool && p.region?`<span class="tag mute">${esc(p.region)}</span>`:''}
-      ${used?`<span class="tag ok">${used} 位学生在报</span>`:''}${staleTag(p)}<span style="margin-left:auto">${nextRound(p)}</span></div></summary>
-    <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+  return `<div class="pg-body" style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
       ${rs.length ? `<div class="tw"><table class="rt"><thead><tr><th>入试</th><th>出愿</th><th>材料必着</th><th>一次发表</th><th>笔试</th><th>面试</th><th>合格发表</th><th>手续截止</th><th>考试内容</th></tr></thead><tbody>
-        ${rs.map(r => { const no = PF.visa && !visaOk(r, PF.visa), vt = visaTags(p, r); return `<tr class="${(r.apply_end||'9999') < TODAY ? 'muted' : ''}${no ? ' rt-no' : ''}"${no ? ' title="按上面选的学生情况，这一轮考不了"' : ''}><td><b>${esc(r.name||'')}</b>${rv(r,'r_mode')?`<div class="xs">${esc(rv(r,'r_mode'))}${rv(r,'r_place')?' · '+esc(rv(r,'r_place')):''}</div>`:''}${vt ? `<div class="vz-row">${vt}</div>` : ''}</td>
+        ${rs.map(r => { const no = PF.visa && !visaOk(r, PF.visa), vt = visaTags(p, r), unk = no && !rv(r, 'r_visa');
+          return `<tr class="${(r.apply_end||'9999') < TODAY ? 'muted' : ''}${no ? ' rt-no' : ''}"${no ? ` title="${unk ? '这一轮学校没写清没有留学签证能不能考，要问学校' : '按上面选的学生情况，这一轮考不了'}"` : ''}><td><b>${esc(r.name||'')}</b>${mixIt && roundIntake(p, r) ? ` <span class="tag mute">${esc(roundIntake(p, r))}入学</span>` : ''}${rv(r,'r_mode')?`<div class="xs">${esc(rv(r,'r_mode'))}${rv(r,'r_place')?' · '+esc(rv(r,'r_place')):''}</div>`:''}${vt ? `<div class="vz-row">${vt}</div>` : ''}</td>
           <td class="num">${dS(r.apply_start)}${r.apply_start||r.apply_end?'–':''}${dS(r.apply_end)}</td><td class="num">${dS(r.docs_due)}</td><td class="num">${dS(r.first_result)}</td><td class="num">${dS(r.written_date)}</td><td class="num">${dS(r.interview_date)}</td><td class="num">${dS(r.result_date)}</td><td class="num">${dS(r.procedure_due)}</td>
-          <td class="xs">${esc(rv(r,'content'))}${rExtra.filter(f => !['r_mode','r_place','content','r_visa'].includes(f.k) && rv(r, f.k)).map(f => `<div class="muted">${esc(rv(r, f.k))}</div>`).join('')}</td></tr>`; }).join('')}
+          <td class="xs">${esc(rv(r,'content'))}${rExtra.filter(f => !['r_mode','r_place','content','r_visa','r_intake'].includes(f.k) && rv(r, f.k)).map(f => `<div class="muted">${esc(rv(r, f.k))}</div>`).join('')}</td></tr>`; }).join('')}
       </tbody></table></div>` : '<div class="muted small">还没有填入试日期</div>'}
       ${pv(p,'campus')?`<div class="small"><span class="muted">校区：</span>${esc(pv(p,'campus'))}</div>`:''}
       <div class="pg-grps">${groups}</div>
       <div class="row">${webUrl(p,'url')?`<a class="btn sm" href="${esc(webUrl(p,'url'))}" target="_blank" rel="noopener">官方入试页面</a>`:''}${webUrl(p,'url2')?`<a class="btn sm" href="${esc(webUrl(p,'url2'))}" target="_blank" rel="noopener">募集要项 PDF</a>`:''}
         <span class="muted xs">${p.updated_by?`${esc(p.updated_by)} ${String(p.updated_at||'').slice(0,10)} 更新`:''}</span>
         <span style="margin-left:auto" class="row"><button class="btn sm" data-act="prog-edit" data-v="${p.id}">编辑</button><button class="btn sm danger" data-act="prog-del" data-v="${p.id}">删除</button></span></div>
-    </div></details>`;
+    </div>`;
 }
+// 点开卡片时才画里面：点标题那一下先画好（键盘回车也是点），程序直接把卡片打开的（toggle）也补上
+function progFill(el){
+  if (!el || el.querySelector(':scope > .pg-body')) return;
+  const p = (PROG || []).find(x => x.id === el.dataset.pid); if (!p) return;
+  el.insertAdjacentHTML('beforeend', progBody(p)); if (typeof labelTables === 'function') labelTables();
+}
+document.addEventListener('click', e => { const s = e.target.closest?.('.pg-card > summary'); if (s && !s.parentElement.open) progFill(s.parentElement); }, true);
+document.addEventListener('toggle', e => { if (e.target.matches?.('.pg-card') && e.target.open) progFill(e.target); }, true);
 
 /* ───────── 添加 / 编辑 ───────── */
 function sfInput(f, val, cls){
@@ -158,7 +190,7 @@ function progForm(p){
     <div class="fields pg-fields">${SF_R.filter(f => f.k !== 'name').map(f => sfInput(f, rv(r, f.k), 'pr')).join('')}</div></div>`).join('')}</div>
   <div><button class="btn sm" data-act="pr-add">＋ 加一轮</button></div>
   ${P_GROUPS.filter(g => g !== '基本信息').map(block).join('')}
-  <div class="row"><button class="btn pri" data-act="prog-save" data-v="${p.id||''}">保存</button></div>`, 'xl');
+  <div class="row"><button class="btn pri" data-act="prog-save" data-v="${p.id||''}" data-ver="${esc(p.updated_at||'')}">保存</button></div>`, 'xl');
 }
 function progCollect(){
   const d = {info:{}};
@@ -195,7 +227,9 @@ function tgCollect(){
 }
 
 /* ───────── Excel / CSV 读取 ───────── */
+let XLSX_1904 = false;   // 这份 Excel 用的是不是「1904 日期系统」（老的 Mac 版 Excel）：是的话日期数字要多加 1462 天
 async function readXlsx(buf){
+  XLSX_1904 = false;
   const dv = new DataView(buf), u8 = new Uint8Array(buf), dec = new TextDecoder();
   let eocd = -1;
   for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 70000); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
@@ -225,8 +259,9 @@ async function readXlsx(buf){
   }
   // 找工作表：优先叫「出愿数据库」「院校库」的，否则第一张
   const wb = xml(await read('xl/workbook.xml')), rels = xml(await read('xl/_rels/workbook.xml.rels') || '<x/>');
+  XLSX_1904 = /^(1|true)$/i.test(tags(wb, 'workbookPr')[0]?.getAttribute('date1904') || '');
   const sheets = [...tags(wb, 'sheet')];
-  const pick = sheets.find(s => /出愿数据库|院校库/.test(s.getAttribute('name'))) || sheets[0];
+  const pick =sheets.find(s => /出愿数据库|院校库/.test(s.getAttribute('name'))) || sheets[0];
   let target = 'xl/worksheets/sheet1.xml';
   if (pick) { const rid = pick.getAttribute('r:id') || pick.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id'); const rel = [...tags(rels, 'Relationship')].find(r => r.getAttribute('Id') === rid);
     if (rel) { const t = rel.getAttribute('Target'); target = t.startsWith('/') ? t.slice(1) : 'xl/' + t.replace(/^\.\//, ''); } }
@@ -277,9 +312,12 @@ function headerMap(row){
 // 日期：Excel 日期数字、2026/10/23、2026-10-23、2026年10月23日
 function toDate(v){
   if (v == null || v === '') return {d: ''};
-  if (typeof v === 'object') { const n = +v.num; if (n > 20000 && n < 80000) return {d: new Date(Date.UTC(1899, 11, 30) + Math.floor(n) * 86400000).toISOString().slice(0,10)}; v = v.num; }
+  if (typeof v === 'object') { const n = +v.num + (XLSX_1904 ? 1462 : 0); if (n > 20000 && n < 80000) return {d: new Date(Date.UTC(1899, 11, 30) + Math.floor(n) * 86400000).toISOString().slice(0,10)}; v = v.num; }
   const m = String(v).match(/(\d{4})\s*[\/\-.年]\s*(\d{1,2})\s*[\/\-.月]\s*(\d{1,2})/);
-  if (m) return {d: `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`};
+  if (m) {   // 2026-11-25：日历上没有的日子（2027-02-30）不当日期，免得数据库整批退回
+    const t = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    if (t.getUTCFullYear() === +m[1] && t.getUTCMonth() === +m[2] - 1 && t.getUTCDate() === +m[3] && +m[1] >= 1990 && +m[1] <= 2100) return {d: t.toISOString().slice(0,10)};
+  }
   return {d: '', bad: String(v).trim()};
 }
 function rowsToPrograms(rows){
@@ -287,6 +325,13 @@ function rowsToPrograms(rows){
   if (hi < 0) throw new Error('表里找不到「学校」这一列的表头，请用系统给的模板');
   const map = headerMap(rows[hi]), warn = [], groups = new Map();
   const txt = v => v == null ? '' : typeof v === 'object' ? String(v.num) : String(v).trim();
+  // 2026-11-25：没认出来的表头说一声（表头被改过的话，那一列不会导入；「学科」没认出来还会把几个专业并成一个）。「居住地限制」是以前的栏，已经不用了，不提
+  const unk = [...rows[hi]].map((h, i) => [txt(h), i]).filter(([h, i]) => h && !(i in map) && normH(h) && normH(h) !== '居住地限制').map(([h]) => `「${h.replace(/\s+/g, '')}」`);
+  if (unk.length) warn.push(`这 ${unk.length} 列的表头系统没认出来，这几列不会导入：${unk.slice(0, 8).join('')}${unk.length > 8 ? '……' : ''}。表头请用模板里原来的写法`);
+  let nEx = 0; const exOld = new Set(), exLines = [];
+  // 旧模板的示例：先把备注是「示例行…」的那一行是哪个专业找出来（表被重新排过序，示例的第二行跑到前面也认得出）
+  const colOf = key => { const i = Object.keys(map).find(i => map[i] === key); return i == null ? -1 : +i; }, cNote = colOf('p.note');
+  if (cNote >= 0) rows.slice(hi + 1).forEach(r => { if (r && /^示例行/.test(txt(r[cNote]))) exOld.add(['p.year', 'p.school', 'p.faculty', 'p.dept'].map(k => colOf(k) < 0 ? '' : txt(r[colOf(k)])).join('|')); });
   const def = key => { const [kind, k] = key.split('.'); return (kind === 'p' ? SF_P : SF_R).find(f => f.k === k); };
   rows.slice(hi + 1).forEach((r, ri) => {
     if (!r || !r.some(c => txt(c))) return;
@@ -309,7 +354,14 @@ function rowsToPrograms(rows){
       if (kind === 'r') { if (val) hasRound = true; put(rd, rd.info); } else put(p, p.info);
     });
     if (!p.school) { warn.push(`第 ${line} 行没有填学校，跳过了`); return; }
-    p.year = String(p.year || '').replace(/[^\d]/g, '').slice(0,4) || String(+TODAY.slice(0,4) + 1);
+    if (/^\s*[（(【\[]?\s*示例/.test(p.school)) { nEx++; exLines.push(line); return; }   // 模板自带的示例行：不导入
+    // 旧模板的两行示例（校名前面没有「（示例）」）：第一行备注是「示例行…」，第二行是同一个专业的「留学生選抜 II期 2027-02-01 开始」。
+    //   只跳过这两行本身；同一个专业后面真的补了别的轮次，照样导入（Codex 复查第 10 条）
+    const exKey = [p.year, p.school, p.faculty || '', p.dept || ''].join('|');
+    if (/^示例行/.test(p.info.note || '')) { exOld.add(exKey); exLines.push(line); nEx++; return; }
+    if (exOld.has(exKey) && rd.name === '留学生選抜 II期' && rd.apply_start === '2027-02-01') { exLines.push(line); nEx++; return; }
+    const rowIt = p.info.intake || ''; if (hasRound) rd._it = rowIt;   // 这一行写的入学时期，先记着，后面看同一个专业里是不是有两种
+    p.year =String(p.year || '').replace(/[^\d]/g, '').slice(0,4) || String(+TODAY.slice(0,4) + 1);
     if (p.level && !['学部','大学院','研究生','专门学校'].includes(p.level)) { warn.push(`第 ${line} 行「类别」写的是「${p.level}」，已按「学部」处理`); p.level = '学部'; }
     const key = [p.year, p.school, p.faculty||'', p.dept||''].join('|');
     if (!groups.has(key)) groups.set(key, {...p, info: {...p.info}, rounds: []});
@@ -318,20 +370,32 @@ function rowsToPrograms(rows){
     Object.entries(p.info).forEach(([k, v]) => { if (v && !g.info[k]) g.info[k] = v; });   // 同一专业的多行：前面空着的用后面的补
     if (hasRound) g.rounds.push(rd);
   });
-  return {list: [...groups.values()], warn};
+  let list = [...groups.values()];
+  if (nEx) warn.push(`模板自带的示例没有导入（只是给你看怎么填的）${exLines.length ? '：第 ' + exLines.join('、') + ' 行' : ''}`);
+  list.forEach(g => {
+    // 同一个专业里既有 4 月入学又有 9 月入学的轮次：把每一行写的入学时期记到那一轮上（「本轮入学时期」）
+    const its = new Set(g.rounds.map(r => r.info.r_intake || r._it).filter(Boolean));
+    g.rounds.forEach(r => { if (its.size > 1 && !r.info.r_intake && r._it) r.info.r_intake = r._it; delete r._it; });
+    const ns = g.rounds.map(r => (r.name || '') + '\u0001' + (r.info.r_intake || '')), dup = [...new Set(ns.filter((n, i) => ns.indexOf(n) !== i).map(n => n.split('\u0001')[0]))];   // 名称一样、入学时期不一样的不算重名
+    if (dup.length) warn.push(`${g.school} ${[g.faculty, g.dept].filter(Boolean).join(' ')}：有重名的轮次（${dup.map(n => n || '没写名称').slice(0, 3).join('、')}），系统按表里的先后一个个对上；最好在名称里写清区别`);
+  });
+  return {list, warn};
 }
 let IMPORT_PENDING = null;
 async function progImportFile(file){
   try {
-    const rows = /\.csv$/i.test(file.name) ? readCsv(await file.text()) : await readXlsx(await file.arrayBuffer());
+    const isCsv = /\.csv$/i.test(file.name); if (isCsv) XLSX_1904 = false;
+    const rows = isCsv ? readCsv(await file.text()) : await readXlsx(await file.arrayBuffer());
     const {list, warn} = rowsToPrograms(rows);
-    if (!list.length) { toast('表里没有可以导入的内容', true); return; }
-    await progLoad().catch(() => {});
+    if (!list.length) { toast(warn.length ? '表里没有可以导入的内容（' + warn[0] + '）' : '表里没有可以导入的内容', true); return; }
+    // 2026-11-25：导入前把院校库重新读一遍（页面开了很久的话，手里的可能是旧的）。读不出来就不导入——
+    //   不然已有的专业会被算成「新增」，而且「空着就保留」的校内分类、校内顺序、文理艺会被清掉
+    try { await progLoad(true); } catch(e) { toast('院校库现在读不出来，先不导入（怕把已有的专业当成新的）。请稍后再试一次', true, 6000); return; }
     const old = new Map((PROG||[]).map(p => [[p.year, p.school, p.faculty, p.dept].join('|'), p]));
     list.forEach(p => {
       const o = old.get([p.year, p.school, p.faculty||'', p.dept||''].join('|'));
-      ['school_group', 'school_ord', 'track'].forEach(k => { if (!p.info[k] && o && pv(o, k)) p.info[k] = pv(o, k); });
-      if (p.info.school_ord && !isFinite(progOrd(p))) { warn.push(`${p.school} ${progName(p)}：「校内顺序」写的是「${p.info.school_ord}」，不是数字，没有导入这一项`); delete p.info.school_ord; }
+      if (p.info.school_ord && !isFinite(progOrd(p))) { warn.push(`${p.school} ${progName(p)}：「校内顺序」写的是「${p.info.school_ord}」，不是数字，没有导入这一项${o && pv(o, 'school_ord') ? '（保留原来的）' : ''}`); delete p.info.school_ord; }
+      // 校内分类、校内顺序、文理艺空着的：不在这里拿网页手里的旧值去填了，原样空着交上去，由数据库在写入那一刻保留当时的值（第 69 步；Codex 复查第 5 条）
     });
     const exist = new Set(old.keys());
     const nUpd = list.filter(p => exist.has([p.year, p.school, p.faculty||'', p.dept||''].join('|'))).length;
@@ -354,7 +418,7 @@ document.addEventListener('click', async e => {
     if (k === 'prog-new') progForm();
     if (k === 'prog-edit') progForm(JSON.parse(JSON.stringify(PROG.find(p => p.id === v))));
     if (k === 'pr-add' || k === 'pr-del') {
-      const d = progCollect(); d.id = a.closest('.modal').querySelector('[data-act="prog-save"]').dataset.v || undefined;
+      const sv = a.closest('.modal').querySelector('[data-act="prog-save"]'), d = progCollect(); d.id = sv.dataset.v || undefined; d.updated_at = sv.dataset.ver || '';
       if (k === 'pr-add') d.rounds.push({info:{}}); else d.rounds.splice(+v, 1);
       progForm(d);
     }
@@ -362,7 +426,11 @@ document.addEventListener('click', async e => {
       const d = progCollect(); if (!d.school) { toast('请填写学校', true); return; }
       if (d.info.school_ord && !isFinite(progOrd(d))) { toast('「校内顺序」请填数字，例如 10、20、30', true); return; }
       d.rounds = d.rounds.filter(r => r.name || R_DATES.some(x => r[x]) || Object.keys(r.info).length);
-      if (v) d.id = v;
+      // 2026-11-25：「添加专业」填的年度、学校、学部、学科和库里已有的一模一样——以前会悄悄盖掉原来那个专业、删掉它的轮次
+      const yr = String(d.year || '').replace(/[^\d]/g, '') || '2027';
+      if (!v && (PROG || []).some(x => String(x.year) === yr && x.school === d.school && (x.faculty || '') === (d.faculty || '') && (x.dept || '') === (d.dept || ''))) {
+        toast('这个专业院校库里已经有了（年度、学校、学部、学科都一样）。请关掉这个窗口，在列表里找到它点「编辑」', true, 7000); return; }
+      if (v) { d.id = v; if (a.dataset.ver) d.ver = a.dataset.ver; }   // 打开窗口时这个专业的「最后改动时间」：之后被别人改过、重新导入过，数据库就不让这份旧的盖上去（第 69 步）
       await act('program_save', {d}, '已保存'); await progLoad(true); closeModal(); render();
     }
     if (k === 'prog-del') {
@@ -372,9 +440,14 @@ document.addEventListener('click', async e => {
     }
     if (k === 'prog-import-go') {
       const list = IMPORT_PENDING; if (!list) return;
-      document.body.classList.add('busy'); let n = 0, u = 0;
-      try { for (let i = 0; i < list.length; i += 40) { const r = await rpc('programs_import', {rows: list.slice(i, i + 40)}); n += r.new; u += r.updated; } }
-      catch(err) { toast(err.message, true); return; }
+      document.body.classList.add('busy'); let n = 0, u = 0, i = 0;
+      try { for (; i < list.length; i += 40) { const r = await rpc('programs_import', {rows: list.slice(i, i + 40)}); n += r.new; u += r.updated; } }
+      catch(err) {
+        // 2026-11-25：一批 40 个，前面几批已经写进去了——说清楚做到哪了；重新导入不会重复（已有的会变成「更新」）
+        const bad = list.slice(i, i + 40);
+        toast(`导入到第 ${i + 1}〜${Math.min(i + 40, list.length)} 个专业（${bad[0].school}${bad.length > 1 ? ' 等' : ''}）时出错了：${err.message}。前面 ${i} 个已经导入（新增 ${n}、更新 ${u}），这一批和后面的还没有。改好以后把整份再导一次就行，不会重复`, true, 15000);
+        if (i > 0) { try { await progLoad(true); render(); } catch(_) {} }
+        return; }
       finally { document.body.classList.remove('busy'); }
       IMPORT_PENDING = null; await progLoad(true); closeModal(); render(); toast(`导入完成：新增 ${n} 个，更新 ${u} 个`);
     }
@@ -385,14 +458,26 @@ document.addEventListener('click', async e => {
       const pre = {...t.d, school: `${p.school}／${progName(p)}`, exam_way: r.name || '',
         requirement: [pv(p,'exam_way'), pv(p,'practical') && `实技：${pv(p,'practical')}`].filter(Boolean).join('；'),
         score_req: [pv(p,'jp_req'), pv(p,'eju_req'), pv(p,'en_req')].filter(Boolean).join('；'), program_id: pid, round_id: rid || ''};
-      DATE_KEYS.forEach(([dk]) => pre[dk] = (r[dk] || ''));
-      targetForm(t.sid, t.tid || undefined, pre); toast('已带入，看一下再保存');
+      // 2026-11-25：改选了别的专业 / 别的轮次，日期换了的那一场，原来填的考试时间、备注不能跟着留下（会拼成一场不存在的考试）
+      const xi = {...(t.d.exam_info || {})}; let dropped = 0;
+      DATE_KEYS.forEach(([dk]) => { const nv = r[dk] || ''; if (xi[dk] && (xi[dk].time || xi[dk].note) && nv !== (t.d[dk] || '')) { delete xi[dk]; dropped++; } pre[dk] = nv; });
+      pre.exam_info = xi;
+      targetForm(t.sid, t.tid || undefined, pre); toast(dropped ? '已带入，看一下再保存。日期换了的那几场，原来填的考试时间、备注已经清掉' : '已带入，看一下再保存', false, dropped ? 6000 : undefined);
     }
   } catch(err) { /* act() 已经提示过 */ }
 });
+function progSearchGo(q){
+  PF.q = q; clearTimeout(PF._t);
+  const go = () => { const box = document.getElementById('pg-list'); if (box) { box.innerHTML = progList(); labelTables(); } };
+  if ((PROG || []).length > 800) PF._t = setTimeout(go, 180); else go();
+}
+document.addEventListener('compositionend', e => { if (e.target.id === 'pf-q') progSearchGo(e.target.value); });
 document.addEventListener('input', e => {
   const el = e.target;
-  if (el.id === 'pf-q') { PF.q = el.value; const box = document.getElementById('pg-list'); if (box) { box.innerHTML = progList(); labelTables(); } }
+  if (el.id === 'pf-q') {   // 院校库大了以后（八百个专业以上）等手停一下再筛，输入法拼到一半不筛（2026-11-25）
+    if (e.isComposing) return;
+    progSearchGo(el.value);
+  }
   if (el.id === 'pk-q') document.querySelectorAll('.pk-item').forEach(x => x.style.display = fzHit(el.value, x.dataset.s) ? '' : 'none');
 });
 document.addEventListener('change', e => {

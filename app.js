@@ -47,8 +47,20 @@ async function readShort(){
   } catch(e) { return 'net'; }   // 网络出错：不能接着用这台设备上次记住的身份
 }
 
+// 2026-11-25 全面检查：总管理的署名（「Panda」还是 K 那边的名字）是数据库按「最后一次切到哪个视图」记的。
+//   另开一个窗口、或手机上切过视图以后，这个窗口再保存，署名就会跟着那边走（K 账的工资审核被记成「Panda」）。
+//   所以总管理每次保存前，先把这个窗口现在的视图告诉数据库一声。只读的入口不用。
+const RPC_NOSIGN = new Set([...PEEK_OK, 'app_load', 'ui_pref_load', 'ui_pref_set', 'ui_theme_set', 'admin_ui_stats', 'owner_set_view']);
+async function ownerViewSync(fn){
+  let own = false; try { own = !!(DB_ALL && DB_ALL.me && DB_ALL.me.owner); } catch(e) {}
+  if (!own || PEEK || RPC_NOSIGN.has(fn)) return;
+  if (fn === 'programs_import' && ownerViewSync.b === S.book && Date.now() - (ownerViewSync.at || 0) < 3000) return;   // 导入院校库一批接一批：3 秒内不重复说（别的保存每次都说）
+  ownerViewSync.b = S.book; ownerViewSync.at = Date.now();
+  try { await fetch(`${SB_URL}/rest/v1/rpc/owner_set_view`, {method: 'POST', headers: {apikey: SB_KEY, 'Content-Type': 'application/json'}, body: JSON.stringify({k: KEY, b: S.book})}); } catch(e) {}
+}
 async function rpc(fn, args = {}){
   if (PEEK && !PEEK_OK.has(fn)) throw new Error('现在是「打开看看」，只能看不能改。要改请回到你自己的教务页面');
+  await ownerViewSync(fn);
   let r;
   try {
     r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
@@ -274,7 +286,8 @@ async function refresh(minGap = 3000){
   if (Date.now() - lastLoad < minGap) return;
   try { await load(); } catch(e) { if (!LOAD_STALE) LOAD_STALE = lastLoad; loadBar(); return; }
   const busy = document.querySelector('.modal') || S.dirtyMain || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
-  if (!busy) render();
+  // 2026-11-25：院校库页不跟着后台刷新重画（它的内容不在这次读的数据里；重画会把点开的学校、专业卡片全收起来）
+  if (!busy && !(S.page === 'schools' && document.querySelector('.pg-card[open], .v2-scblk[open]'))) render();
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && DB) refresh(30000); });
 
@@ -587,7 +600,7 @@ function fbCard(f, o={}){
     <div class="row xs"><span class="muted">上次作业</span><span class="tag ${f.last_hw==='已完成'?'ok':f.last_hw==='未完成'?'seal':'warn'}">${esc(f.last_hw||'—')}</span>
       <span class="muted">本次作业</span><span class="tag ${f.hw_fb?'ok':f.hw_sub?'blue':'mute'}">${f.hw_fb?'已批改':f.hw_sub?'已交·待批改':'未交'}</span>
       <span class="muted">学生确认</span>${confirmTag(f)}<span class="muted">${f.status==='approved'?'家长可见':'家长暂不可见'}</span></div>
-    ${o.actions ? `<div class="row">${edit ? `<button class="btn pri sm" data-act="save-edit" data-v="${f.id}">保存修改</button><button class="btn sm" data-act="cancel-edit">取消</button>`
+    ${o.actions ? `<div class="row">${edit ? `<button class="btn pri sm" data-act="save-edit" data-v="${f.id}" data-ver="${esc(f.ver||'')}">保存修改</button><button class="btn sm" data-act="cancel-edit">取消</button>`
       : f.status==='pending' ? `<button class="btn seal sm" data-act="approve" data-v="${f.id}" data-ver="${esc(f.ver||'')}">审批通过</button><button class="btn sm" data-act="edit" data-v="${f.id}">先修改措辞</button>`
       : `<button class="btn sm" data-act="unapprove" data-v="${f.id}">撤回审批</button>`}</div>` : ''}
   </article>`;
@@ -1154,7 +1167,9 @@ document.addEventListener('click', async e => {
     case 'unapprove': await act('admin_feedback_unapprove', {fid:v}, '已撤回，家长暂时看不到'); break;
     case 'edit': S.editing=v; render(); break;
     case 'cancel-edit': S.editing=null; render(); break;
-    case 'save-edit': { const args={fid:v, content:val(`ed-content-${v}`), perf:val(`ed-perf-${v}`), hw:val(`ed-hw-${v}`)}; S.editing=null; await act('admin_feedback_edit', args, '已保存修改，可以审批了'); break; }
+    case 'save-edit': { const args={fid:v, content:val(`ed-content-${v}`), perf:val(`ed-perf-${v}`), hw:val(`ed-hw-${v}`)};
+      if (a.dataset.ver) args.ver = a.dataset.ver;   // 2026-11-25（第 69 步）：带上打开修改时这条反馈的版本；别人刚审批了、老师又改了，就不让这份旧的盖上去
+      S.editing=null; try { await act('admin_feedback_edit', args, '已保存修改，可以审批了'); } catch(err) { S.editing = v; throw err; } break; }   // 没保存成：还留在修改状态，写的字不丢
     case 'copy-remind': { const l=L(v), c=course(l.course_id); copyText(`${tea(c.teacher_id).name}您好，${sMD(l.date)} ${stu(c.student_id).name}的${c.subject}课反馈还没写，麻烦抽空填一下，谢谢！`, '提醒文字已复制，发到老师微信就行'); break; }
     case 'student': studentModal(v); break;
     case 'stu-tab': { const [id,t]=v.split('|'); studentModal(id,t); break; }

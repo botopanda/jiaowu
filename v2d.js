@@ -42,7 +42,7 @@ function v2LinkCell(p, label){
 }
 function v2Links(){
   const P = (DB.people || []).filter(p => !ownerShadow(p));
-  const tab = ['sp', 'teacher', 'admin', 'off'].includes(S.v2lnTab) ? S.v2lnTab : 'sp';
+  let tab = ['sp', 'teacher', 'admin', 'off'].includes(S.v2lnTab) ? S.v2lnTab : 'sp';
   const scopeTxt = p => p.level === 'top' ? '全部学生' : (p.scope || []).map(id => stu(id).name).join('、') || '（还没分配学生）';
   // 学生和家长：一个学生一行（停用的链接不在这里，在「已停用」里）
   const stuRows = DB.students.slice().sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')) || pyCmp(a.name, b.name)).map(s => {
@@ -61,6 +61,7 @@ function v2Links(){
   const offRows = P.filter(p => !p.active).sort((a, b) => pyCmp(a.name, b.name))
     .map(p => one(p, esc(p.role === 'parent' || p.role === 'student' ? `${stu(p.student_id).name}${p.role === 'parent' ? ' 的家长' : ''}` : v2RoleName(p)), 'off')).join('');
   const n = {sp: DB.students.filter(s => P.some(p => p.student_id === s.id && p.active)).length, teacher: P.filter(p => p.role === 'teacher' && p.active).length, admin: P.filter(p => p.role === 'admin' && p.active).length, off: P.filter(p => !p.active).length};
+  if (tab === 'off' && !n.off) tab = S.v2lnTab = 'sp';   // 2026-11-25：恢复了最后一条停用的链接，「已停用」这一类没有了——回到第一类，不然整页是空的
   const tabs = [['sp', '学生和家长'], ['teacher', '老师'], ['admin', '教务'], ...(n.off ? [['off', '已停用']] : [])];
   const help = `<details class="v2-help"><summary>怎么用 ›</summary><div class="small">
     <p>每个人一条专属链接，打开就能用。点「复制链接」发到对方微信。<b>链接被转发、老师离职、学生毕业</b>时，在「更多 ▾」里点「换一条新链接」或「停用」，旧链接马上失效。新增老师、学生时会自动生成链接。</p>
@@ -168,7 +169,7 @@ const V2_TYPE = ['国立', '公立', '私立'];
 function v2ScDue(p){
   const rs = p.rounds || [], ds = rs.map(r => r.apply_end).filter(d => d && d >= TODAY).sort();
   if (ds.length) return ds[0];
-  return !rs.length || rs.some(r => !r.apply_end && (r.apply_start || r.result_date || '9999') >= TODAY) ? '9998' : '9999';
+  return !rs.length || rs.some(r => !r.apply_end && !roundOver(r)) ? '9998' : '9999';   // 2026-11-25：截止日没填的，只知道「出愿已经开始」不算截止（roundOver 在 schools.js）
 }
 const v2ScDueLabel = d => d === '9998' ? '日期还没公布' : d === '9999' ? '本年度各轮已截止' : (d.slice(0, 4) === TODAY.slice(0, 4) ? '' : d.slice(0, 4) + ' 年 ') + (+d.slice(5, 7)) + ' 月截止';
 // 一所学校的国公私、地区：用整个院校库里这所学校最常见的写法（筛选掉几个专业，学校也不会换位置）
@@ -197,9 +198,9 @@ function v2ProgList(){
   const sec = b => mode === 'region' ? v2PrefNo(b.region) : mode === 'type' ? V2_TYPE.indexOf(b.type) : 0;
   if (mode) blocks.sort((a, b) => { const x = sec(a), y = sec(b); return (x < 0 ? 99 : x) - (y < 0 ? 99 : y); });   // 稳定排序：同一地区 / 类型里还是学校名顺序
   const secName = b => mode === 'region' ? (v2PrefLabel(v2PrefNo(b.region)) || (b.region ? '其他地区' : '没填地区')) : mode === 'type' ? (V2_TYPE.includes(b.type) ? b.type : '没填学校类型') : '';
-  const q = (PF.q || '').trim(), open = S.v2scOpen || {};
-  const isOpen = b => q ? true : (open[b.school] ?? S.v2scAll ?? blocks.length <= 3);   // 搜索时全部展开；学校不多时也展开
-  let last = null, out = `<div class="row v2-sccount"><span class="muted xs">共 ${v2Uniq(list)} 个专业 · ${blocks.length} 所学校</span>${q || blocks.length < 2 ? '' : `<span class="row" style="margin-left:auto"><button class="btn xs" data-act="v2-sc-all" data-v="1">全部展开</button><button class="btn xs" data-act="v2-sc-all" data-v="0">全部收起</button></span>`}</div>`;
+  const q = (PF.q || '').trim(), open = S.v2scOpen || {}, qOpen = q && list.length <= 300;   // 2026-11-25：搜到的太多（300 个专业以上）就不自动全展开，免得卡
+  const isOpen = b => qOpen ? true : (open[b.school] ?? S.v2scAll ?? blocks.length <= 3);   // 搜索时全部展开；学校不多时也展开
+  let last = null, out = `<div class="row v2-sccount"><span class="muted xs">共 ${v2Uniq(list)} 个专业 · ${blocks.length} 所学校${q && !qOpen ? ' · 搜到的比较多，先收着，点学校名展开' : ''}</span>${qOpen || blocks.length < 2 ? '' : `<span class="row" style="margin-left:auto"><button class="btn xs" data-act="v2-sc-all" data-v="1">全部展开</button><button class="btn xs" data-act="v2-sc-all" data-v="0">全部收起</button></span>`}</div>`;
   blocks.forEach(b => {
     const s = secName(b);
     if (mode && s !== last){ out += `<div class="v2-scsec">${esc(s)} <span class="muted xs">${blocks.filter(x => secName(x) === s).length} 所</span></div>`; last = s; }
@@ -233,6 +234,24 @@ function v2TdFilter(){
   box.querySelectorAll('.v2-bulk').forEach(b => b.hidden = !!q);   // 搜索时不显示「全部…」，免得以为只处理搜出来的
   const none = box.querySelector('.v2-tdnone'); if (none){ none.hidden = !q || shown > 0 || !box.querySelector('.v2-tdi'); const sp = none.querySelector('span'); if (sp) sp.textContent = q; }
 }
+/* 2026-11-25 全面检查：待处理摊开以后一页上有很多输入框（改期的新日期时间、不同意的原因、改措辞……）。
+   处理其中一条会整页重画，别的卡片里写了一半的就没了。现在：重画前把「改过、还没提交」的记下来，画完放回去（那张卡片还在的话）。 */
+function v2TdDraft(){
+  return [...document.querySelectorAll('.v2-td input[id], .v2-td textarea[id], .v2-td select[id]')].filter(el => !['search', 'checkbox', 'file', 'hidden'].includes(el.type)
+    && (el.tagName === 'SELECT' ? [...el.options].some(o => o.selected !== o.defaultSelected) : el.value !== el.defaultValue)).map(el => ({id: el.id, v: el.value, ver: v2TdVer(el)}));
+}
+// 「先修改措辞」的输入框：这条反馈当时是哪一版（保存按钮上记着）。老师中途又改了的话，旧草稿不能盖回去（Codex 复查第 3 条）
+const v2TdVer = el => el.id.startsWith('ed-') ? (el.closest('.card')?.querySelector('[data-act="save-edit"]')?.dataset.ver || '') : '';
+function v2TdRestore(){
+  const keep = S.v2tdKeep || []; S.v2tdKeep = null;
+  if (S.page !== 'todo') return;
+  let put = 0, stale = 0;
+  keep.forEach(x => { const el = document.getElementById(x.id); if (!el || !el.closest('.v2-td')) return;
+    if (x.ver && v2TdVer(el) !== x.ver) { stale++; return; }
+    if (el.value !== x.v) el.value = x.v; put++; });
+  if (put) S.dirtyMain = true;
+  if (stale) toast('老师刚刚又改了这条反馈。你改到一半的措辞没有放回去，请照现在的内容重新改', true, 8000);
+}
 function v2TdFocus(){
   const k = S.page === 'todo' && S.v2sel.todo; if (!k) return;
   S.v2sel.todo = null;
@@ -242,7 +261,7 @@ function v2TdFocus(){
 
 /* ───────── 搜索框、按钮 ───────── */
 document.addEventListener('input', e => {
-  const td = e.target.closest?.('[data-v2td]'); if (td) { S.v2q.todo = td.value; v2TdFilter(); S.dirtyMain = false; return; }
+  const td = e.target.closest?.('[data-v2td]'); if (td) { S.v2q.todo = td.value; v2TdFilter(); S.dirtyMain = v2TdDraft().length > 0; return; }   // 2026-11-25：搜索框打字不算「填了一半」，但卡片里有没提交的还是算
   const a = e.target.closest?.('[data-v2ln]'); if (a) { S.v2lnQ = a.value; v2LnFilter(); S.dirtyMain = false; return; }
   const b = e.target.closest?.('[data-v2lg]'); if (b) { S.v2lgQ = b.value; v2LgFilter(); S.dirtyMain = false; if (b.value.trim() && !e.isComposing) setTimeout(v2LgAuto, 400); }
 });
@@ -252,7 +271,7 @@ document.addEventListener('focusin', e => { if (e.target.closest?.('[data-v2lg]'
 document.addEventListener('focusout', e => { if (e.target.closest?.('[data-v2lg]')) setTimeout(() => { if (!document.activeElement?.closest?.('[data-v2lg]')) S.v2lgFocus = false; }, 0); });
 // 画完页面以后按搜索框里的字筛一遍
 const v2AfterD = v2After;
-v2After = function(){ v2AfterD(); v2LnFilter(); v2LgFilter(); v2TdFilter(); v2TdFocus();
+v2After = function(){ v2AfterD(); v2LnFilter(); v2LgFilter(); v2TdRestore(); v2TdFilter(); v2TdFocus();
   const i = document.querySelector('[data-v2lg]'); if (i && S.v2lgFocus){ i.focus(); i.setSelectionRange(i.value.length, i.value.length); } };
 document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a || V2.ver !== 'new' || !document.body.classList.contains('v2')) return;

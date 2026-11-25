@@ -351,9 +351,9 @@ document.addEventListener('click', async e => {
     case 'tg-save': { const [sid,tid]=v.split('|'); if(!val('tg-school').trim()){toast('请填写大学／专业',true);break;} if(!val('tg-tier')){toast('请选择级别',true);break;}
       const d={student_id:sid, tier:val('tg-tier'), seq:val('tg-seq'), school:val('tg-school'), exam_way:val('tg-way'), requirement:val('tg-req'), score_req:val('tg-score'), status:val('tg-status'), doc_status:val('tg-doc'), next_step:val('tg-next'), program_id:val('tg-pid'), round_id:val('tg-rid')};
       DATE_KEYS.forEach(([kk])=>d[kk]=val('tg-'+kk)); if(tid){ d.id=tid; d.ver=val('tg-ver'); } const xi=tgExamInfo(); if(xi) d.exam_info=xi;
-      await act('target_save', {d}, '已保存'); studentModal(sid,'target'); break; }
+      await act('target_save', {d}, '已保存'); if (S.page === 'apply') { closeModal(); render(); } else studentModal(sid,'target'); break; }   // 2026-11-25：在「升学与出愿」页里改的，保存后留在这一页
     case 'tg-del-ask': document.getElementById('tg-del-row').innerHTML=`<span class="small">确定删除？</span><button class="btn danger sm" data-act="tg-del" data-v="${v}">删除</button>`; break;
-    case 'tg-del': { const t=(DB.targets||[]).find(x=>x.id===v); await act('target_delete', {xid:v}, '已删除'); studentModal(t.student_id,'target'); break; }
+    case 'tg-del': { const t=(DB.targets||[]).find(x=>x.id===v); await act('target_delete', {xid:v}, '已删除'); if (S.page === 'apply') { closeModal(); render(); } else studentModal(t.student_id,'target'); break; }
     case 'rv-open': { const [sid,ym]=v.split('|'); reviewForm(sid, ym); break; }
     case 'rv-pick': reviewForm(v, val('rv-ym')); break;
     case 'rv-save': { const [sid,ym]=v.split('|'); const d={content:val('rv-content'), teacher_eval:val('rv-teacher'), talk:val('rv-talk'), talk_raw:val('rv-raw'), teacher_raw:val('rv-traw'), conclusion:val('rv-concl'), next_focus:val('rv-next'), status:val('rv-status'), note:val('rv-note')};

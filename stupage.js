@@ -13,6 +13,9 @@ function studentModal(id, tab){
   const t = SP_OLD[tab] || tab || 'home', moved = S.page !== 'student' || S.stuId !== id || S.stuTab !== t;
   closeModal();
   S.page = 'student'; S.stuId = id; S.stuTab = t;
+  // 2026-11-25：新版名单上有筛选 / 搜索挡着这个学生时（新增学生保存后、考试弹窗点「去看这所」），右边会换成别人——告诉新版「就是要看这个人」
+  S.v2jump = id;
+  if (typeof v2Phone === 'function' && document.body.classList.contains('v2') && v2Phone() && S.v2sel) { S.v2open = 'stu'; S.v2sel.stu = id; }
   render();
   if (moved) window.scrollTo(0, 0);
 }
@@ -55,9 +58,10 @@ function spHome(s){
   const fp = DB.feedbacks.filter(f => f.status === 'pending' && cOfF(f)?.student_id === id).length;
   if (fp) todo.push(['warn', `有 ${fp} 条老师反馈等审批`, 'data-act="page" data-v="feedback"']);
   const pe = lsOfS(id).filter(isPend).length;
-  if (pe) todo.push(['warn', `${pe} 节课上完了，老师还没写反馈`, `data-act="stu-tab" data-v="${id}|tl"`]);
+  const v2on = document.body.classList.contains('v2');   // 2026-11-25：新版里这两项要去「课表」「作业」才看得到（以前跳到上课记录卡片，那里只有写好的反馈）
+  if (pe) todo.push(['warn', `${pe} 节课上完了，老师还没写反馈`, `data-act="stu-tab" data-v="${id}|${v2on ? 'cal' : 'tl'}"`]);
   const un = latestHw(id).filter(f => !f.hw_sub && (f.hw || '').trim()).length;
-  if (un) todo.push(['seal', `${un} 份作业还没交`, `data-act="stu-tab" data-v="${id}|tl"`]);
+  if (un) todo.push(['seal', `${un} 份作业还没交`, `data-act="stu-tab" data-v="${id}|${v2on ? 'hw' : 'tl'}"`]);
   const mu = (typeof MSGS !== 'undefined' ? MSGS : []).filter(m => m.student_id === id && !m.read_at).length;
   if (mu) todo.push(['seal', `${mu} 条学生 / 家长留言没读`, 'data-act="page" data-v="msgs"']);
   fusOf(id).filter(f => f.next_date && f.confirm !== '已确认' && f.next_date <= addDay(TODAY, 7)).forEach(f =>

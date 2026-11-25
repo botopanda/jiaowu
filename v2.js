@@ -126,7 +126,7 @@ function v2Flag(l){
 const v2FlagTag = l => { const f = v2Flag(l); return f ? ` <span class="tag warn">${f}</span>` : ''; };
 const nowBJ = () => bjHM();
 const v2Next = ls => { const n = nowBJ(); return ls.filter(l => l.status === 'scheduled' && (l.date > TODAY || (l.date === TODAY && l.end > n))); };
-const v2Given = n => { n = String(n || ''); return n.length >= 3 ? n.slice(1) : n; };   // 「林知夏」→「知夏」
+const v2Given = n => { n = String(n || '').trim(); return /^[一-鿿]{3}$/.test(n) ? n.slice(1) : n; };   // 「林知夏」→「知夏」；2026-11-25：只有正好 3 个汉字的才去掉姓（「Amber」「欧阳娜娜」「佐藤健太」都用全名）
 const v2WkMon = d => { const wd = (pd(d).getDay() + 6) % 7; return addDay(d, -wd); };
 const v2Range = days => `${md(days[0])}–${days[6].slice(5, 7) === days[0].slice(5, 7) ? +days[6].slice(8) : md(days[6])}`;
 
@@ -200,7 +200,9 @@ function v2Shell(){
     <main class="v2-main"><div class="v2-top"><b>${esc(curT)}</b><span class="v2-top-me">${v2Ava(me.role === 'parent' ? stu(me.student_id).name : me.name)}</span></div>
       ${me.owner ? `<div class="v2-booksw">${bookSwitch()}</div>` : ''}${v2Banner()}${v2Page()}</main></div>${bar}`;
 }
-const v2MoreKeys = () => ['more', 'teachers', 'reviews', 'apply', 'schools', 'checks', 'payroll', 'sys', 'log'];
+// 2026-11-25：手机、平板上左边菜单收起来了，教务和老师找不到「退出」——在「更多」「我的」最下面也放一个
+const V2_LOGOUT = '<div class="row" style="justify-content:center;margin:20px 0 4px"><button class="btn sm" data-act="logout">退出这台设备</button></div><div class="muted xs" style="text-align:center;margin-bottom:12px">在别人的手机、电脑上打开过的话，用完点这里退出</div>';
+const v2MoreKeys = () =>['more', 'teachers', 'reviews', 'apply', 'schools', 'checks', 'payroll', 'sys', 'log'];
 function v2Page(){
   const me = ME();
   if (me.role === 'admin'){
@@ -216,7 +218,7 @@ function v2Page(){
   }
   if (me.role === 'teacher'){
     const t = tea(me.teacher_id);
-    if (S.tab === 'd') return v2Legacy(`<div class="v2-entry"><button type="button" class="v2-go" data-act="tab" data-v="f">${navIcon('通关点检')}<span>通关点检</span>${v2Ic('go')}</button></div>` + tMe(t) + v2Look() + v2UiRow(), true);
+    if (S.tab === 'd') return v2Legacy(`<div class="v2-entry"><button type="button" class="v2-go" data-act="tab" data-v="f">${navIcon('通关点检')}<span>通关点检</span>${v2Ic('go')}</button></div>` + tMe(t) + v2Look() + v2UiRow() + V2_LOGOUT, true);
     if (S.tab === 'f') return typeof v2Checks === 'function' ? v2Checks(DB.students.filter(s => DB.courses.some(c => c.student_id === s.id && c.teacher_id === t.id)), '上完课在这里给学生打档') : v2Legacy(tChecks(t));
     return ({a: v2TSched, b: v2TStudents, c: v2TWrite}[S.tab] || v2TStudents)(t);
   }
@@ -230,7 +232,7 @@ function v2Page(){
 }
 function v2More(){
   const nv = v2Nav(), list = nv.groups.flatMap(g => g[1]).filter(([k]) => !['overview', 'calendar', 'todo', 'students'].includes(k));
-  return v2Head('更多') + `<div class="v2-entry">${list.map(([k, t]) => `<button type="button" class="v2-go" data-act="page" data-v="${k}">${navIcon(t)}<span>${t}</span>${v2Ic('go')}</button>`).join('')}</div>` + v2Look() + v2UiRow();
+  return v2Head('更多') + `<div class="v2-entry">${list.map(([k, t]) => `<button type="button" class="v2-go" data-act="page" data-v="${k}">${navIcon(t)}<span>${t}</span>${v2Ic('go')}</button>`).join('')}</div>` + v2Look() + v2UiRow() + V2_LOGOUT;
 }
 
 /* ═════════════ 教务 ═════════════ */
@@ -372,6 +374,7 @@ function v2TdCard(x){   // 一件事：直接用原来那几种卡片（带按�
   return h ? `<div class="v2-tdi" id="td-${esc(x.k)}" data-q="${esc(fz(v2TdWho(t, id)))}">${h}</div>` : '';
 }
 function v2Todo(){
+  if (typeof v2TdDraft === 'function' && !S.v2tdKeep) S.v2tdKeep = v2TdDraft();   // 重画前：卡片里改过、还没提交的先记下，画完放回去（v2d.js）
   const all = v2TodoItems(), chip = S.v2chip.todo === 'done' && !isTop() ? 'all' : (S.v2chip.todo || 'all');
   const n = g => all.filter(x => x.g === g).length;
   const chips = [['all', '全部', v2TodoTotal(all)], ...(isTop() ? [['req', '改期请假', n('req')], ['ch', '老师申请', n('ch')], ['fb', '反馈审批', n('fb')], ['pend', '待确认的课', n('pend')]] : []), ['other', '留言 · 跟进'], ...(isTop() ? [['done', '最近处理过的']] : [])];
@@ -421,7 +424,7 @@ function v2Calendar(){
   const hours = ls.filter(l => l.status === 'scheduled').reduce((a, l) => a + dur(l), 0);
   const chipL = l => { const c = course(l.course_id), f = v2Flag(l);
     return `<button type="button" class="v2-lc ${l.status !== 'scheduled' ? 'off' : ''} ${isPend(l) ? 'pend' : ''} ${f ? 'flag' : ''}" style="--hc:${hue(c.subject)}" data-act="lesson" data-v="${l.id}" title="${esc(`${l.start}–${l.end} ${stu(c.student_id).name} ${c.subject}${l.kind ? '·' + l.kind : ''}${l.topic ? '\n本节：' + l.topic : ''}`)}"><b>${l.start}</b><span class="n">${esc(stu(c.student_id).name)}</span><span class="s">${esc(c.subject)}${l.status === 'leave' ? ' · 请假' : l.status === 'cancelled' ? ' · 取消' : ''}${l.makeup ? ' · 补' : ''}</span>${f ? `<span class="f">${f}</span>` : isPend(l) ? '<span class="f">待确认</span>' : ''}</button>`; };
-  const nav = `<div class="v2-wknav"><button class="btn sm" data-act="v2-wk" data-v="-7" aria-label="上一周">‹</button><b>${v2Range(days)}</b><button class="btn sm" data-act="v2-wk" data-v="7" aria-label="下一周">›</button><button class="btn sm" data-act="v2-wk" data-v="0">本周</button>${only}<span class="muted xs">共 ${ls.length} 节 · ${+hours.toFixed(1)} 小时 · 北京时间${isAdmin() ? ' · <b>点空格给那位老师那天排课</b>' : ''}</span></div>`;
+  const nav = `<div class="v2-wknav"><button class="btn sm" data-act="v2-wk" data-v="-7" aria-label="上一周">‹</button><b>${v2Range(days)}</b><button class="btn sm" data-act="v2-wk" data-v="7" aria-label="下一周">›</button><button class="btn sm" data-act="v2-wk" data-v="0">本周</button>${only}<span class="muted xs">共 ${ls.filter(l => l.status === 'scheduled').length} 节 · ${+hours.toFixed(1)} 小时 · 北京时间${isAdmin() ? ' · <b>点空格给那位老师那天排课</b>' : ''}</span></div>`;
   const acts = isAdmin() ? `${exAddBtn()}<button class="btn pri" data-act="add-lesson" ${DB.courses.length ? '' : 'disabled title="先在学生档案里添加课程"'}>${v2Ic('plus')}排课</button>` : '';
   let body;
   if (v2Phone()){
@@ -435,7 +438,7 @@ function v2Calendar(){
     const exRow = exs.length ? `<div class="v2-wk-t ex">考试</div>${days.map(d => `<div class="v2-wk-c ex">${exs.filter(e => e.date === d).map(e => `<button type="button" class="v2-lc ex" data-act="exam" data-v="${e.tid}|${e.date}" title="${esc(exTitle(e))}"><b>考</b><span class="n">${esc(stu(e.sid).name)}</span><span class="s">${esc(exShort(e.school))} · ${e.label}</span></button>`).join('')}</div>`).join('')}` : '';
     const rows = teachers.map(t => { const tl = ls.filter(l => course(l.course_id).teacher_id === t.id);
       return `<div class="v2-wk-t">${v2Ava(t.name)}<span><b>${esc(t.name)}</b><small>${tl.filter(l => l.status === 'scheduled').length} 节</small></span></div>` + days.map(d => `<div class="v2-wk-c ${d === TODAY ? 'today' : ''} ${isAdmin() ? 'can' : ''}" ${isAdmin() ? `data-act="v2-slot" data-v="${d}|${t.id}" title="点空白处给 ${esc(t.name)} 在 ${md(d)} 排课"` : ''}>${tl.filter(l => l.date === d).map(chipL).join('')}</div>`).join(''); }).join('');
-    body = teachers.length ? `<div class="v2-wk-wrap"><div class="v2-wk">${head}${exRow}${rows}</div></div>` : '<div class="v2-empty big">还没有老师和课程</div>';
+    body = teachers.length || exs.length ? `<div class="v2-wk-wrap"><div class="v2-wk">${head}${exRow}${rows}</div></div>` : '<div class="v2-empty big">还没有老师和课程</div>';   // 2026-11-25：没有课、只有考试的那一周，考试也要显示
   }
   return v2Head('课表与排课', '', acts) + scopeNote() + `<div class="v2-calseg">${seg}</div>` + nav + body;
 }
@@ -697,7 +700,12 @@ document.addEventListener('click', async e => {
       else { const d = document.querySelector(`[data-tri="${id}"]`); if (d && d.getBoundingClientRect().top < 0) d.scrollIntoView({block: 'start'}); }
       break; }
     case 'v2-back': S.v2open = null; render(); window.scrollTo(0, S.v2scroll[v] || 0); break;
-    case 'v2-chip': { const [id, c] = v.split('|'); S.v2chip[id] = c; S.v2idx[id] = 0; if (S.v2open === id) S.v2open = null; render(); break; }
+    case 'v2-chip': { const [id, c] = v.split('|');
+      // 2026-11-25：待处理摊开以后，卡片里写了一半的（不同意原因、改措辞、改期时间）换分类会丢——先问一句
+      if (id === 'todo' && v2TdDraft().length && !confirm('这一页有写了一半还没提交的内容，换过去会丢掉。\n\n确定换过去吗？')) break;
+      if (id === 'tw') wTags.clear();   // 老师换「要做的 / 我写过的」：给上一节课点的学生状态不带到别的课
+      if (id === 'ck') S.v2sel.ck = null;   // 通关点检：手动换分类时不带着上一类选中的学生（不然点「还没建表」会被弹回「有点检表」）
+      S.v2chip[id] = c; S.v2idx[id] = 0; if (S.v2open === id) S.v2open = null; render(); break; }
     case 'v2-cal': S.v2cal = v; render(); break;
     case 'v2-sx': { const [sid, ym] = v.split('|'); if (typeof sxOpen === 'function') sxOpen(sid, ym); break; }
     case 'v2-wk': S.v2wk = v === '0' ? v2WkMon(TODAY) : addDay(S.v2wk || v2WkMon(TODAY), Number(v)); render(); break;
@@ -710,7 +718,7 @@ document.addEventListener('click', async e => {
     case 'v2-twk': S.v2twk = v === '0' ? v2WkMon(TODAY) : addDay(S.v2twk || v2WkMon(TODAY), Number(v)); render(); break;
     case 'v2-tslot': S.alPre = {d: v, s: '18:00', e: '20:00'}; addLessonModal(); break;
     case 'v2-go-write': {   // 老师「我的学生」→ 反馈批改，直接选中这个学生的第一件
-      S.tab = 'c'; S.v2chip.tw = 'todo';
+      S.tab = 'c'; S.v2chip.tw = 'todo'; S.v2q.tw = '';   // 2026-11-25：反馈页搜索框里留着别的学生名字时，会选到别人的课——跳过去先清搜索
       const l = DB.lessons.find(x => (x.date < TODAY || (x.date === TODAY && x.start <= bjHM())) && x.status === 'scheduled' && !fbOf(x) && course(x.course_id).student_id === v);
       const f = !l && DB.feedbacks.find(x => x.hw_sub && !x.hw_fb && cOfF(x)?.student_id === v);
       S.v2sel.tw = l ? 'w:' + l.id : f ? 'g:' + f.id : null; wTags.clear();
@@ -718,9 +726,13 @@ document.addEventListener('click', async e => {
       render(); window.scrollTo(0, 0); break; }
     case 'v2-subj': S.v2subj = v; render(); break;
     case 'v2-fb-all': {
-      const ids = DB.feedbacks.filter(f => f.status === 'pending').map(f => f.id); if (!ids.length) break;
-      if (!confirm(`把 ${ids.length} 条待审批的反馈全部审批通过？\n通过后家长就能看到。`)) break;
-      await act('admin_feedback_approve', {ids, vers: fbVers(ids)}, r => r === ids.length ? `已审批 ${r} 条` : `已审批 ${r} 条；另外 ${ids.length - r} 条老师刚改过，请重新看一遍再批`); break; }
+      // 2026-11-25 全面检查：只批屏幕上现在看得到的那几条，版本号也用屏幕上的。
+      //   以前是从后台刚读进来的数据里取：页面没重画时（正在别处打字），老师新交的、刚改过的，教务没看过也会一起批掉、放给家长
+      const bs = [...document.querySelectorAll('.v2-td .v2-tdi:not([hidden]) [data-act="approve"][data-v]')].filter(b => b.dataset.ver);
+      const ids = bs.map(b => b.dataset.v), vers = Object.fromEntries(bs.map(b => [b.dataset.v, b.dataset.ver])); if (!ids.length) break;
+      const editing = document.querySelector('.v2-td [data-act="save-edit"]') ? '\n（正在「先修改措辞」的那一条不在里面，改完保存后再单独批）' : '';
+      if (!confirm(`把页面上这 ${ids.length} 条待审批的反馈全部审批通过？\n通过后家长就能看到。${editing}`)) break;
+      await act('admin_feedback_approve', {ids, vers}, r => r === ids.length ? `已审批 ${r} 条` : `已审批 ${r} 条；另外 ${ids.length - r} 条老师刚改过，请重新看一遍再批`); break; }
     case 'v2-stats': v2Stats(); break;
   }
   } catch(err) { if (err && err.message !== 'busy') toast(err.message || '操作没成功，请稍后再试', true); }
