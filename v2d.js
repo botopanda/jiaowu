@@ -141,7 +141,8 @@ async function v2LgAuto(){
 /* ═════════════ 院校库（2026-11-23）：结构不变——上面搜索＋四个筛选，下面一个专业一张卡片、点开看各轮日期和全部资料；只换样子 ═════════════ */
 function v2Schools(){
   const acts = `<a class="btn sm" href="院校库导入模板.xlsx" download>下载 Excel 模板</a><label class="btn sm" for="prog-file">导入 Excel</label><input type="file" id="prog-file" accept=".xlsx,.csv" data-change="prog-import" hidden><button class="btn pri sm" data-act="prog-new">${v2Ic('plus')}添加专业</button>`;
-  const help = `<details class="v2-help"><summary>怎么用 ›</summary><div class="small"><p>一个专业一张卡片，点开看全部资料和各轮入试日期。学生的「大学与出愿」可以直接从这里带入。导入 Excel 时，同年度、同学校、同学部学科的会更新，其他的新增。</p></div></details>`;
+  const help = `<details class="v2-help"><summary>怎么用 ›</summary><div class="small"><p>一个专业一张卡片，点开看全部资料和各轮入试日期。学生的「大学与出愿」可以直接从这里带入。导入 Excel 时，同年度、同学校、同学部学科的会更新，其他的新增。</p>
+    <p><b>学生情况</b>：选「有留学签证」「没签证、能来日本考」「没签证、不来日本」，只显示这个学生有能考的轮次的专业；卡片里考不了的轮次变淡。每一轮都标了没有留学签证能不能考；合格发表离入学不到 3 个月的标「办签证时间紧」，不到 2 个月的标「很可能来不及」（没签证的学生考上后办 COE＋签证通常要 2〜3 个月）。</p></div></details>`;
   if (!PROG){
     progLoad().then(() => { if (S.page === 'schools') render(); }).catch(e => toast(e.message, true));
     return v2Head('院校库', '', acts) + help + '<div class="v2-empty big">正在读取院校库…</div>';
@@ -150,7 +151,7 @@ function v2Schools(){
   return v2Head('院校库', `${v2Uniq(PROG)} 个专业`, acts) + help
     + `<div class="v2-scbar"><label class="v2-search big">${v2Ic('search')}<input type="search" id="pf-q" placeholder="搜学校、学部、学科、关键词；中文、日文、英文都行，例：早稻田 / waseda" value="${esc(PF.q)}" aria-label="搜院校库"></label>
       <div class="v2-sctrk" role="group" aria-label="文理艺">${V2_TRK.map(t => `<button class="v2-chip ${(PF.track || '') === t ? 'on' : ''}" data-act="v2-sc-trk" data-v="${t}">${t || '全部'}<span class="n">${v2Uniq(t ? PROG.filter(p => trkHit(p, t)) : PROG)}</span></button>`).join('')}</div>
-      <div class="v2-scsel"><select id="pf-sort" aria-label="排序">${V2_SC_SORT.map(([v, l]) => `<option value="${v}" ${v === (PF.sort || '') ? 'selected' : ''}>排序：${l}</option>`).join('')}</select>${sel('year', '年度')}${sel('level', '类别')}${sel('field', '方向')}${sel('school_type', '学校类型')}</div></div>
+      <div class="v2-scsel"><select id="pf-sort" aria-label="排序">${V2_SC_SORT.map(([v, l]) => `<option value="${v}" ${v === (PF.sort || '') ? 'selected' : ''}>排序：${l}</option>`).join('')}</select>${sel('year', '年度')}${sel('level', '类别')}${sel('field', '方向')}${sel('school_type', '学校类型')}${visaSel()}</div></div>
     <div id="pg-list" class="v2-schools">${progList()}</div>`;
 }
 

@@ -6,7 +6,7 @@
    读 Excel 不用外部插件：.xlsx 本身是个压缩包，用浏览器自带的解压读里面的表格
    ══════════════════════════════════════════════════════════════ */
 let PROG = null;                       // 院校库数据，用到时才读
-const PF = {q:'', field:'', level:'', year:'', school_type:'', track:''};
+const PF = {q:'', field:'', level:'', year:'', school_type:'', track:'', visa:''};
 const P_CORE = SF_P.filter(f => f.core).map(f => f.k), R_CORE = SF_R.filter(f => f.core).map(f => f.k);
 const R_DATES = SF_R.filter(f => f.t === 'date').map(f => f.k);
 const P_GROUPS = [...new Set(SF_P.map(f => f.g))];
@@ -15,6 +15,30 @@ const pv = (p, k) => P_CORE.includes(k) ? (p[k] ?? '') : ((p.info || {})[k] ?? '
 // 院校库的网址只认 http / https 开头的（导入的表里如果混进别的协议，就不显示按钮；体检 C-13）
 const webUrl = (p, k) => { const u = String(pv(p, k) || '').trim(); return /^https?:\/\//i.test(u) ? u : ''; };
 const rv = (r, k) => R_CORE.includes(k) ? (r[k] ?? '') : ((r.info || {})[k] ?? '');
+
+/* 没有留学签证能不能考（2026-11-25）：每一轮一个答案。另外按合格发表日自动算：没签证的学生考上后办 COE＋签证（通常 2〜3 个月）来不来得及 */
+const VISA_TAG = {'能，不用来日本': ['没签证也能考 · 不用来日本', 'vz-ok'], '能，要来日本考': ['没签证也能考 · 要来日本考', 'vz-come'],
+  '不能，报名时要有留学签证': ['报名时要有留学签证', 'vz-no'], '只收海外考生': ['只收海外考生', 'vz-abroad']};
+const VISA_SIT = [['', '学生情况：全部'], ['has', '有留学签证（在日本）'], ['come', '没签证、能来日本考'], ['remote', '没签证、不来日本']];
+const progEntry = p => `${p.year}-${({'9月': '09', '10月': '10'})[pv(p, 'intake')] || '04'}-01`;   // 入学日：年度＋入学时期，没写按 4 月
+function visaLate(p, r){   // 0 来得及 / 1 时间紧（合格发表到入学不到 3 个月）/ 2 很可能来不及（不到 2 个月）
+  const v = rv(r, 'r_visa'); if (!r.result_date || !v || v.startsWith('不能')) return 0;
+  const d = dBetween(r.result_date, progEntry(p));
+  return d < 60 ? 2 : d < 90 ? 1 : 0;
+}
+function visaOk(r, sit){   // 这一轮，这种情况的学生能不能考（没填的：有签证的算能考，没签证的不算）
+  const v = rv(r, 'r_visa');
+  if (!sit) return true;
+  if (sit === 'has') return v !== '只收海外考生';
+  return (sit === 'come' ? ['能，不用来日本', '能，要来日本考', '只收海外考生'] : ['能，不用来日本', '只收海外考生']).includes(v);
+}
+const visaHit = (p, sit) => !sit || (p.rounds || []).some(r => visaOk(r, sit));
+function visaTags(p, r){
+  const t = VISA_TAG[rv(r, 'r_visa')], late = visaLate(p, r);
+  return (t ? `<span class="tag vz ${t[1]}">${t[0]}</span>` : '')
+    + (late ? `<span class="tag ${late > 1 ? 'vz-late' : 'warn'}" title="没有留学签证的学生考上以后要办 COE 和签证，通常要 2〜3 个月">${late > 1 ? '没签证的话：办签证很可能来不及' : '没签证的话：办签证时间紧'}</span>` : '');
+}
+const visaSel = () => `<select id="pf-visa" aria-label="学生情况">${VISA_SIT.map(([v, l]) => `<option value="${v}" ${v === (PF.visa || '') ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
 
 async function progLoad(force){
   if (PROG && !force) return PROG;
@@ -46,7 +70,7 @@ function pgSchools(){
   }
   const sel = (k, label) => `<select id="pf-${k}" aria-label="${label}"><option value="">${label}：全部</option>${pfOpts(k).map(x => `<option ${x===PF[k]?'selected':''}>${esc(x)}</option>`).join('')}</select>`;
   return head + `<div class="row"><input type="search" id="pf-q" placeholder="搜学校、学部、学科、关键词；中文、日文、英文都行，例：早稻田 / waseda" value="${esc(PF.q)}" style="flex:1;min-width:200px">
-    ${sel('year','年度')}${sel('level','类别')}${sel('field','方向')}${sel('school_type','学校类型')}</div>
+    ${sel('year','年度')}${sel('level','类别')}${sel('field','方向')}${sel('school_type','学校类型')}${visaSel()}</div>
   <div id="pg-list">${progList()}</div>`;
 }
 // 搜索用的内容（简繁日汉字统一、带上学校的中文名 / 英文名 / 简称），算一次记住
@@ -75,7 +99,7 @@ const pfVals = (p, k) => k === 'field' ? String(pv(p, k)).split(/[、,，\/／]/
 const pfOpts = k => [...new Set(PROG.flatMap(p => pfVals(p, k)).filter(Boolean))].sort(k === 'field' ? pyCmp : undefined);
 const trkHit = (p, t) => !t || pv(p, 'track') === t || (pv(p, 'track') === '文理皆可' && (t === '文科' || t === '理科'));   // 文理艺：选文科、理科时「文理皆可」两边都算
 function progFiltered(){
-  return PROG.filter(p => ['year','level','field','school_type'].every(k => !PF[k] || pfVals(p, k).includes(PF[k])) && trkHit(p, PF.track) && fzHit(PF.q, progHay(p)));
+  return PROG.filter(p => ['year','level','field','school_type'].every(k => !PF[k] || pfVals(p, k).includes(PF[k])) && trkHit(p, PF.track) && visaHit(p, PF.visa) && fzHit(PF.q, progHay(p)));
 }
 function progList(){
   if (typeof v2ProgList === 'function' && document.body.classList.contains('v2')) return v2ProgList();   // 新版：按学校分块、可切换排序（v2d.js）
@@ -98,9 +122,9 @@ function progCard(p, o = {}){   // o.inSchool：放在新版「学校块」里�
       ${used?`<span class="tag ok">${used} 位学生在报</span>`:''}${staleTag(p)}<span style="margin-left:auto">${nextRound(p)}</span></div></summary>
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
       ${rs.length ? `<div class="tw"><table class="rt"><thead><tr><th>入试</th><th>出愿</th><th>材料必着</th><th>一次发表</th><th>笔试</th><th>面试</th><th>合格发表</th><th>手续截止</th><th>考试内容</th></tr></thead><tbody>
-        ${rs.map(r => `<tr class="${(r.apply_end||'9999') < TODAY ? 'muted' : ''}"><td><b>${esc(r.name||'')}</b>${rv(r,'r_mode')?`<div class="xs">${esc(rv(r,'r_mode'))}${rv(r,'r_place')?' · '+esc(rv(r,'r_place')):''}</div>`:''}</td>
+        ${rs.map(r => { const no = PF.visa && !visaOk(r, PF.visa), vt = visaTags(p, r); return `<tr class="${(r.apply_end||'9999') < TODAY ? 'muted' : ''}${no ? ' rt-no' : ''}"${no ? ' title="按上面选的学生情况，这一轮考不了"' : ''}><td><b>${esc(r.name||'')}</b>${rv(r,'r_mode')?`<div class="xs">${esc(rv(r,'r_mode'))}${rv(r,'r_place')?' · '+esc(rv(r,'r_place')):''}</div>`:''}${vt ? `<div class="vz-row">${vt}</div>` : ''}</td>
           <td class="num">${dS(r.apply_start)}${r.apply_start||r.apply_end?'–':''}${dS(r.apply_end)}</td><td class="num">${dS(r.docs_due)}</td><td class="num">${dS(r.first_result)}</td><td class="num">${dS(r.written_date)}</td><td class="num">${dS(r.interview_date)}</td><td class="num">${dS(r.result_date)}</td><td class="num">${dS(r.procedure_due)}</td>
-          <td class="xs">${esc(rv(r,'content'))}${rExtra.filter(f => !['r_mode','r_place','content'].includes(f.k) && rv(r, f.k)).map(f => `<div class="muted">${esc(rv(r, f.k))}</div>`).join('')}</td></tr>`).join('')}
+          <td class="xs">${esc(rv(r,'content'))}${rExtra.filter(f => !['r_mode','r_place','content','r_visa'].includes(f.k) && rv(r, f.k)).map(f => `<div class="muted">${esc(rv(r, f.k))}</div>`).join('')}</td></tr>`; }).join('')}
       </tbody></table></div>` : '<div class="muted small">还没有填入试日期</div>'}
       ${pv(p,'campus')?`<div class="small"><span class="muted">校区：</span>${esc(pv(p,'campus'))}</div>`:''}
       <div class="pg-grps">${groups}</div>
@@ -370,6 +394,6 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const el = e.target;
-  if (/^pf-(year|level|field|school_type)$/.test(el.id)) { PF[el.id.slice(3)] = el.value; const box = document.getElementById('pg-list'); if (box) { box.innerHTML = progList(); labelTables(); } }
+  if (/^pf-(year|level|field|school_type|visa)$/.test(el.id)) { PF[el.id.slice(3)] = el.value; const box = document.getElementById('pg-list'); if (box) { box.innerHTML = progList(); labelTables(); } }
   if (el.dataset && el.dataset.change === 'prog-import' && el.files.length) { progImportFile(el.files[0]); el.value = ''; }
 });

@@ -304,6 +304,9 @@ details>summary{cursor:pointer;list-style:none} details>summary::-webkit-details
 }
 
 /* 文理艺标签（旧版） */
+.vz-row{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}.vz-row .tag{font-size:11px;white-space:nowrap}
+.tag.vz-ok{background:#e2f3ea;color:#1f7a4d;border-color:#c4e3d1}.tag.vz-come{background:#e3ecfb;color:#2f5aa8;border-color:#c9d8f3}.tag.vz-no{background:#f3e6e4;color:#9b3b30;border-color:#e6cbc6}.tag.vz-abroad{background:#fbf0dc;color:#8a5a12;border-color:#f0dcb5}.tag.vz-late{background:#fbe1e1;color:#b42318;border-color:#f3c3c3;font-weight:700}
+table.rt tr.rt-no td{opacity:.35}
 .tag.trk-w{background:#e3ecfb;color:#2f5aa8;border-color:#c9d8f3}.tag.trk-l{background:#e2f3ea;color:#1f7a4d;border-color:#c4e3d1}.tag.trk-y{background:#f6e6f3;color:#9a3a86;border-color:#ebcbe4}.tag.trk-wl{background:#efe9fb;color:#5b46a8;border-color:#dbd1f3}
 /* 院校库 */
 .pg-card summary{cursor:pointer;list-style:none}

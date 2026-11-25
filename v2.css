@@ -548,6 +548,13 @@ body.v2 .tag.trk-w{background:#e3ecfb!important;color:#2f5aa8!important}body.v2 
 body.v2 .tag.trk-y{background:#f6e6f3!important;color:#9a3a86!important}body.v2 .tag.trk-wl{background:#efe9fb!important;color:#5b46a8!important}
 body.v2[data-theme="night"] .tag.trk-w{background:#22324d!important;color:#9dbdf2!important}body.v2[data-theme="night"] .tag.trk-l{background:#1f3a2d!important;color:#8fd6b0!important}
 body.v2[data-theme="night"] .tag.trk-y{background:#3d2438!important;color:#e7a6d8!important}body.v2[data-theme="night"] .tag.trk-wl{background:#2e2747!important;color:#c3b5f2!important}
+/* 没有留学签证能不能考（2026-11-25） */
+body.v2 .tag.vz-ok{background:#e2f3ea!important;color:#1f7a4d!important}body.v2 .tag.vz-come{background:#e3ecfb!important;color:#2f5aa8!important}
+body.v2 .tag.vz-no{background:#f3e6e4!important;color:#9b3b30!important}body.v2 .tag.vz-abroad{background:#fbf0dc!important;color:#8a5a12!important}
+body.v2 .tag.vz-late{background:#fbe1e1!important;color:#b42318!important;font-weight:800}
+body.v2[data-theme="night"] .tag.vz-ok{background:#1f3a2d!important;color:#8fd6b0!important}body.v2[data-theme="night"] .tag.vz-come{background:#22324d!important;color:#9dbdf2!important}
+body.v2[data-theme="night"] .tag.vz-no{background:#3d2624!important;color:#eba79e!important}body.v2[data-theme="night"] .tag.vz-abroad{background:#3a2e17!important;color:#e9c486!important}
+body.v2[data-theme="night"] .tag.vz-late{background:#4a1f1f!important;color:#ffb4ab!important}
 .v2-scblk{background:var(--paper);border-radius:20px;padding:4px 10px}
 .v2-scblk[open]{padding-bottom:10px}
 .v2-schd{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap;padding:8px 6px;cursor:pointer;list-style:none}
