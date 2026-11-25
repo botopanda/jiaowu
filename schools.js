@@ -97,7 +97,10 @@ const progCmpAll = (a, b) => pyCmp(progSchoolKey(a), progSchoolKey(b)) || (a.sch
 // 筛选用的值：「方向」可能写了两个（「机械、工学」），拆开算，选「工学」也能筛出来
 const pfVals = (p, k) => k === 'field' ? String(pv(p, k)).split(/[、,，\/／]/).map(s => s.trim()).filter(Boolean) : [String(pv(p, k))];
 const pfOpts = k => [...new Set(PROG.flatMap(p => pfVals(p, k)).filter(Boolean))].sort(k === 'field' ? pyCmp : undefined);
-const trkHit = (p, t) => !t || pv(p, 'track') === t || (pv(p, 'track') === '文理皆可' && (t === '文科' || t === '理科'));   // 文理艺：选文科、理科时「文理皆可」两边都算
+// 艺术（2026-11-25）：「文理艺」按考试方式分；学的是艺术类内容的（「方向」里写了设计、美术、音乐……），考试按文科 / 理科考，点「艺术」也查得出来
+const ART_FIELD = /艺术|美术|设计|动画|漫画|游戏|影像|电影|写真|摄影|音乐|表演|戏剧|舞蹈|服装|时装|工艺|插画|书法|声优|造形/;
+const artByField = p => pv(p, 'track') !== '艺术' && ART_FIELD.test(String(p.field || ''));
+const trkHit = (p, t) => !t || pv(p, 'track') === t || (pv(p, 'track') === '文理皆可' && (t === '文科' || t === '理科')) || (t === '艺术' && artByField(p));   // 文理艺：选文科、理科时「文理皆可」两边都算
 function progFiltered(){
   return PROG.filter(p => ['year','level','field','school_type'].every(k => !PF[k] || pfVals(p, k).includes(PF[k])) && trkHit(p, PF.track) && visaHit(p, PF.visa) && fzHit(PF.q, progHay(p)));
 }
@@ -117,7 +120,7 @@ function progCard(p, o = {}){   // o.inSchool：放在新版「学校块」里�
     return items.length ? `<div class="pg-grp"><div class="pg-gt">${g}</div><dl class="kv small">${items.map(f => `<dt>${f.l}</dt><dd style="white-space:pre-wrap">${esc(String(pv(p, f.k)))}</dd>`).join('')}</dl></div>` : '';
   }).join('');
   return `<details class="card pg-card"><summary><div class="row">${o.inSchool ? `<b class="pg-prog">${esc(progName(p) || '（没填学部学科）')}</b>` : `<b class="pg-school" title="${esc([pv(p,'school_cn'), pv(p,'school_en')].filter(Boolean).join(' / '))}">${esc(p.school)}</b>${pv(p,'school_group')?`<span class="muted">${esc(pv(p,'school_group'))}</span>`:''}<span>${esc(progName(p))}</span>`}
-      <span class="tag mute">${p.year}${pv(p,'intake')&&pv(p,'intake')!=='4月'?' · '+esc(pv(p,'intake'))+'入学':''}</span><span class="tag blue">${esc(p.level)}</span>${pv(p,'track')?`<span class="tag trk trk-${{'文科':'w','理科':'l','艺术':'y','文理皆可':'wl'}[pv(p,'track')]||'x'}">${esc(pv(p,'track'))}</span>`:''}${p.field?`<span class="tag gold">${esc(p.field)}</span>`:''}
+      <span class="tag mute">${p.year}${pv(p,'intake')&&pv(p,'intake')!=='4月'?' · '+esc(pv(p,'intake'))+'入学':''}</span><span class="tag blue">${esc(p.level)}</span>${pv(p,'track')?`<span class="tag trk trk-${{'文科':'w','理科':'l','艺术':'y','文理皆可':'wl'}[pv(p,'track')]||'x'}">${esc(pv(p,'track'))}</span>`:''}${artByField(p)?`<span class="tag trk trk-y" title="考试按${esc(pv(p,'track')||'文科 / 理科')}考，学的是艺术类内容（设计、美术、音乐等）">艺术</span>`:''}${p.field?`<span class="tag gold">${esc(p.field)}</span>`:''}
       ${!o.inSchool && pv(p,'school_type')?`<span class="tag mute">${esc(pv(p,'school_type'))}</span>`:''}${!o.inSchool && p.region?`<span class="tag mute">${esc(p.region)}</span>`:''}
       ${used?`<span class="tag ok">${used} 位学生在报</span>`:''}${staleTag(p)}<span style="margin-left:auto">${nextRound(p)}</span></div></summary>
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
