@@ -22,13 +22,13 @@ function v2Overview2(){
   const n = g => all.filter(x => x.g === g).length, miss = needFb();
   const mu = (all.find(x => x.k === 'msg') || {}).n || 0, fu = (all.find(x => x.k === 'fu') || {}).n || 0;
   const batch = [n('fb') ? {tag: '审批', cls: 'blue', title: `${n('fb')} 条老师反馈等审批`, sub: '审批后家长才看得到', go: 'data-act="page" data-v="feedback"'} : null,
-    isTop() && miss.length ? {tag: '待确认', cls: 'warn', title: `${miss.length} 节课上完了，老师还没写反馈`, sub: `${pendByT(miss).replace(/<[^>]+>/g, '')} · 暂时不计课时和工资`, go: 'data-act="page" data-v="feedback-missing"'} : null,
+    miss.length ? {tag: '待确认', cls: 'warn', title: `${miss.length} 节课上完了，老师还没写反馈`, sub: `${pendByT(miss).replace(/<[^>]+>/g, '')} · 暂时不计课时和工资`, go: 'data-act="page" data-v="feedback-missing"'} : null,
     mu ? {tag: '留言', cls: 'blue', title: `${mu} 条学生 / 家长留言还没看`, sub: '', go: 'data-act="page" data-v="msgs"'} : null,
     fu ? {tag: '跟进', cls: 'warn', title: `${fu} 条跟进记录到期`, sub: '', go: 'data-act="page" data-v="followups"'} : null].filter(Boolean);
   const today = DB.lessons.filter(l => l.date === TODAY).sort((a, b) => a.start.localeCompare(b.start));
   const evs = upcomingEvents(14);
   const row = x => `<div class="v2-ovr"><span class="v2-flag ${x.cls || ''}">${esc(x.tag)}</span><div class="tx"><b>${x.title}</b>${x.sub ? `<span>${x.sub}</span>` : ''}</div>${x.d ? `<span class="v2-due ${x.d < TODAY ? 'late' : ''}">${v2Due(x.d)}</span>` : ''}<button type="button" class="btn sm" ${x.go}>${x.btn || '去处理'}</button></div>`;
-  const batchN = n('fb') + (isTop() ? miss.length : 0) + mu + fu;
+  const batchN = n('fb') + miss.length + mu + fu;   // 2026-11-26：待确认的课普通教务也能办（和待处理页、旧版总览一致）
   const tabs = [['decide', '要你决定', decide.length], ['batch', '可以集中办理', batchN], ['today', '今天的课', today.length], ['exam', '近期考试 / 放榜', evs.length]];
   let body;
   if (tab === 'batch') body = batch.length ? batch.map(row).join('') : '<div class="v2-empty">没有要集中办理的 👍</div>';
@@ -177,12 +177,10 @@ function v2Payroll(){
     const rawOk = ok.reduce((a, l) => a + paidH(l), 0), rawPend = pend.reduce((a, l) => a + dur(l), 0);   // 2026-11-25：合计用没取整的课时加（3 节 50 分钟＝2 小时 30 分，不是 2 小时 29 分）
     return {ok, pend, later, hOk, hPend, rawOk, rawPend, partsOk: money_(ok), amtOk: sumMoney(money_(ok)), amtPend: sumMoney(money_(pend)), amtAll: sumMoney(money_([...ok, ...pend])), snap: (DB.pay || []).some(p => p.teacher_id === t.id && p.ym === ym && p.snap)}; };
   const all = DB.teachers.filter(t => !t.staff).map(t => ({t, i: info(t)})).filter(x => x.i.ok.length || x.i.pend.length || x.i.snap);
-  // 2026-11-26（Codex 复查）：「全部」视图里，这位老师这个月牵涉到哪几本账——有计入工资的课、有待核对的课、结算时存过明细的都算。
-  // 只看「有计入的课」的话：课删光只剩存档的老师会被算成没结算；另一本账还有课待核对的老师会被算成全结算了
-  const bkOf = l => stu(course(l.course_id).student_id).private ? 'mine' : 'K';
-  const booksAll = (t, i) => [...new Set([...payBooks(t.id, ym), ...i.pend.map(bkOf), ...(DB.pay || []).filter(p => p.teacher_id === t.id && p.ym === ym && p.snap).map(p => p.book || 'K')])].sort();
-  const done = (t, i, f) => isOwner() && S.book === 'all' ? (bs => bs.length > 0 && bs.every(b => payOfBook(t.id, ym, b)[f]))(booksAll(t, i)) : !!payOf(t.id, ym)[f];
-  const PS = (t, i) => { if (isOwner() && S.book === 'all'){ const st = booksAll(t, i).map(b => payOfBook(t.id, ym, b)); if (!st.length) return null;   // 「全部」：两本账都结算了才算已结算
+  // 2026-11-26：「全部」视图里这位老师牵涉到哪几本账、办完没有，用 extras.js 里共用的 payBooksAll / payDone（旧版、页头的小标签也用它，三处一个算法）
+  const booksAll = t => payBooksAll(t.id, ym);
+  const done = (t, i, f) => payDone(t.id, ym, f);
+  const PS = (t, i) => { if (isOwner() && S.book === 'all'){ const st = booksAll(t).map(b => payOfBook(t.id, ym, b)); if (!st.length) return null;   // 「全部」：两本账都结算了才算已结算
       return st.every(p => p.settled_at) ? ['已结算', 'ok'] : st.every(p => p.reviewed_at) ? ['已审核', 'blue'] : st.some(p => p.settled_at || p.reviewed_at) ? ['部分审核', 'blue'] : null; }
     const p = payOf(t.id, ym); return p.settled_at ? ['已结算', 'ok'] : p.reviewed_at ? ['已审核', 'blue'] : null; };
   const items = all.sort((a, b) => b.i.pend.length - a.i.pend.length || pyCmp(a.t.name, b.t.name)).map(({t, i}) => ({k: t.id, name: t.name, line: `${i.ok.length} 节 · ${v2HM(i.hOk)} · ${i.amtOk}`, flag: i.pend.length ? [`待核对 ${i.pend.length}`, 'warn'] : PS(t, i) || ['未审核', 'mute'], q: t.name}));

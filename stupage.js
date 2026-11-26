@@ -54,9 +54,9 @@ function spHome(s){
   // 要处理的事
   const todo = [], my = l => course(l.course_id)?.student_id === id;
   const rq = DB.requests.filter(q => q.status === 'pending' && L(q.lesson_id) && my(L(q.lesson_id))).length;
-  if (rq) todo.push(['warn', `有 ${rq} 个改期 / 请假申请等处理`, 'data-act="page" data-v="requests"']);
+  if (rq && isTop()) todo.push(['warn', `有 ${rq} 个改期 / 请假申请等处理`, 'data-act="page" data-v="requests"']);   // 2026-11-26：这两样只有教务·管理能处理，普通教务点过去是空的，就不提醒了
   const fp = DB.feedbacks.filter(f => f.status === 'pending' && cOfF(f)?.student_id === id).length;
-  if (fp) todo.push(['warn', `有 ${fp} 条老师反馈等审批`, 'data-act="page" data-v="feedback"']);
+  if (fp && isTop()) todo.push(['warn', `有 ${fp} 条老师反馈等审批`, 'data-act="page" data-v="feedback"']);
   const pe = lsOfS(id).filter(isPend).length;
   const v2on = document.body.classList.contains('v2');   // 2026-11-25：新版里这两项要去「课表」「作业」才看得到（以前跳到上课记录卡片，那里只有写好的反馈）
   if (pe) todo.push(['warn', `${pe} 节课上完了，老师还没写反馈`, `data-act="stu-tab" data-v="${id}|${v2on ? 'cal' : 'tl'}"`]);

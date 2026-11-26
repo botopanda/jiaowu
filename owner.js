@@ -47,7 +47,8 @@ function kSnap(s, all){
   if (!s || !Array.isArray(s.rows)) return s;
   const priv = new Set(all.students.filter(x => x.private).map(x => x.id)), cs = new Map(all.courses.map(c => [c.id, c.student_id]));
   const ls = new Map(all.lessons.map(l => [l.id, cs.get(l.course_id)]));
-  const rows = s.rows.filter(r => ls.has(r.id) ? !priv.has(ls.get(r.id)) : r.sid ? !priv.has(r.sid) : true);
+  const rows = s.rows.filter(r => r.pv !== true && (ls.has(r.id) ? !priv.has(ls.get(r.id)) : r.sid ? !priv.has(r.sid) : true));   // 第 70 步：转进 Panda 时打了记号的也不算（学生以后删掉了也认得出）
+  if (rows.length === s.rows.length) return s;   // 第 70 步：没有行被藏掉，就原样用当时存的小时和金额，不重算（和数据库一样）
   const n = x => Number.isFinite(+x) ? +x : 0, amt = {};
   rows.forEach(r => { const c = r.cur === 'JPY' ? 'JPY' : 'CNY'; amt[c] = (amt[c] || 0) + curRound(n(r.h) * n(r.rate), c); });
   return {...s, rows, h: +rows.reduce((a, r) => a + n(r.h), 0).toFixed(2), amt};
@@ -109,7 +110,10 @@ function ownerTeacherWarn(){
   if (!ownerUI() || !DB_ALL) return '';
   const priv = new Set(DB_ALL.students.filter(s => s.private).map(s => s.id));
   const xs = DB_ALL.teachers.filter(t => t.book === 'mine' && DB_ALL.courses.some(c => c.teacher_id === t.id && !priv.has(c.student_id)));
-  return xs.length ? `<div class="note warn">${xs.map(t => `<b>${esc(t.name)}</b>`).join('、')} 归属是「Panda」，但也在教 Project K 的学生，所以潘老师、金老师那边能看到这位老师（看不到你的学生）。如果是两边都教，建议把归属改成「两边都教」。</div>` : '';
+  // 2026-11-26：反过来——归属写的是「Project K」、却排了 Panda 学生的课：潘、金那边照常看到这位老师，只是删不掉他；工资也要分两本账结
+  const ys = DB_ALL.teachers.filter(t => (t.book || 'K') === 'K' && DB_ALL.courses.some(c => c.teacher_id === t.id && priv.has(c.student_id)));
+  return (xs.length ? `<div class="note warn">${xs.map(t => `<b>${esc(t.name)}</b>`).join('、')} 归属是「Panda」，但也在教 Project K 的学生，所以潘老师、金老师那边能看到这位老师（看不到你的学生）。如果是两边都教，建议把归属改成「两边都教」。</div>` : '')
+    + (ys.length ? `<div class="note warn">${ys.map(t => `<b>${esc(t.name)}</b>`).join('、')} 归属是「Project K」，但也在教 Panda 的学生。请把归属改成「两边都教」：不改的话，这位老师用现在的链接看不到 Panda 的学生。</div>` : '');
 }
 
 document.addEventListener('click', e => {

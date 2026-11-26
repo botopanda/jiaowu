@@ -45,7 +45,7 @@ const meetTodo = tid => DB.lessons.filter(l => course(l.course_id)?.teacher_id =
 
 // 课的窗口里一行（老师、教务）
 function meetLessonRow(l){
-  return `<dt>上课链接</dt><dd>${meetBtn(l, {empty: '<span class="muted">还没填</span>'})}${canSched() && l.status === 'scheduled' ? ` <button class="btn sm" data-act="mt-open" data-v="${l.id}">${meetOk(l) ? '修改' : '填写'}</button>` : ''}</dd>`;
+  return `<dt>上课链接</dt><dd>${meetBtn(l, {empty: '<span class="muted">还没填</span>'})}${canSched() && l.status === 'scheduled' ? ` <button class="btn ${meetOk(l) ? '' : 'pri '}sm" data-act="mt-open" data-v="${l.id}">${meetOk(l) ? '修改' : '＋ 填上课链接'}</button>` : ''}</dd>`;   // 2026-11-26：没填的时候按钮做成蓝色、写清楚（原来是灰色小字「填写」，不显眼）
 }
 
 // 填写弹窗

@@ -329,13 +329,14 @@ function v2TodoItems(){
   if (isTop()){
     DB.requests.filter(q => q.status === 'pending').forEach(q => { const l = L(q.lesson_id); if (!l) return; const c = course(l.course_id);
       out.push({k: 'q:' + q.id, g: 'req', d: l.date, sid: c.student_id, name: stu(c.student_id).name, line: `${q.type} · ${md(l.date)} ${esc(c.subject)}${q.wish ? ` → ${esc(q.wish)}` : ''}`, flag: [q.type, q.type === '请假' ? 'bad' : 'warn']}); });
-    chPend().forEach(x => { const c = course(x.course_id) || {}, l = L(x.lesson_id), d = (x.d && (x.d.date || (x.d.dates || [])[0])) || (l && l.date) || TODAY;
-      out.push({k: 'c:' + x.id, g: 'ch', d, sid: c.student_id, name: stu(c.student_id).name, line: `${esc(x.by_name)} · ${chLabel(x)} ${md(d)}${c.subject ? ' ' + esc(c.subject) : ''}`, flag: [chLabel(x), 'warn']}); });
-    DB.feedbacks.filter(f => f.status === 'pending').forEach(f => { const l = L(f.lesson_id), c = l && course(l.course_id); if (!c) return;
-      out.push({k: 'f:' + f.id, g: 'fb', d: l.date, sid: c.student_id, name: stu(c.student_id).name, line: `${esc(tea(c.teacher_id).name)} · ${md(l.date)} ${esc(c.subject)}的反馈`, flag: ['审批', 'blue']}); });
-    needFb().forEach(l => { const c = course(l.course_id);
-      out.push({k: 'l:' + l.id, g: 'pend', d: l.date, sid: c.student_id, name: stu(c.student_id).name, line: `${esc(tea(c.teacher_id).name)} · ${md(l.date)} ${esc(c.subject)} · ${dBetween(l.date, TODAY)} 天没写反馈`, flag: ['待确认', 'warn']}); });
   }
+  // 2026-11-26：老师的排课申请、待确认的课，普通教务也能处理自己负责的学生的（数据库一直允许、旧版总览也一直列着），新版以前只给教务·管理看
+  chPend().forEach(x => { const c = course(x.course_id) || {}, l = L(x.lesson_id), d = (x.d && (x.d.date || (x.d.dates || [])[0])) || (l && l.date) || TODAY;
+      out.push({k: 'c:' + x.id, g: 'ch', d, sid: c.student_id, name: stu(c.student_id).name, line: `${esc(x.by_name)} · ${chLabel(x)} ${md(d)}${c.subject ? ' ' + esc(c.subject) : ''}`, flag: [chLabel(x), 'warn']}); });
+  if (isTop()) DB.feedbacks.filter(f => f.status === 'pending').forEach(f => { const l = L(f.lesson_id), c = l && course(l.course_id); if (!c) return;
+      out.push({k: 'f:' + f.id, g: 'fb', d: l.date, sid: c.student_id, name: stu(c.student_id).name, line: `${esc(tea(c.teacher_id).name)} · ${md(l.date)} ${esc(c.subject)}的反馈`, flag: ['审批', 'blue']}); });
+  needFb().forEach(l => { const c = course(l.course_id);
+      out.push({k: 'l:' + l.id, g: 'pend', d: l.date, sid: c.student_id, name: stu(c.student_id).name, line: `${esc(tea(c.teacher_id).name)} · ${md(l.date)} ${esc(c.subject)} · ${dBetween(l.date, TODAY)} 天没写反馈`, flag: ['待确认', 'warn']}); });
   out.sort((a, b) => (a.d < TODAY ? 0 : 1) - (b.d < TODAY ? 0 : 1) || a.d.localeCompare(b.d));
   const mu = typeof msgUnread === 'function' ? msgUnread() : 0, fuDue = (DB.followups || []).filter(f => f.next_date && f.confirm !== '已确认' && f.next_date <= TODAY).length;
   if (typeof pgMsgs === 'function') out.push({k: 'msg', g: 'other', n: mu, ava: '留', name: '学生留言', line: mu ? `${mu} 条还没看` : '没有新留言', flag: mu ? [`${mu}`, 'blue'] : null});
@@ -377,7 +378,7 @@ function v2Todo(){
   if (typeof v2TdDraft === 'function' && !S.v2tdKeep) S.v2tdKeep = v2TdDraft();   // 重画前：卡片里改过、还没提交的先记下，画完放回去（v2d.js）
   const all = v2TodoItems(), chip = S.v2chip.todo === 'done' && !isTop() ? 'all' : (S.v2chip.todo || 'all');
   const n = g => all.filter(x => x.g === g).length;
-  const chips = [['all', '全部', v2TodoTotal(all)], ...(isTop() ? [['req', '改期请假', n('req')], ['ch', '老师申请', n('ch')], ['fb', '反馈审批', n('fb')], ['pend', '待确认的课', n('pend')]] : []), ['other', '留言 · 跟进'], ...(isTop() ? [['done', '最近处理过的']] : [])];
+  const chips = [['all', '全部', v2TodoTotal(all)], ...(isTop() ? [['req', '改期请假', n('req')]] : []), ['ch', '老师申请', n('ch')], ...(isTop() ? [['fb', '反馈审批', n('fb')]] : []), ['pend', '待确认的课', n('pend')], ['other', '留言 · 跟进'], ...(isTop() ? [['done', '最近处理过的']] : [])];
   const cpOk = chPend().filter(x => !chStuck(x)).length;
   const GROUPS = [
     ['req', '改期 · 请假', '学生在自己的链接里申请；在这里处理，学生和任课老师同时看到结果，课表自动更新', ''],

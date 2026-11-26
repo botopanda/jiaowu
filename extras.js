@@ -76,9 +76,19 @@ const payOf = (tid, ym) => (DB.pay || []).find(p => p.teacher_id === tid && p.ym
 // 这个月这位老师在哪几本账有课（「全部」视图里分开显示状态）
 const payBooks = (tid, ym) => [...new Set(lsOfT(tid).filter(l => l.date.startsWith(ym) && paidH(l) > 0).map(l => stu(course(l.course_id).student_id).private ? 'mine' : 'K'))].sort();
 const payOfBook = (tid, ym, bk) => (DB.pay || []).find(p => p.teacher_id === tid && p.ym === ym && (p.book || 'K') === bk) || {};
-const payDone = (tid, ym, f) => isOwner() && S.book === 'all' ? (payBooks(tid, ym).length > 0 && payBooks(tid, ym).every(b => payOfBook(tid, ym, b)[f])) : !!payOf(tid, ym)[f];
+// 2026-11-26：「全部」视图里判断这位老师这个月办完没有，要把牵涉到的账本列齐——有计入工资的课、有待核对的课、结算时存过明细的都算。
+//   只看「有计入的课」的话：课删光只剩存档的会被算成没结算；另一本账还有课待核对的会被算成全结算了。新版、旧版、页头的小标签共用这一个
+const payBooksAll = (tid, ym) => { const bk = l => stu(course(l.course_id).student_id).private ? 'mine' : 'K';
+  return [...new Set([...lsOfT(tid).filter(l => l.date.startsWith(ym) && (paidH(l) > 0 || isPend(l))).map(bk), ...(DB.pay || []).filter(p => p.teacher_id === tid && p.ym === ym && p.snap).map(p => p.book || 'K')])].sort(); };
+const payDone = (tid, ym, f) => isOwner() && S.book === 'all' ? (payBooksAll(tid, ym).length > 0 && payBooksAll(tid, ym).every(b => payOfBook(tid, ym, b)[f])) : !!payOf(tid, ym)[f];
 function payBadge(tid, ym){
-  if (isOwner() && S.book === 'all') return payBooks(tid, ym).map(b => { const p = payOfBook(tid, ym, b);
+  if (ME().role === 'teacher') {
+    // 2026-11-26：老师自己看「课时记录」。老师的数据里分不出哪节课是哪本账的，就按给到他的工资记录里进度最慢的那一条来写
+    //   （以前一律按 Project K 那本账看，只教 Panda 的老师永远显示「未审核」）
+    const ps = (DB.pay || []).filter(p => p.teacher_id === tid && p.ym === ym);
+    return ps.length && ps.every(p => p.settled_at) ? '<span class="tag ok">已结算</span>' : ps.length && ps.every(p => p.settled_at || p.reviewed_at) ? '<span class="tag blue">已审核</span>' : '<span class="tag mute">未审核</span>';
+  }
+  if (isOwner() && S.book === 'all') return payBooksAll(tid, ym).map(b => { const p = payOfBook(tid, ym, b);
     return `<span class="tag ${p.settled_at ? 'ok' : p.reviewed_at ? 'blue' : 'mute'}">${b === 'mine' ? 'Panda' : 'K'}：${p.settled_at ? '已结算' : p.reviewed_at ? '已审核' : '未审核'}</span>`; }).join('');
   const p = payOf(tid, ym);
   return p.settled_at ? '<span class="tag ok">已结算</span>' : p.reviewed_at ? '<span class="tag blue">已审核</span>' : '<span class="tag mute">未审核</span>';
@@ -105,7 +115,7 @@ const payDiffTag = (tid, ym) => payDiff(tid, ym) ? '<span class="tag seal">结�
 function payDiffBox(tid, ym){
   const x = payDiff(tid, ym); if (!x) return '';
   const one = r => `${esc(sMD(String(r.d || '')))} ${esc(r.s)} ${esc(r.stu)} ${esc(r.subj)} ${payNum(r.h)} 小时 × ${money(payNum(r.rate), payCur(r.cur))}`;
-  return `<div class="note warn" style="margin-top:8px"><b>结算以后，这个月的课有改动。</b>结算时：${payAmtTxt(x.was.amt)}（${x.was.rows.length} 节 ${payNum(x.was.h)} 小时）；现在按课表算：${payAmtTxt(x.now.amt)}（${x.now.rows.length} 节 ${x.now.h} 小时）。
+  return `<div class="note warn" style="margin-top:8px"><b>结算以后，这个月的课有改动。</b>结算时：${payAmtTxt(x.was.amt)}（${x.was.rows.length} 节 ${hTxt(payNum(x.was.h))} 小时）；现在按课表算：${payAmtTxt(x.now.amt)}（${x.now.rows.length} 节 ${hTxt(x.now.h)} 小时）。
     ${x.gone.length ? `<div>结算时有、现在没有了：${x.gone.map(one).join('；')}</div>` : ''}${x.added.length ? `<div>结算以后多出来的：${x.added.map(one).join('；')}</div>` : ''}
     ${x.changed.length ? `<div>改了时长或单价：${x.changed.map(r => { const w = x.was.rows.find(y => y.id === r.id); return `${esc(sMD(String(r.d || '')))} ${esc(r.stu)} ${payNum(w.h)} 小时 × ${money(payNum(w.rate), payCur(w.cur))} → ${payNum(r.h)} 小时 × ${money(payNum(r.rate), payCur(r.cur))}`; }).join('；')}</div>` : ''}
     <div class="muted xs">已经发出去的按结算时的算。要按现在的重新算，点「撤销结算」再结算一次；或者差额放到下个月补。</div></div>`;

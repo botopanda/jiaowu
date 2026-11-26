@@ -374,6 +374,10 @@ function rowsToPrograms(rows){
   if (nEx) warn.push(`模板自带的示例没有导入（只是给你看怎么填的）${exLines.length ? '：第 ' + exLines.join('、') + ' 行' : ''}`);
   list.forEach(g => {
     // 同一个专业里既有 4 月入学又有 9 月入学的轮次：把每一行写的入学时期记到那一轮上（「本轮入学时期」）
+    // 2026-11-26：有的行「入学时期」空着（按规矩＝4 月）、有的行写了 9 月：空着的那几行明确记成 4 月，专业上也写回 4 月。
+    //   以前空着的行会被后面那行的「9月」补上，整个专业都成了 9 月入学，4 月那轮「办签证来不及」的提醒就漏了
+    const blankRow = g.rounds.some(r => !r.info.r_intake && !r._it), other = g.rounds.some(r => { const v = r.info.r_intake || r._it; return v && v !== '4月'; });
+    if (blankRow && other) { g.rounds.forEach(r => { if (!r.info.r_intake && !r._it) r._it = '4月'; }); g.info.intake = '4月'; }
     const its = new Set(g.rounds.map(r => r.info.r_intake || r._it).filter(Boolean));
     g.rounds.forEach(r => { if (its.size > 1 && !r.info.r_intake && r._it) r.info.r_intake = r._it; delete r._it; });
     const ns = g.rounds.map(r => (r.name || '') + '\u0001' + (r.info.r_intake || '')), dup = [...new Set(ns.filter((n, i) => ns.indexOf(n) !== i).map(n => n.split('\u0001')[0]))];   // 名称一样、入学时期不一样的不算重名
@@ -439,7 +443,8 @@ document.addEventListener('click', async e => {
       await act('program_delete', {xid: v}, '已删除'); await progLoad(true); render();
     }
     if (k === 'prog-import-go') {
-      const list = IMPORT_PENDING; if (!list) return;
+      const list = IMPORT_PENDING; if (!list || window.__progImporting) return;   // 2026-11-26：网慢时连点两下「确认导入」，只跑一遍
+      window.__progImporting = true;
       document.body.classList.add('busy'); let n = 0, u = 0, i = 0;
       try { for (; i < list.length; i += 40) { const r = await rpc('programs_import', {rows: list.slice(i, i + 40)}); n += r.new; u += r.updated; } }
       catch(err) {
@@ -448,7 +453,7 @@ document.addEventListener('click', async e => {
         toast(`导入到第 ${i + 1}〜${Math.min(i + 40, list.length)} 个专业（${bad[0].school}${bad.length > 1 ? ' 等' : ''}）时出错了：${err.message}。前面 ${i} 个已经导入（新增 ${n}、更新 ${u}），这一批和后面的还没有。改好以后把整份再导一次就行，不会重复`, true, 15000);
         if (i > 0) { try { await progLoad(true); render(); } catch(_) {} }
         return; }
-      finally { document.body.classList.remove('busy'); }
+      finally { document.body.classList.remove('busy'); window.__progImporting = false; }
       IMPORT_PENDING = null; await progLoad(true); closeModal(); render(); toast(`导入完成：新增 ${n} 个，更新 ${u} 个`);
     }
     if (k === 'tg-pick') progPicker(...v.split('|'));
