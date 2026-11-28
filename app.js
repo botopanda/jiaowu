@@ -226,6 +226,8 @@ const reqOf = l => DB.requests.filter(q => q.lesson_id===l.id).slice(-1)[0];
 const personOf = (role, field, id) => (DB.people||[]).find(p => p.role===role && p[field]===id && p.active);
 // 这条反馈有没有留作业（写「无」「没有」的不算）
 const hasHw = f => !/^(无|没有|暂无|—|-|\/)?$/.test((f.hw || '').trim());
+// 写反馈时「三、课后作业」下面的按钮：点一下自动填「无」（2026-11-28；以前要手打，打成「今天不用做」会被当成留了作业去催学生）
+const W_NOHW = '<div class="row w-nohw"><button type="button" class="btn sm" data-act="w-nohw">这节没留作业</button><span class="muted xs">点一下自动填「无」，学生那边不会催交</span></div>';
 // 作业到该交的时候了吗：交了就算；没交的，等这门课下一节课开始才算该交（后面没课了就等 7 天）
 function hwDue(f){
   if (f.hw_sub) return true;
@@ -235,13 +237,21 @@ function hwDue(f){
   if (nx) return nx.date < TODAY || (nx.date === TODAY && nx.start <= bjHM());
   return Date.parse(l.date) + 7 * 864e5 < Date.parse(TODAY);
 }
-function monthStats(sid, ym){
+// okOnly：只算教务审批过的反馈（给家长的月报图片用：教务导出的要和家长自己看到的一个数，2026-11-28）
+function monthStats(sid, ym, okOnly){
   const ls = lsOfS(sid).filter(l => l.date.startsWith(ym) && l.status !== 'cancelled' && (l.date < TODAY || isDone(l)));   // 取消的课不算应上
   const actual = ls.filter(isDone).length, leave = ls.filter(l => l.status==='leave').length;
-  const fs = fbOfS(sid).filter(f => L(f.lesson_id).date.startsWith(ym) && hasHw(f) && hwDue(f));
+  const fs = fbOfS(sid).filter(f => (!okOnly || f.status==='approved') && L(f.lesson_id).date.startsWith(ym) && hasHw(f) && hwDue(f));
   return {req: ls.length, actual, leave, hwOk: fs.length ? Math.round(fs.filter(f => f.hw_sub).length / fs.length * 100) : 0, fbN: fs.length};
 }
-const latestHw = sid => DB.courses.filter(c => c.student_id===sid).map(c => DB.feedbacks.filter(f => L(f.lesson_id).course_id===c.id && hasHw(f)).slice(-1)[0]).filter(Boolean);   // 2026-11-19：写「无」的不算
+// 每门课最新一份作业。2026-11-28：停了的课不算（以前停课半年了，首页还一直催那份没交的作业）
+const latestHw = sid => DB.courses.filter(c => c.student_id===sid && c.active!==false).map(c => DB.feedbacks.filter(f => L(f.lesson_id).course_id===c.id && hasHw(f)).slice(-1)[0]).filter(Boolean);   // 2026-11-19：写「无」的不算
+// 作业分四组：这次要交的（每门课最新一份）、以前没交的（最近 12 份里的，停了的课不算）、等批改、批改好了。首页的数字和作业页都用这一个
+function hwGroups(sid){
+  const cur = latestHw(sid), older = fbOfS(sid).filter(f => !cur.includes(f) && hasHw(f)).slice(-12).reverse(), all = [...cur, ...older];
+  return {now: cur.filter(f => !f.hw_sub), late: older.filter(f => !f.hw_sub && cOfF(f)?.active !== false), wait: all.filter(f => f.hw_sub && !f.hw_fb), done: all.filter(f => f.hw_fb).slice(0, 10)};
+}
+const hwUnsub = sid => { const G = hwGroups(sid); return [...G.now, ...G.late]; };   // 没交的作业（这次的＋以前的）
 
 let lastLoad = 0, LOAD_ERRS = [], LOAD_STALE = 0;
 // 有填了一半没保存的内容（弹窗里或页面上），刷新前先问一句（2026-11-21）
@@ -443,8 +453,8 @@ function pgOverview(){
     <button class="stat" data-act="page" data-v="calendar"><small>今天的课</small><b>${today.length}</b></button>
     ${isTop() ? `<button class="stat ${reqs.length?'al':''}" data-act="page" data-v="requests"><small>待处理申请</small><b>${reqs.length}</b></button>
     <button class="stat ${pend.length?'al':''}" data-act="page" data-v="feedback"><small>待审批反馈</small><b>${pend.length}</b></button>` : ''}
-    <button class="stat ${chPend().length?'al':''}" ${isTop()?'data-act="page" data-v="requests-ch"':''}><small>老师排课申请</small><b>${chPend().length}</b></button>
-    <button class="stat ${miss.length?'al':''}" ${isTop()?'data-act="page" data-v="feedback-missing"':''}><small>待确认的课</small><b>${miss.length}</b></button>
+    <button class="stat ${chPend().length?'al':''}" data-act="page" data-v="requests-ch"><small>老师排课申请</small><b>${chPend().length}</b></button>
+    <button class="stat ${miss.length?'al':''}" data-act="page" data-v="feedback-missing"><small>待确认的课</small><b>${miss.length}</b></button>
   </div>
   ${ownerClashBlock()}
   <div class="grid2 ov-grid">
@@ -459,7 +469,7 @@ function pgOverview(){
       ${bad.map(f => { const l=L(f.lesson_id), c=course(l.course_id); return `<div class="li"><span class="tag seal">不满意</span><div class="grow">${esc(stu(c.student_id).name)} 对 ${sMD(l.date)} ${esc(tea(c.teacher_id).name)} 的课评价「不满意」</div></div>`}).join('')}
       ${chPend().map(x => chCard(x, true)).join('')}
       ${miss.length ? `<div class="li"><span class="tag warn">待确认</span><div class="grow">${pendByT(miss)}<br><span class="muted xs">上课时间过了、老师还没写反馈的课，暂时不计课时和工资。</span></div>${miss.length>1?`<button class="btn sm" data-act="done-all">全部标为已上课</button>`:''}</div>` : ''}
-      ${miss.length ? `<details class="ov-more"><summary>逐条处理（${miss.length} 节）</summary>${miss.slice(0,8).map(pendRow).join('')}${miss.length>8?`<div class="muted xs" style="padding:4px 2px">还有 ${miss.length-8} 节${isTop()?'，在「待处理 → 反馈审批 → 待确认」里看全部':''}</div>`:''}</details>` : ''}
+      ${miss.length ? `<details class="ov-more"><summary>逐条处理（${miss.length} 节）</summary>${miss.slice(0,8).map(pendRow).join('')}${miss.length>8?`<div class="muted xs" style="padding:4px 2px">还有 ${miss.length-8} 节，在「待处理 → ${isTop()?'反馈审批 → 待确认':'待确认的课'}」里看全部</div>`:''}</details>` : ''}
       ${fus.map(f=>`<div class="li"><span class="tag gold">跟进</span><div class="grow">${esc(stu(f.student_id).name)} · ${esc(f.next_action||f.task||'')}（${sMD(f.next_date)}）</div><button class="btn sm" data-act="fu-edit" data-v="${f.id}">更新</button></div>`).join('')}
       ${!chPend().length && !reqs.length && !pend.length && !bad.length && !miss.length && !fus.length ? '<div class="empty">没有要处理的事</div>' : ''}
     </div></section>
@@ -545,15 +555,22 @@ function chClashModal(bad, ok){
 // 普通教务原来就看不到改期·请假、老师申请、反馈审批，这里也只有后两个页签
 function todoTabs(){
   const fuDue = (DB.followups||[]).filter(f => f.next_date && f.confirm!=='已确认' && f.next_date<=TODAY).length;
-  return (isTop() ? [['req','改期 · 请假',DB.requests.filter(q=>q.status==='pending').length],['ch','老师排课申请',chPend().length],['fb','反馈审批',DB.feedbacks.filter(f=>f.status==='pending').length]] : [])
+  // 2026-11-28：普通教务也能办自己负责学生的老师排课申请和待确认的课（新版早就放开了，旧版没跟上）
+  return (isTop() ? [['req','改期 · 请假',DB.requests.filter(q=>q.status==='pending').length],['ch','老师排课申请',chPend().length],['fb','反馈审批',DB.feedbacks.filter(f=>f.status==='pending').length]]
+                  : [['ch','老师排课申请',chPend().length],['pend','待确认的课',needFb().length]])
     .concat([['msg','学生留言',typeof msgUnread==='function'?msgUnread():0],['fu','跟进记录',fuDue]]);
+}
+const PEND_NOTE = '上课时间过了、老师还没写反馈的课是「待确认」，<b>不计课时和工资</b>。老师写了反馈会自动变成「已上课」；也可以在这里直接标为已上课，或者点「改时长 / 取消」。';
+function pendBody(){
+  const miss = needFb();
+  return `<div class="ph"><h2>待确认的课</h2></div>` + (miss.length ? `<div class="note">${PEND_NOTE}<div class="row" style="margin-top:6px">${pendByT(miss)}${miss.length>1?`<button class="btn sm" style="margin-left:auto" data-act="done-all">全部标为已上课</button>`:''}</div></div><div class="card list">${miss.map(pendRow).join('')}</div>` : '<div class="card empty">没有待确认的课</div>');
 }
 // 并进来的页面：去掉它自己的大标题，标题旁边的按钮留着
 const subPage = h => h.replace(/^\s*<div class="ph"><h2>[^<]*<\/h2>/, '<div class="ph ph-sub">');
 const tabBar = (list, cur, act) => `<div class="sp-tabs pg-tabs">${list.map(([k,t,n]) => `<button class="${cur===k?'on':''}" data-act="${act}" data-v="${k}">${t}${n?` <span class="cnt">${n}</span>`:''}</button>`).join('')}</div>`;
 function pgTodo(){
   const ts = todoTabs(); if (!ts.some(t => t[0]===S.todoTab)) S.todoTab = ts[0][0];
-  const body = {req:reqStuBody, ch:reqChBody, fb:pgFeedback, msg:typeof pgMsgs==='function' ? pgMsgs : () => '', fu:pgFollowups}[S.todoTab];
+  const body = {req:reqStuBody, ch:reqChBody, fb:pgFeedback, pend:pendBody, msg:typeof pgMsgs==='function' ? pgMsgs : () => '', fu:pgFollowups}[S.todoTab];
   return `<div class="ph"><h2>待处理</h2></div>${tabBar(ts, S.todoTab, 'todo-tab')}${subPage(body())}`;
 }
 function pgSys(){
@@ -564,7 +581,7 @@ function pgSys(){
 const PAGE_OLD = {requests:['todo','req'], 'requests-ch':['todo','ch'], feedback:['todo','fb'], 'feedback-missing':['todo','fb'], msgs:['todo','msg'], followups:['todo','fu'], links:['sys','links'], backup:['sys','backup']};
 function goPage(v){
   const o = PAGE_OLD[v];
-  if (o){ S.page = o[0]; if (o[0]==='todo') S.todoTab = o[1]; else S.sysTab = o[1]; if (v==='feedback') S.fbTab = 'pending'; if (v==='feedback-missing') S.fbTab = 'missing'; return; }
+  if (o){ S.page = o[0]; if (o[0]==='todo') S.todoTab = o[1]; else S.sysTab = o[1]; if (v==='feedback') S.fbTab = 'pending'; if (v==='feedback-missing') { S.fbTab = 'missing'; if (!isTop()) S.todoTab = 'pend'; } return; }
   if (v==='todo'){ const ts = todoTabs(); S.todoTab = (ts.find(t => t[2]) || ts.find(t => t[0]===S.todoTab) || ts[0])[0]; if (S.todoTab==='fb') S.fbTab = 'pending'; }
   S.page = v;
 }
@@ -583,7 +600,7 @@ function reqCard(q){ const l=L(q.lesson_id), c=course(l.course_id), at = bjAt(q.
       ${q.status==='pending' ? `${q.type==='改期'
         ? `<div class="fields"><label class="field"><span>新日期</span><input type="date" id="rq-d-${q.id}" value="${l.date}"></label><label class="field"><span>开始（北京时间）</span><input type="time" id="rq-s-${q.id}" value="${l.start}"></label><label class="field"><span>结束</span><input type="time" id="rq-e-${q.id}" value="${l.end}"></label></div>
            <div class="row"><button class="btn pri sm" data-act="req-ok" data-v="${q.id}">同意，改到这个时间</button></div>`
-        : `<div class="row" style="align-items:flex-end"><label class="field"><span>扣学生课时${same?'（当天请假）':'（提前请假）'}</span><select id="rq-dd-${q.id}"><option value="0" ${same?'':'selected'}>不扣</option><option value="${dur(l)/2}" ${same?'selected':''}>扣 ${hTxt(dur(l)/2)} 小时（一半）</option><option value="${dur(l)}">扣全部 ${hTxt(dur(l))} 小时</option></select></label><button class="btn seal sm" data-act="req-ok" data-v="${q.id}">同意请假</button></div>`}
+        : `<div class="row" style="align-items:flex-end"><label class="field"><span>扣学生课时${same?'（当天请假）':'（提前请假）'}</span><select id="rq-dd-${q.id}"><option value="0" ${same?'':'selected'}>不扣</option><option value="${h4(dur(l)/2)}" ${same?'selected':''}>扣 ${hTxt(dur(l)/2)} 小时（一半）</option><option value="${h4(dur(l))}">扣全部 ${hTxt(dur(l))} 小时</option></select></label><button class="btn seal sm" data-act="req-ok" data-v="${q.id}">同意请假</button></div>`}
         <div class="row"><input type="text" id="rq-r-${q.id}" placeholder="不同意的话，写一句原因回复学生" style="flex:1;min-width:180px"><button class="btn sm" data-act="req-no" data-v="${q.id}">不同意</button></div>`
       : `<div class="small" style="color:${q.status==='accepted'?'var(--ok)':'var(--seal)'}">${q.status==='accepted'?'已同意':'未同意'}（${esc(q.handled_by)}）：${esc(q.reply)}</div>`}
     </section>`; }
@@ -619,7 +636,7 @@ function pgFeedback(){
   if (S.fbTab==='pending') body = pend.length ? `<div class="card row"><label class="row"><input type="checkbox" class="chk" id="sel-all" data-act="sel-all" ${S.sel.size===pend.length?'checked':''}> 全选</label>
       <span class="muted small">已选 ${S.sel.size} 条</span><button class="btn seal sm" data-act="approve-sel" ${S.sel.size?'':'disabled'}>批量审批通过</button></div>${pend.map(f => fbCard(f,{check:true,actions:true})).join('')}` : '<div class="card empty">没有待审批的反馈</div>';
   else if (S.fbTab==='approved') body = done.slice(0,15).map(f => fbCard(f,{actions:true})).join('') || '<div class="card empty">还没有</div>';
-  else body = miss.length ? `<div class="note">上课时间过了、老师还没写反馈的课是「待确认」，<b>不计课时和工资</b>。老师写了反馈会自动变成「已上课」；也可以在这里直接标为已上课，或者点「改时长 / 取消」。<div class="row" style="margin-top:6px">${pendByT(miss)}${miss.length>1?`<button class="btn sm" style="margin-left:auto" data-act="done-all">全部标为已上课</button>`:''}</div></div><div class="card list">${miss.map(pendRow).join('')}</div>` : '<div class="card empty">没有待确认的课</div>';
+  else body = miss.length ? `<div class="note">${PEND_NOTE}<div class="row" style="margin-top:6px">${pendByT(miss)}${miss.length>1?`<button class="btn sm" style="margin-left:auto" data-act="done-all">全部标为已上课</button>`:''}</div></div><div class="card list">${miss.map(pendRow).join('')}</div>` : '<div class="card empty">没有待确认的课</div>';
   return `<div class="ph"><h2>反馈审批</h2></div>
   <div class="note">老师写完反馈，学生马上能看到；<b>审批通过后，家长才能看到</b>。措辞不合适可以先改再通过。</div>
   <div class="seg">${[['pending',`待审批 ${pend.length}`],['approved','已通过'],['missing',`待确认 ${miss.length}`]].map(([k,t])=>`<button class="${S.fbTab===k?'on':''}" data-act="fbtab" data-v="${k}">${t}</button>`).join('')}</div>${body}`;
@@ -638,7 +655,7 @@ function pgStudents(){
   return `<div class="ph"><h2>学生档案</h2>${isTop()?`<button class="btn pri" data-act="student-form">＋ 新增学生</button>`:''}</div>${scopeNote()}
   <div class="row"><input type="text" id="stu-q" placeholder="搜索姓名或方向" value="${esc(S.stuQ)}" data-input="stuq" style="width:200px"></div>
   ${list.length ? `<div class="tw"><table class="rt stu-tbl"><thead><tr><th>编号</th><th>姓名</th><th>方向</th><th>任课老师</th><th>负责教务</th><th>${+ym.slice(5)} 月出勤</th><th>作业</th><th>${+ym.slice(5)} 月计划</th></tr></thead><tbody>
-  ${list.map(s => { const cs = DB.courses.filter(c=>c.student_id===s.id), st = monthStats(s.id, ym), un = latestHw(s.id).filter(f=>!f.hw_sub).length;
+  ${list.map(s => { const cs = DB.courses.filter(c=>c.student_id===s.id), st = monthStats(s.id, ym), un = hwUnsub(s.id).length;
     const pn = cs.filter(c => planText(c.id, ym)).length;
     return `<tr class="click" data-act="student" data-v="${s.id}"><td class="num">${esc(s.code||'')}</td><td><b>${esc(s.name)}</b>${isMine(s) && ownerUI()?' <span class="tag gold">Panda</span>':''}${s.active?'':' <span class="tag mute">停课</span>'}<br><span class="xs muted">${esc(s.loc||'')}</span></td><td>${esc(s.direction||s.track||'')}${s.target_ym?`<br><span class="xs muted">目标 ${esc(s.target_ym)}</span>`:''}</td>
     <td>${teacherChips(cs) || '<span class="tag warn">还没有课程</span>'}</td><td>${esc(s.staff)}</td>
@@ -667,10 +684,10 @@ function pgTeachers(){
 
 function pgPayroll(){
   const ym = S.payMonth;
-  const rows = DB.teachers.filter(t => !t.staff).map(t => { const ls = lsOfT(t.id).filter(l => l.date.startsWith(ym) && paidH(l)>0);
+  const rows = DB.teachers.filter(t => !t.staff).map(t => { const ls = payLs(t.id, ym).filter(l => paidH(l)>0);   // payLs：另一本账已经结算过的课不算（extras.js）
     const parts = ls.map(l => { const c = course(l.course_id); return [paidH(l)*(c.rate||0), curOf(c)]; });
     const hr = ls.reduce((a,l)=>a+paidH(l),0);
-    return {t, ls, hr, h: +hr.toFixed(2), parts, amt: sumMoney(parts), pn: lsOfT(t.id).filter(l => l.date.startsWith(ym) && isPend(l)).length}; }).filter(r => r.ls.length || r.pn || (DB.pay || []).some(p => p.teacher_id === r.t.id && p.ym === ym && p.snap));   // 结算过的老师：课删光了也列出来，看得到差额
+    return {t, ls, hr, h: +hr.toFixed(2), parts, amt: sumMoney(parts), pn: payLs(t.id, ym).filter(isPend).length}; }).filter(r => r.ls.length || r.pn || (DB.pay || []).some(p => p.teacher_id === r.t.id && p.ym === ym && p.snap));   // 结算过的老师：课删光了也列出来，看得到差额
   const total = sumMoney(rows.flatMap(r => r.parts));
   const months = [...new Set(DB.lessons.map(l=>l.date.slice(0,7)).concat([TODAY.slice(0,7), ymShift(TODAY.slice(0,7),-1)], (DB.pay||[]).map(p=>p.ym)))].sort().reverse();
   return `<div class="ph"><h2>课时与工资</h2><select id="pay-m" data-change="paym">${months.map(v=>`<option value="${v}" ${v===ym?'selected':''}>${ymLabel(v)}</option>`).join('')}</select></div>
@@ -864,7 +881,7 @@ function tWrite(t){
     <label class="field"><span>一、本节授课内容</span><textarea id="w-content" placeholder="例：听解练习，要求学生用日语复述听力内容" data-auto="${esc(cand[0].topic||'')}">${esc(cand[0].topic||'')}</textarea></label>
     <label class="field"><span>二、学生课堂表现</span><textarea id="w-perf" placeholder="例：课堂状态良好，能积极参与练习"></textarea></label>
     <div class="field"><span>学生状态（点选，可多选）</span><div class="chips">${[...TAGS_GOOD,...TAGS_WARN].map(x=>`<button class="chip ${wTags.has(x)?'on':''}" data-act="w-tag" data-v="${x}">${x}</button>`).join('')}</div></div>
-    <label class="field"><span>三、课后作业安排</span><textarea id="w-hw" placeholder="例：1. 复习本节生词  2. 完成长文 1–10"></textarea></label>
+    <label class="field"><span>三、课后作业安排</span><textarea id="w-hw" placeholder="例：1. 复习本节生词  2. 完成长文 1–10"></textarea></label>${W_NOHW}
     <label class="field"><span>作业图片 / PDF（可以不选；学生在「作业」里能看到，最多 9 个）</span><input type="file" id="w-hwfiles" accept="image/*,.pdf,application/pdf" multiple></label>
     <div class="fields"><label class="field"><span>实际上课时长</span><select id="w-hrs">${wHrsOpts(cand[0])}</select></label>
     <label class="field"><span>时长不一样的原因</span><input type="text" id="w-why" placeholder="例：学生临时有事，提前半小时结束"></label></div>
@@ -931,6 +948,17 @@ function labelTables(){ document.querySelectorAll('table.rt').forEach(t => { con
 function closeModal(){ mroot.innerHTML=''; mroot.dataset.dirty = ''; lastModal = null; }
 const mHead = t => `<div class="mh"><h3>${t}</h3><button class="btn sm" data-act="close" aria-label="关闭">✕</button></div>`;
 
+// 请假卡片里的「扣学生课时」：已经请假的课带出原来扣的数（以前一律回到「不扣」，只想补一句备注点「更新请假」会把扣的课时清零）
+const LV_AUTO = /^(当天请假，扣 [\d.]+ 小时|请假，不扣课时)$/;   // 系统自己写的备注：换了扣法就跟着重写
+const h4 = n => +Number(n).toFixed(4);   // 发给数据库的课时最多四位小数（50 分钟的一半不再发 0.4166666666666667）
+function lvSelect(l){
+  const half = h4(dur(l)/2), full = h4(dur(l)), on = l.status==='leave', cur = on ? Number(l.deduct) || 0 : (l.date===TODAY ? half : 0);
+  const std = [0, half, full].some(x => sameH(x, cur));
+  const o = (v, t) => `<option value="${v}" ${sameH(v, cur)?'selected':''}>${t}</option>`;
+  return `<select id="lv-d">${o(0, '不扣')}${o(half, `扣 ${hTxt(half)} 小时（一半）`)}${o(full, `扣全部 ${hTxt(full)} 小时`)}${std ? '' : `<option value="${h4(cur)}" selected>扣 ${hTxt(cur)} 小时（现在记的）</option>`}</select>`;
+}
+// 今天还没开始的课：不能标「已上课」（和老师写反馈一个规矩）
+const lesStarted = l => l.date < TODAY || (l.date === TODAY && l.start <= bjHM());
 function lessonModal(id){
   lastModal = () => lessonModal(id);
   const l = L(id), c = course(l.course_id), s = stu(c.student_id), t = tea(c.teacher_id), f = fbOf(l), q = reqOf(l);
@@ -942,7 +970,7 @@ function lessonModal(id){
   ${l.status==='leave'?`<dt>扣学生课时</dt><dd class="num">${hTxt(l.deduct)} 小时（老师照发）</dd>`:''}${l.actual_note?`<dt>时长说明</dt><dd>${esc(l.actual_note)}</dd>`:''}${(isDone(l)||isPend(l)) && !t.staff?`<dt>反馈</dt><dd>${f?(f.status==='approved'?'已审批':'待审批'):l.has_fb?'已写':'<span class="tag warn">老师未写</span>'}</dd>`:''}
   ${q?`<dt>申请</dt><dd>${reqLine(q)}</dd>`:''}${chPendOf(l.id)?`<dt>老师申请</dt><dd><span class="tag warn">${chLabel(chPendOf(l.id))}待审批</span> <span class="small">${chText(chPendOf(l.id))}</span></dd>`:''}</dl>
   ${isAdmin() && l.date<=TODAY && l.status!=='leave' ? `<section class="card" style="display:flex;flex-direction:column;gap:8px"><b>上课确认</b>
-    ${!isTop() && lesBilled(l) ? '<div class="muted small">这节课已经计入课时了。要撤销确认、标成取消或者改时长，请联系教务·管理。</div>' : l.status==='cancelled' ? `<div class="row"><span class="muted small">这节课已取消，不计课时。</span><button class="btn sm" data-act="lstate" data-v="${l.id}|reset">恢复这节课</button></div>` : `
+    ${!isTop() && lesBilled(l) ? '<div class="muted small">这节课已经计入课时了。要撤销确认、标成取消或者改时长，请联系教务·管理。</div>' : !lesStarted(l) && l.status==='scheduled' && !isDone(l) ? `<div class="muted small" id="ls-early">这节课 ${l.start} 才开始，上完课再来标「已上课」。</div>${!f&&!l.has_fb?`<div class="row"><button class="btn" data-act="lstate" data-v="${l.id}|cancelled">这节课没上（取消）</button><span class="muted xs">老师或学生临时来不了、这节不上了，点这里</span></div>`:''}` : l.status==='cancelled' ? `<div class="row"><span class="muted small">这节课已取消，不计课时。</span><button class="btn sm" data-act="lstate" data-v="${l.id}|reset">恢复这节课</button></div>` : `
     <div class="fields"><label class="field"><span>实际上课时长（小时）</span><input type="number" id="ls-h" min="0.1" max="8" step="0.01" value="${hTxt(realH(l))}"></label>
     <label class="field"><span>原因（时长和排课不一样时填）</span><input type="text" id="ls-why" value="${esc(l.actual_note||'')}" placeholder="例：学生有事，提前结束"></label></div>
     <div class="row"><button class="btn pri" data-act="lstate" data-v="${l.id}|done">${isDone(l)?'保存时长':'标为已上课'}</button>${!f&&!l.has_fb?`<button class="btn" data-act="lstate" data-v="${l.id}|cancelled">这节课没上（取消）</button>`:''}${l.done_manual&&!f&&!l.has_fb?`<button class="btn sm" data-act="lstate" data-v="${l.id}|reset">撤销确认</button>`:''}</div>
@@ -956,8 +984,8 @@ function lessonModal(id){
   ${!isTop() && canSched() && f ? '<div class="muted xs">这节课已经写了反馈，不能再调课或删除。需要改的话请联系教务老师。</div>' : ''}
   ${isTop() && !f && l.status!=='cancelled' ? `<section class="card" style="display:flex;flex-direction:column;gap:8px"><b>${l.status==='leave'?'请假':'标记请假'}</b>
     <div class="muted xs">当天请假原则上扣一半课时，也可以酌情不扣。</div>
-    <div class="fields"><label class="field"><span>扣学生课时</span><select id="lv-d"><option value="0">不扣</option><option value="${dur(l)/2}" ${l.date===TODAY?'selected':''}>扣 ${hTxt(dur(l)/2)} 小时（一半）</option><option value="${dur(l)}">扣全部 ${hTxt(dur(l))} 小时</option></select></label>
-    <label class="field"><span>备注</span><input type="text" id="lv-note" placeholder="例：第一次，已口头提醒"></label></div>
+    <div class="fields"><label class="field"><span>扣学生课时</span>${lvSelect(l)}</label>
+    <label class="field"><span>备注</span><input type="text" id="lv-note" value="${l.status==='leave' && !LV_AUTO.test(l.note||'') ? esc(l.note||'') : ''}" placeholder="例：第一次，已口头提醒"></label></div>
     <div class="row"><button class="btn seal" data-act="leave" data-v="${l.id}">${l.status==='leave'?'更新请假':'确认请假'}</button>${l.status==='leave'?`<button class="btn" data-act="unleave" data-v="${l.id}">取消请假</button>`:''}</div></section>
   <div class="row" id="del-row"><button class="btn danger sm" data-act="del-ask" data-v="${l.id}">删除这节课</button></div>` : (isTop() && f ? `<div class="row" id="del-row"><button class="btn danger sm" data-act="del-ask" data-v="${l.id}">删除这节课</button><span class="muted xs">这节课已经写了反馈，删除时反馈会一起删掉</span></div>` : '')}`);
 }
@@ -986,13 +1014,21 @@ function addLessonModal(){
   </div>
   <div id="al-note"></div>
   <div class="fields"><label class="field"><span>第一节日期</span><input type="date" id="al-d" value="${preD}"></label><label class="field"><span>开始（${tzName(myTz())}）</span><input type="time" id="al-s" value="${pre ? pre.s : '18:00'}"></label><label class="field"><span>结束</span><input type="time" id="al-e" value="${pre ? pre.e : '20:00'}"></label></div>
-  <div class="fields"><label class="field"><span>重复</span><select id="al-rep"><option value="month">每周同一时间，到这个月底</option><option value="1">只排这一节</option><option value="4">每周同一时间，共 4 周</option><option value="8">每周同一时间，共 8 周</option></select></label></div>
+  <div class="fields"><label class="field"><span>重复</span><select id="al-rep"><option value="month">每周同一时间，到这个月底</option><option value="1" ${pre && pre.one ? 'selected' : ''}>只排这一节</option><option value="4">每周同一时间，共 4 周</option><option value="8">每周同一时间，共 8 周</option></select></label></div>
   <label class="field"><span>本节内容（可以不填）</span><input type="text" id="al-topic" maxlength="200" placeholder="例：第3节｜两点透视"></label>
   ${typeof meetAddFields==='function' ? meetAddFields() : ''}
   <div class="muted xs">和这位老师已有的课时间重叠的，会自动跳过。每周重复排的课，本节内容只写进第一节，其他几节之后点开那节课再填。</div>
-  <div class="row"><button class="btn pri" data-act="save-lesson">${isT ? '提交排课申请' : '排课'}</button></div>`);
-  alPick();
+  <div class="row"><button class="btn pri" id="al-go" data-act="save-lesson" data-t="${isT ? '提交排课申请' : '排课'}">${isT ? '提交排课申请' : '排课'}</button></div>`);
+  alPick(); alGoSync();
 }
+// 2026-11-28：排课按钮上写清这一下会排出几节（月初选「到这个月底」会一口气排四五节）
+function alGoSync(){
+  const b = document.getElementById('al-go'); if (!b) return;
+  const d = val('al-d'), n = d ? lessonDates(d, val('al-rep')).length : 0;
+  b.textContent = n ? `${b.dataset.t}（共 ${n} 节）` : b.dataset.t;
+}
+document.addEventListener('change', e => { if (['al-rep', 'al-d'].includes(e.target?.id)) alGoSync(); });
+document.addEventListener('input', e => { if (e.target?.id === 'al-d') alGoSync(); });
 // 选好学生、老师、科目后：看这门课程（学生 × 老师 × 科目）有没有，没有的话排课时自动建立
 const alSubj = () => val('al-subj')==='__other' ? val('al-subj-x').trim() : val('al-subj');
 const alTeacher = () => ME().role==='teacher' ? ME().teacher_id : val('al-tea');
@@ -1163,16 +1199,20 @@ document.addEventListener('click', async e => {
       document.getElementById('tp-text').focus(); break; }
     case 'topic-save': await act('lesson_set_topic', {lid:v, t:val('tp-text')}, '本节内容已保存'); lessonModal(v); break;
     case 'add-lesson': addLessonModal(); break;
-    case 'cal-day': S.alPre = {d:v, s:'18:00', e:'20:00'}; addLessonModal(); break;   // 教务月历：点某天空白处直接排课
+    case 'cal-day': S.alPre = {d:v, s:'18:00', e:'20:00', one:true}; addLessonModal(); break;   // one：从课表上点某一天进来的，「重复」先选「只排这一节」（2026-11-28）   // 教务月历：点某天空白处直接排课
     case 'al-mk': { const on = val('al-mk')!=='1'; document.getElementById('al-mk').value = on ? '1' : '0'; a.classList.toggle('on', on); a.setAttribute('aria-pressed', on); break; }
     case 'close': case 'close-bg': if (mroot.dataset.dirty && !confirm('填的内容还没保存，确定关掉吗？')) break; closeModal(); break;
-    case 'fbtab': S.fbTab=v; S.sel.clear(); S.editing=null; render(); break;
+    case 'fbtab': S.fbTab=v; S.sel.clear(); S.selVer = {}; S.editing=null; render(); break;
     case 'sel': S.selVer = S.selVer || {}; if (S.sel.has(v)) { S.sel.delete(v); delete S.selVer[v]; } else { S.sel.add(v); S.selVer[v] = a.dataset.ver; } render(); break;
-    case 'sel-all': { const p=DB.feedbacks.filter(f=>f.status==='pending'); if (S.sel.size===p.length) S.sel.clear(); else p.forEach(f=>S.sel.add(f.id)); render(); break; }
+    case 'sel-all': {   // 2026-11-28：只选屏幕上已经画出来的那些，并记下画出来时的版本（以前直接拿内存里最新的，可能把没看过的新内容一起批掉）
+      const els=[...document.querySelectorAll('[data-act="sel"]')]; S.selVer = S.selVer || {};
+      if (els.length && els.every(el => S.sel.has(el.dataset.v))) { S.sel.clear(); S.selVer = {}; }
+      else els.forEach(el => { S.sel.add(el.dataset.v); if (!S.selVer[el.dataset.v]) S.selVer[el.dataset.v] = el.dataset.ver; });
+      render(); break; }
     case 'approve': await act('admin_feedback_approve', {ids:[v], vers: a.dataset.ver ? {[v]: a.dataset.ver} : fbVers([v])}, r => r ? '已审批，家长现在能看到这条反馈' : '老师刚改过这条反馈，请重新看一遍再批'); S.sel.delete(v); break;
     case 'approve-sel': { const pend=new Set(DB.feedbacks.filter(f=>f.status==='pending').map(f=>f.id)), ids=[...S.sel].filter(id=>pend.has(id));
       if (!ids.length){ S.sel.clear(); render(); toast('这一页上没有选中的反馈', true); break; }
-      await act('admin_feedback_approve', {ids, vers:fbVers(ids)}, r => r === ids.length ? `已审批 ${r} 条` : `已审批 ${r} 条；另外 ${ids.length - r} 条老师刚改过，请重新看一遍再批`); S.sel.clear(); render(); break; }
+      await act('admin_feedback_approve', {ids, vers:fbVers(ids)}, r => r === ids.length ? `已审批 ${r} 条` : `已审批 ${r} 条；另外 ${ids.length - r} 条老师刚改过，请重新看一遍再批`); S.sel.clear(); S.selVer = {}; render(); break; }
     case 'unapprove': await act('admin_feedback_unapprove', {fid:v}, '已撤回，家长暂时看不到'); break;
     case 'edit': S.editing=v; render(); break;
     case 'cancel-edit': S.editing=null; render(); break;
@@ -1217,7 +1257,9 @@ document.addEventListener('click', async e => {
     case 'l-kind-cancel': lessonModal(v); break;
     case 'unmove': { const l0 = L(v), clr = isTop() && l0 && l0.note==='已调课' ? {note:''} : {};
       await act('admin_update_lesson', {lid:v, d:{moved:false, ...clr}}, isT()?'已提交申请，教务批准后生效':'已取消调课标记'); lessonModal(v); break; }
-    case 'leave': { const dd=Number(val('lv-d')); await act('admin_update_lesson', {lid:v, d:{status:'leave', deduct:dd, note:val('lv-note')||(dd?`当天请假，扣 ${hTxt(dd)} 小时`:'请假，不扣课时')}}, '已标记请假'); closeModal(); break; }
+    case 'leave': { const dd=Number(val('lv-d')); let nt=val('lv-note').trim();
+      if (/^学生请假：/.test(nt)) nt = nt.replace(/（(扣 [\d.]+ 小时|不扣课时)）$/, dd ? `（扣 ${hTxt(dd)} 小时）` : '（不扣课时）');   // 学生申请留下的备注：后面那句跟着这次选的扣法走
+      await act('admin_update_lesson', {lid:v, d:{status:'leave', deduct:dd, note:(nt && !LV_AUTO.test(nt)) ? nt : (dd?`当天请假，扣 ${hTxt(dd)} 小时`:'请假，不扣课时')}}, '已标记请假'); closeModal(); break; }
     case 'unleave': await act('admin_update_lesson', {lid:v, d:{status:'scheduled', deduct:0, note:''}}, '已取消请假'); closeModal(); break;
     case 'del-ask': document.getElementById('del-row').innerHTML=`<span class="small">${L(v) && fbOf(L(v)) ? '确定删除？<b>老师写的反馈也会一起删掉，不能恢复。</b>' : '确定删除这节课？'}</span><button class="btn danger sm" data-act="del" data-v="${v}">删除</button><button class="btn sm" data-act="close">算了</button>`; break;
     case 'del': await act('admin_delete_lesson', {lid:v}, isT()?'已提交删课申请，教务批准后才会删除':'已删除'); closeModal(); break;
@@ -1274,6 +1316,7 @@ document.addEventListener('click', async e => {
     case 't-note-save': { const c=DB.courses.find(x=>x.student_id===v && x.teacher_id===ME().teacher_id); await act('note_add', {sid:v, txt:val('t-note')}, '已保存，只有你和教务能看到'); if(c) tStuModal(c.id); break; }
     case 't-stu': tStuModal(v); break;
     case 'w-tag': wTags.has(v)?wTags.delete(v):wTags.add(v); a.classList.toggle('on'); break;
+    case 'w-nohw': { const el = document.getElementById('w-hw'); if (el) { el.value = '无'; el.dispatchEvent(new Event('input', {bubbles: true})); const fi = document.getElementById('w-hwfiles'); if (fi) fi.value = ''; } break; }
     case 'submit-fb': { const c=val('w-content').trim(), p=val('w-perf').trim(), h=val('w-hw').trim(); if(!c||!p||!h){toast('三项内容都要填',true);break;}
       const hrs = val('w-hrs') ? Number(val('w-hrs')) : null, why = val('w-why').trim(), lid = val('w-lesson');
       if (hrs!=null && hrs!==dur(L(lid)) && !why){ toast('实际时长和排课不一样，请写一句原因',true); break; }
@@ -1304,7 +1347,7 @@ document.addEventListener('click', async e => {
     case 'req-submit': { const t=val('rq-type'), why=val('rq-reason').trim(), wish=val('rq-wish').trim(); if(!why){toast('请写原因',true);break;} if(t==='改期'&&!wish){toast('请写希望的时间',true);break;}
       await act('student_request', {lid:v, typ:t, reason:why, wish}, '已提交，教务老师处理后你会在这里看到结果'); closeModal(); break; }
     case 'copy-link': copyText(linkOf(v), '链接已复制，发到对方微信就行'); break;
-    case 'copy-pay': { const ls=lsOfT(v).filter(l=>l.date.startsWith(S.payMonth) && paidH(l)>0); const t=tea(v);
+    case 'copy-pay': { const ls=payLs(v, S.payMonth).filter(l=>paidH(l)>0); const t=tea(v);
       copyText(`${t.name} ${ymLabel(S.payMonth)}课时\n`+ls.map(l=>`${sMD(l.date)} ${timeFor(l,t.tz)} ${stu(course(l.course_id).student_id).name} ${+paidH(l).toFixed(2)}h${l.status==='leave'?'（当天请假）':''}${l.actual_hours!=null&&isDone(l)?`（排课 ${+dur(l).toFixed(2)}h${l.actual_note?'，'+l.actual_note:''}）`:''}`).join('\n')+`\n共 ${hTxt(ls.reduce((a,l)=>a+paidH(l),0))} 小时`, '已复制，发给老师核对'); break; }
     case 'link-regen': { const p=DB.people.find(x=>x.id===v); const isMe=p.id===ME().id;
       const nk = await act('admin_link_update', {pid:v, d:{regen:'true'}}, `已为 ${p.name} 生成新链接，旧链接已失效`);

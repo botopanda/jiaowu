@@ -424,7 +424,7 @@ document.addEventListener('click', async e => {
     if (k === 'pr-add' || k === 'pr-del') {
       const sv = a.closest('.modal').querySelector('[data-act="prog-save"]'), d = progCollect(); d.id = sv.dataset.v || undefined; d.updated_at = sv.dataset.ver || '';
       if (k === 'pr-add') d.rounds.push({info:{}}); else d.rounds.splice(+v, 1);
-      progForm(d);
+      progForm(d); mroot.dataset.dirty = '1';   // 2026-11-28：重画弹窗会把「还没保存」的记号清掉，补回来（不然误点弹窗外面，填的内容直接没了）
     }
     if (k === 'prog-save') {
       const d = progCollect(); if (!d.school) { toast('请填写学校', true); return; }
@@ -456,8 +456,8 @@ document.addEventListener('click', async e => {
       finally { document.body.classList.remove('busy'); window.__progImporting = false; }
       IMPORT_PENDING = null; await progLoad(true); closeModal(); render(); toast(`导入完成：新增 ${n} 个，更新 ${u} 个`);
     }
-    if (k === 'tg-pick') progPicker(...v.split('|'));
-    if (k === 'pk-back') { const t = TG_DRAFT; targetForm(t.sid, t.tid || undefined, t.d); }
+    if (k === 'tg-pick') { const was = !!mroot.dataset.dirty; progPicker(...v.split('|')); window.__tgDirty = was; }   // 记下去挑学校之前表单改没改过
+    if (k === 'pk-back') { const t = TG_DRAFT; targetForm(t.sid, t.tid || undefined, t.d); if (window.__tgDirty) mroot.dataset.dirty = '1'; }
     if (k === 'pk-pick') {
       const [pid, rid] = v.split('|'), p = PROG.find(x => x.id === pid), r = (p.rounds||[]).find(x => x.id === rid) || {}, t = TG_DRAFT;
       const pre = {...t.d, school: `${p.school}／${progName(p)}`, exam_way: r.name || '',
@@ -467,7 +467,7 @@ document.addEventListener('click', async e => {
       const xi = {...(t.d.exam_info || {})}; let dropped = 0;
       DATE_KEYS.forEach(([dk]) => { const nv = r[dk] || ''; if (xi[dk] && (xi[dk].time || xi[dk].note) && nv !== (t.d[dk] || '')) { delete xi[dk]; dropped++; } pre[dk] = nv; });
       pre.exam_info = xi;
-      targetForm(t.sid, t.tid || undefined, pre); toast(dropped ? '已带入，看一下再保存。日期换了的那几场，原来填的考试时间、备注已经清掉' : '已带入，看一下再保存', false, dropped ? 6000 : undefined);
+      targetForm(t.sid, t.tid || undefined, pre); mroot.dataset.dirty = '1'; toast(dropped ? '已带入，看一下再保存。日期换了的那几场，原来填的考试时间、备注已经清掉' : '已带入，看一下再保存', false, dropped ? 6000 : undefined);
     }
   } catch(err) { /* act() 已经提示过 */ }
 });

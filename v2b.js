@@ -35,7 +35,9 @@ function v2Overview2(){
   else if (tab === 'today') body = today.length ? today.map(l => { const c = course(l.course_id), on = l.start <= now && l.end > now, fl = v2Flag(l);
       return `<button type="button" class="v2-ovr click" data-act="lesson" data-v="${l.id}"><b class="num v2-ovt">${l.start}–${l.end}</b><div class="tx"><b>${esc(stu(c.student_id).name)} · ${esc(c.subject)}</b><span>${esc(tea(c.teacher_id).name)}${l.kind ? ' · ' + esc(l.kind) : ''}</span></div>${l.status === 'leave' ? '<span class="tag seal">请假</span>' : l.status === 'cancelled' ? '<span class="tag mute">取消</span>' : on ? '<span class="tag blue">上课中</span>' : isPend(l) ? '<span class="tag warn">待确认</span>' : isDone(l) ? '<span class="tag ok">已上</span>' : ''}${fl ? `<span class="tag warn">${fl}</span>` : ''}</button>`; }).join('') : '<div class="v2-empty">今天没有课</div>';
   else if (tab === 'exam') body = evs.length ? evs.map(e => `<button type="button" class="v2-ovr click" data-act="student-tab" data-v="${e.t.student_id}|target"><span class="v2-flag ${e.days <= 7 ? 'bad' : ''}">${e.days === 0 ? '今天' : e.days + ' 天'}</span><div class="tx"><b>${esc(stu(e.t.student_id).name)} · ${esc(e.t.school)}</b><span>${e.label} · ${v2Wd(e.date)}</span></div></button>`).join('') : '<div class="v2-empty">14 天内没有考试和放榜</div>';
-  else body = (decide.length ? decide.map(row).join('') : '<div class="v2-empty">没有要你拿主意的事 👍</div>') + (warn.length ? `<div class="v2-sep">提醒 · 学生说不满意（不算在件数里）</div>${warn.map(row).join('')}` : '');
+  // 2026-11-28：「可以集中办理」的几行直接摊在「要你决定」下面，不用再点一下页签才看得到（家长留言、待审反馈以前藏在第二个页签后面）
+  else body = (decide.length ? decide.map(row).join('') : '<div class="v2-empty">没有要你拿主意的事 👍</div>') + (warn.length ? `<div class="v2-sep">提醒 · 学生说不满意（不算在件数里）</div>${warn.map(row).join('')}` : '')
+    + (batch.length ? `<div class="v2-sep v2-ovb">可以集中办理 · ${batchN} 件</div>${batch.map(row).join('')}` : '');
   // 右边：现在、这周、最近的老师反馈
   const nowL = today.find(l => l.status === 'scheduled' && l.start <= now && l.end > now), nextL = v2Next(DB.lessons).find(l => l !== nowL);
   const nowBox = v2Box(`现在 <span class="v2-sub2">${now}</span>`, [nowL ? `<button type="button" class="v2-now on" data-act="lesson" data-v="${nowL.id}"><b>${nowL.start}</b><span><b>${esc(stu(course(nowL.course_id).student_id).name)} · ${esc(course(nowL.course_id).subject)}</b><small>${esc(tea(course(nowL.course_id).teacher_id).name)} · 还有 ${mins(nowL.end) - mins(now)} 分钟下课</small></span></button>` : '',
@@ -132,9 +134,9 @@ function v2HwCols(s, ro){
       ${!ro && f.hw_sub && !f.hw_fb ? `<div class="row">${uploadBtn('hw', f.id, '再传几张')}<button class="btn sm" style="margin-left:auto" data-act="hw-undo" data-v="${f.id}" title="点错了「我完成了」？老师批改前可以撤回">还没做完，撤回</button></div>` : ''}
       ${fileList(f.id, 'hw', `${who}交的作业`)}${fileList(f.id, 'grade', '老师的批改')}
       ${f.hw_note ? `<div class="muted xs">${who}说：${esc(f.hw_note)}</div>` : ''}${f.hw_fb ? `<div class="note"><b>老师批改：</b>${esc(f.hw_fb)}</div>` : ''}</div>`; };
-  const col = (t, cls, xs, empty, extra = '') => `<section class="v2-col"><div class="v2-colh ${cls}"><b>${t}</b><span>${xs.length}</span></div>${xs.length ? xs.map(item).join('') : `<div class="v2-empty">${empty}</div>`}${extra}</section>`;
+  const col = (t, cls, xs, empty, extra = '', n = xs.length) => `<section class="v2-col"><div class="v2-colh ${cls}"><b>${t}</b><span>${n}</span></div>${xs.length ? xs.map(item).join('') : extra ? '' : `<div class="v2-empty">${empty}</div>`}${extra}</section>`;
   const late = G.late.length ? `<div class="v2-sep">以前没交的 · ${G.late.length} 份${ro ? '' : '，可以补交'}</div>${G.late.map(item).join('')}` : '';
-  return `<div class="v2-cols">${col('要交', 'warn', G.now, '这次的都交了 👍', late)}${col('等批改', 'blue', wait, '没有等批改的')}${col('批改好了', 'ok', done, '还没有批改好的')}</div>`;
+  return `<div class="v2-cols">${col('要交', 'warn', G.now, '这次的都交了 👍', late, G.now.length + G.late.length)}${col('等批改', 'blue', wait, '没有等批改的')}${col('批改好了', 'ok', done, '还没有批改好的')}</div>`;
 }
 
 /* ═════════════ 月度家长反馈 ═════════════ */
@@ -145,7 +147,8 @@ function v2Reviews(){
   const done = x => x.r?.status === '已完成';
   const list = all.filter(x => chip === 'all' || (chip === 'done' ? done(x) : !done(x))).sort((a, b) => done(a) - done(b) || pyCmp(a.s.name, b.s.name));
   const FL = {'已完成': 'ok', '需调整': 'bad', '待跟进': 'warn'};
-  const items = list.map(({s, r, st}) => ({k: s.id, name: s.name, line: `上了 ${st.actual} 节 · 自评${r?.self_eval ? '已写' : '未写'} · 老师评价${r?.teacher_eval ? '已写' : '未写'}`, flag: [r?.status || '未开始', FL[r?.status] || 'mute'], q: s.name + ' ' + (s.code || '')}));
+  // 2026-11-28：名单一行放不下，后半句「老师评价未写」以前被截掉看不见——写短
+  const items = list.map(({s, r, st}) => ({k: s.id, name: s.name, line: `${st.actual} 节 · 自评${r?.self_eval ? '✓' : '未写'} · 师评${r?.teacher_eval ? '✓' : '未写'}`, flag: [r?.status || '未开始', FL[r?.status] || 'mute'], q: s.name + ' ' + (s.code || '')}));
   const cur = v2Pick('rv', items);
   let detail = '';
   if (cur){
@@ -170,7 +173,7 @@ function v2Reviews(){
 function v2Payroll(){
   const ym = S.payMonth;
   const months = [...new Set(DB.lessons.map(l => l.date.slice(0, 7)).concat([TODAY.slice(0, 7), ymShift(TODAY.slice(0, 7), -1)], (DB.pay || []).map(p => p.ym)))].sort().reverse();
-  const info = t => { const ms = lsOfT(t.id).filter(l => l.date.startsWith(ym));
+  const info = t => { const ms = payLs(t.id, ym);   // 2026-11-28：另一本账已经结算过的课不算（extras.js）
     const ok = ms.filter(l => paidH(l) > 0), pend = ms.filter(isPend), later = ms.filter(l => l.status === 'scheduled' && !isDone(l) && !isPend(l));
     const money_ = ls => ls.map(l => { const c = course(l.course_id); return [(l.status === 'scheduled' && !isDone(l) ? dur(l) : paidH(l)) * (c.rate || 0), curOf(c)]; });
     const hOk = +ok.reduce((a, l) => a + paidH(l), 0).toFixed(2), hPend = +pend.reduce((a, l) => a + dur(l), 0).toFixed(2);
@@ -183,7 +186,8 @@ function v2Payroll(){
   const PS = (t, i) => { if (isOwner() && S.book === 'all'){ const st = booksAll(t).map(b => payOfBook(t.id, ym, b)); if (!st.length) return null;   // 「全部」：两本账都结算了才算已结算
       return st.every(p => p.settled_at) ? ['已结算', 'ok'] : st.every(p => p.reviewed_at) ? ['已审核', 'blue'] : st.some(p => p.settled_at || p.reviewed_at) ? ['部分审核', 'blue'] : null; }
     const p = payOf(t.id, ym); return p.settled_at ? ['已结算', 'ok'] : p.reviewed_at ? ['已审核', 'blue'] : null; };
-  const items = all.sort((a, b) => b.i.pend.length - a.i.pend.length || pyCmp(a.t.name, b.t.name)).map(({t, i}) => ({k: t.id, name: t.name, line: `${i.ok.length} 节 · ${v2HM(i.hOk)} · ${i.amtOk}`, flag: i.pend.length ? [`待核对 ${i.pend.length}`, 'warn'] : PS(t, i) || ['未审核', 'mute'], q: t.name}));
+  // 2026-11-28：金额放最前面（以前排在最后，被右边的小标签挤成「1,4…」）
+  const items = all.sort((a, b) => b.i.pend.length - a.i.pend.length || pyCmp(a.t.name, b.t.name)).map(({t, i}) => ({k: t.id, name: t.name, line: `<b class="v2-amt">${i.amtOk}</b> · ${i.ok.length} 节 ${hTxt(i.hOk)}h`, flag: i.pend.length ? [`待核对 ${i.pend.length}`, 'warn'] : PS(t, i) || ['未审核', 'mute'], q: t.name}));
   const cur = v2Pick('pay', items);
   let detail = '';
   if (cur){
@@ -201,9 +205,9 @@ function v2Payroll(){
       ${i.pend.length ? `<div class="note warn">还有 ${i.pend.length} 节没确认：${i.pend.map(l => `${md(l.date)} ${esc(stu(course(l.course_id).student_id).name)}（${hasFb(l) ? '待确认' : '老师还没写反馈'}）`).join('、')}。确认后才算进工资。上过的可以在下面每一行点「已上课」，或者 <button class="btn sm" data-act="v2-pay-done" data-v="${t.id}|${ym}">把这 ${i.pend.length} 节都标为已上课</button>（只动 ${esc(t.name)} ${+ym.slice(5)} 月这几节）</div>` : ''}
       ${payDiffBox(t.id, ym)}
       <div class="tw"><table class="rt v2-paytbl"><thead><tr><th>日期</th><th>时间</th><th>学生</th><th>科目</th><th>时长</th><th>状态</th><th>单价</th><th>金额</th></tr></thead><tbody>
-      ${rows.map(l => { const c = course(l.course_id); return `<tr class="${isPend(l) ? 'pend' : ''}"><td class="num">${v2Wd(l.date)}</td><td class="num">${l.start}–${l.end}</td><td>${esc(stu(c.student_id).name)}</td><td>${subjTag(c.subject)}</td><td class="num">${v2HM(hrs(l))}${hrsTag(l)}</td><td>${st(l)}${why(l) ? `<div class="muted xs">${why(l)}</div>` : ''}${isPend(l) ? ` <button class="btn sm" data-act="lstate" data-v="${l.id}|done|q">已上课</button>` : ''}</td><td class="num">${rateTxt(c)}</td><td class="num">${isPend(l) ? `<span class="muted">${money(hrs(l) * (c.rate || 0), curOf(c))}</span>` : money(hrs(l) * (c.rate || 0), curOf(c))}</td></tr>`; }).join('')}
+      ${rows.map(l => { const c = course(l.course_id); return `<tr class="click ${isPend(l) ? 'pend' : ''}" data-act="lesson" data-v="${l.id}" title="点开这节课：看反馈、改时长"><td class="num">${v2Wd(l.date)}</td><td class="num">${l.start}–${l.end}</td><td>${esc(stu(c.student_id).name)}</td><td>${subjTag(c.subject)}</td><td class="num">${v2HM(hrs(l))}${hrsTag(l)}</td><td>${st(l)}${why(l) ? `<div class="muted xs">${why(l)}</div>` : ''}${isPend(l) ? ` <button class="btn sm" data-act="lstate" data-v="${l.id}|done|q">已上课</button>` : ''}</td><td class="num">${rateTxt(c)}</td><td class="num">${isPend(l) ? `<span class="muted">${money(hrs(l) * (c.rate || 0), curOf(c))}</span>` : money(hrs(l) * (c.rate || 0), curOf(c))}</td></tr>`; }).join('')}
       </tbody><tfoot><tr><td colspan="4"><b>已确认合计</b></td><td class="num"><b>${v2HM(i.hOk)}</b></td><td></td><td></td><td class="num"><b>${i.amtOk}</b></td></tr></tfoot></table></div>
-      ${i.later.length ? `<div class="muted xs">另：${md(i.later[0].date)} 起已排 ${i.later.length} 节，上完后计入。</div>` : ''}
+      <div class="muted xs">点表里任意一行可以打开那节课，当场看反馈、改时长。${i.later.length ? `另：${md(i.later[0].date)} 起已排 ${i.later.length} 节，上完后计入。` : ''}</div>
       <div class="row" style="justify-content:flex-end">${v2PayBtns(t.id, ym, i.pend.length)}</div></div>`;
   }
   const tot = all.reduce((a, x) => a + x.i.rawOk, 0);
@@ -240,7 +244,7 @@ document.addEventListener('click', e => {
   else if (k === 'v2-ssub'){ S.v2ssub = v; render(); }
   else if (k === 'v2-stu-add'){ S.alPre = {d: TODAY, s: '18:00', e: '20:00', sid: v}; addLessonModal(); }
   else if (k === 'v2-pay-done'){   // 只把这位老师这个月待核对的标成已上课
-    const [tid, ym] = v.split('|'), ls = lsOfT(tid).filter(l => l.date.startsWith(ym) && isPend(l)); if (!ls.length) return;
+    const [tid, ym] = v.split('|'), ls = payLs(tid, ym).filter(isPend); if (!ls.length) return;   // 2026-11-28：和工资页上列的同一批课（另一本账结算过的不算）
     if (!confirm(`把 ${tea(tid).name} ${ymLabel(ym)} 待核对的 ${ls.length} 节课标为已上课？\n按排课时长计入学生课时和老师工资。\n\n${ls.map(l => `${md(l.date)} ${l.start} ${stu(course(l.course_id).student_id).name} ${course(l.course_id).subject}`).join('\n')}`)) return;
     act('admin_mark_done_many', {ids: ls.map(l => l.id)}, r => Number.isFinite(+r) && +r !== ls.length ? `已标为已上课 ${+r} 节；另外 ${ls.length - r} 节刚才已经被处理过了` : `已标为已上课（${ls.length} 节）`).catch(() => {});
   }

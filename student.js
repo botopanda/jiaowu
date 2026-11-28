@@ -12,7 +12,7 @@ const nowJST = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 1
 const addDay = (d, n) => { const x = pd(d); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`; };
 const tName = id => { const n = tea(id).name || ''; return /老师$/.test(n) ? n : n + '老师'; };   // 「陈伟健」→「陈伟健老师」
 const dayWord = d => { const n = dBetween(TODAY, d); return n === 0 ? '今天' : n === 1 ? '明天' : n === 2 ? '后天' : fmtMD(d); };
-const sUnHw = s => latestHw(s.id).filter(f => !f.hw_sub);   // latestHw 已经不算写「无」的
+const sUnHw = s => hwUnsub(s.id);   // 没交的作业：这次的＋以前的（2026-11-28：以前只数这次的，首页说 0、作业页还列着没交的）
 const sUnConfirm = s => fbOfS(s.id).filter(f => !f.confirm);
 const sSelfDue = s => !reviewOf(s.id, TODAY.slice(0,7))?.self_eval && +TODAY.slice(8,10) >= 20;   // 每月 20 号以后提醒写自评
 function sTabs(s){
@@ -115,7 +115,7 @@ const sSched = s => `<div class="muted xs">${PRO() ? '点某一天看当天的�
 /* ───────── 作业：平时收起，点「我完成了」再填 ───────── */
 function sHomework2(s){
   const cur = latestHw(s.id), todo = cur.filter(f => !f.hw_sub), done = cur.filter(f => f.hw_sub);
-  const older = fbOfS(s.id).filter(f => !cur.includes(f) && hasHw(f)).slice(-8).reverse(), olderUn = older.filter(f => !f.hw_sub).length;
+  const older = fbOfS(s.id).filter(f => !cur.includes(f) && hasHw(f)).slice(-12).reverse(), olderUn = older.filter(f => !f.hw_sub && cOfF(f)?.active !== false).length;   // 和 hwGroups 一个算法（首页的数字用的是它）
   const ro = PRO(), who = ro ? '孩子' : '我';
   const item = (f, now0) => { const l = L(f.lesson_id), c = course(l.course_id), now = now0 && !ro;
     return `<div class="les hw-i" style="--hc:${hue(c.subject)}"><div style="min-width:0;flex:1">
@@ -125,7 +125,7 @@ function sHomework2(s){
       ${now && f.hw_sub && !f.hw_fb ? `<div class="row">${uploadBtn('hw', f.id, '再传几张')}<button class="btn sm" style="margin-left:auto" data-act="hw-undo" data-v="${f.id}" title="点错了「我完成了」？老师批改前可以撤回">还没做完，撤回</button></div>` : ''}
       ${fileList(f.id,'hw',`${who}交的作业`)}${fileList(f.id,'grade','老师的批改')}
       ${f.hw_note?`<div class="muted xs">${who}说：${esc(f.hw_note)}</div>`:''}${f.hw_fb?`<div class="note"><b>老师批改：</b>${esc(f.hw_fb)}</div>`:''}</div></div>`; };
-  return `${todo.length ? `<div class="dg">还没交 · ${todo.length} 份</div>${todo.map(f => item(f, true)).join('')}` : '<div class="card todo-ok"><b>作业都交了</b><span class="muted small">新作业会出现在这里</span></div>'}
+  return `${todo.length ? `<div class="dg">还没交 · ${todo.length} 份</div>${todo.map(f => item(f, true)).join('')}` : olderUn ? `<div class="card todo-ok"><b>这次的作业交了</b><span class="muted small">下面还有 ${olderUn} 份以前没交的</span></div>` : '<div class="card todo-ok"><b>作业都交了</b><span class="muted small">新作业会出现在这里</span></div>'}
   ${done.length ? `<div class="dg">这次的作业 · 已交</div>${done.map(f => item(f, true)).join('')}` : ''}
   ${older.length ? `<details class="sh-more" ${olderUn && !ro ? 'open' : ''}><summary>以前的作业（${older.length}）${olderUn ? `· ${olderUn} 份没交，可以补交` : ''}</summary>${older.map(f => item(f, !f.hw_sub)).join('')}</details>` : ''}`;
 }

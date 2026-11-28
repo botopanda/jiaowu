@@ -11,7 +11,8 @@ const isImg = f => /^image\//.test(f.mime || '') || /\.(jpe?g|png|webp|heic|heif
 function fileList(ref, purpose, label){
   const fs = filesOf(ref, purpose);
   if (!fs.length) return '';
-  const canDel = f => isTop() || f.mine;   // 2026-11-19：按链接编号认是不是自己传的（同名不会认错）
+  // 2026-11-19：按链接编号认是不是自己传的（同名不会认错）。2026-11-28：老师批改过的作业，学生不能再删原图（数据库也挡）
+  const canDel = f => (isTop() || f.mine) && !(ME().role === 'student' && f.purpose === 'hw' && (DB.feedbacks.find(x => x.id === f.ref) || {}).hw_fb);
   return `<div class="files">${label ? `<span class="muted xs">${label}</span>` : ''}${fs.map(f => `<span class="fitem">
     <a href="${fileUrl(f)}" target="_blank" rel="noopener" title="${esc(f.name)}">${isImg(f) ? `<img src="${fileUrl(f)}" alt="${esc(f.name)}" loading="lazy">` : `<span class="fpdf">PDF</span><span class="fname">${esc(f.name)}</span>`}</a>
     ${canDel(f) ? `<button class="fdel" data-act="file-del" data-v="${f.id}" aria-label="删除这个文件">×</button>` : ''}</span>`).join('')}</div>`;
@@ -73,13 +74,27 @@ function reopenModal(){ if (lastModal && document.querySelector('.modal')) lastM
 
 /* ───────── 工资：审核 / 结算 ───────── */
 const payOf = (tid, ym) => (DB.pay || []).find(p => p.teacher_id === tid && p.ym === ym && (p.book || 'K') === curBook()) || {};
+// 2026-11-28（数据库第 71 步）：一节课的工资只发一次。数据库给一份名单 pay_skip：{课编号: '账本|月份|老师'}——
+//   这些课已经在「它现在所在的那一格」以外的地方结算过了（学生换了账本，或者结算以后课被改到了别的月份）。
+//   潘、金那边，在他们看不到的地方结算过的只写 'x'。算工资、列清单、数待核对，都跳过这些课；只有当初结算它的那一格在比对存档时还认它
+const payPaid = () => { const src = (typeof DB_ALL !== 'undefined' && DB_ALL) || DB;
+  if (!src._pp) Object.defineProperty(src, '_pp', {value: new Map(Object.entries(src.pay_skip || {})), enumerable: false});
+  return src._pp; };
+const payKey = (bk, ym, tid) => `${bk}|${ym}|${tid}`;
+const lesBook = l => { const p = payPaid().get(l.id); return p === 'x' ? 'mine' : p ? p.split('|')[0] : (stu(course(l.course_id).student_id).private ? 'mine' : 'K'); };
+// 这位老师这个月、算在现在这本账里的课
+const payLs = (tid, ym) => lsOfT(tid).filter(l => { if (!l.date.startsWith(ym)) return false;
+  const p = payPaid().get(l.id); if (!p) return true;
+  if (isOwner() && S.book === 'all') { const [, m, t] = p.split('|'); return m === ym && t === tid; }   // 「全部」：同一个月、只是换了账本的照常算一次；在别的月份结算过的不算
+  return false; });
 // 这个月这位老师在哪几本账有课（「全部」视图里分开显示状态）
-const payBooks = (tid, ym) => [...new Set(lsOfT(tid).filter(l => l.date.startsWith(ym) && paidH(l) > 0).map(l => stu(course(l.course_id).student_id).private ? 'mine' : 'K'))].sort();
+const payBooks = (tid, ym) => [...new Set(payLs(tid, ym).filter(l => paidH(l) > 0).map(lesBook))].sort();
 const payOfBook = (tid, ym, bk) => (DB.pay || []).find(p => p.teacher_id === tid && p.ym === ym && (p.book || 'K') === bk) || {};
 // 2026-11-26：「全部」视图里判断这位老师这个月办完没有，要把牵涉到的账本列齐——有计入工资的课、有待核对的课、结算时存过明细的都算。
 //   只看「有计入的课」的话：课删光只剩存档的会被算成没结算；另一本账还有课待核对的会被算成全结算了。新版、旧版、页头的小标签共用这一个
-const payBooksAll = (tid, ym) => { const bk = l => stu(course(l.course_id).student_id).private ? 'mine' : 'K';
-  return [...new Set([...lsOfT(tid).filter(l => l.date.startsWith(ym) && (paidH(l) > 0 || isPend(l))).map(bk), ...(DB.pay || []).filter(p => p.teacher_id === tid && p.ym === ym && p.snap).map(p => p.book || 'K')])].sort(); };
+const payBooksAll = (tid, ym) => { const bk = lesBook;
+  // 2026-11-28：只看这个月真正该算的课（payLs）——已经在别的月份结算过、后来改到这个月的课，不让这个月多出一本「未审核」的账
+  return [...new Set([...payLs(tid, ym).filter(l => paidH(l) > 0 || isPend(l)).map(bk), ...(DB.pay || []).filter(p => p.teacher_id === tid && p.ym === ym && p.snap).map(p => p.book || 'K')])].sort(); };
 const payDone = (tid, ym, f) => isOwner() && S.book === 'all' ? (payBooksAll(tid, ym).length > 0 && payBooksAll(tid, ym).every(b => payOfBook(tid, ym, b)[f])) : !!payOf(tid, ym)[f];
 function payBadge(tid, ym){
   if (ME().role === 'teacher') {
@@ -95,8 +110,18 @@ function payBadge(tid, ym){
 }
 // 第 59 步：结算时把这个月这位老师的逐节明细存下来（时长、单价、金额），以后改了课也看得出当时发了多少
 function payDetail(tid, ym){
-  const rows = lsOfT(tid).filter(l => l.date.startsWith(ym) && paidH(l) > 0).map(l => { const c = course(l.course_id);
+  const rows = payLs(tid, ym).filter(l => paidH(l) > 0).map(l => { const c = course(l.course_id);
     return {id: l.id, sid: c.student_id, d: l.date, s: l.start, e: l.end, stu: stu(c.student_id).name, subj: c.subject, h: paidH(l), rate: c.rate || 0, cur: curOf(c), st: l.status}; });
+  // 2026-11-28：当初就是在这一格（这本账、这个月、这位老师）结算的、现在已经不在这一格的课（学生转去了另一本账，或者课被改到了别的月份），
+  //   也按它现在的样子算进来——这样和存下的明细比：只是换了地方的不报改动；之后改了时长、单价的照样报；删掉的照样报「现在没有了」。
+  //   这些课只有在这一格已经结算时才会在名单里，所以不会被带进一次新的结算
+  if (!(isOwner() && S.book === 'all')) { const key = payKey(curBook(), ym, tid), pp = payPaid();
+    if ([...pp.values()].includes(key)) {
+      const src = isOwner() && S.book === 'mine' && typeof DB_ALL !== 'undefined' && DB_ALL ? DB_ALL : DB;   // Panda 视图里，转去 K 的学生的课要到全部数据里找；K 视图只看 K 自己的（转去 Panda 的不露出来）
+      const cs = new Map(src.courses.map(c => [c.id, c])), ss = new Map(src.students.map(x => [x.id, x])), have = new Set(rows.map(r => r.id));
+      src.lessons.filter(l => pp.get(l.id) === key && !have.has(l.id) && cs.has(l.course_id)).forEach(l => { const c = cs.get(l.course_id), h = paidH(l);
+        if (h > 0) rows.push({id: l.id, sid: c.student_id, d: l.date, s: l.start, e: l.end, stu: (ss.get(c.student_id) || {}).name || '', subj: c.subject, h, rate: c.rate || 0, cur: curOf(c), st: l.status}); });
+    } }
   const amt = {}; rows.forEach(r => amt[r.cur] = (amt[r.cur] || 0) + curRound(r.h * r.rate, r.cur));
   return {v: 1, h: +rows.reduce((a, r) => a + r.h, 0).toFixed(2), amt, rows};
 }
@@ -120,11 +145,14 @@ function payDiffBox(tid, ym){
     ${x.changed.length ? `<div>改了时长或单价：${x.changed.map(r => { const w = x.was.rows.find(y => y.id === r.id); return `${esc(sMD(String(r.d || '')))} ${esc(r.stu)} ${payNum(w.h)} 小时 × ${money(payNum(w.rate), payCur(w.cur))} → ${payNum(r.h)} 小时 × ${money(payNum(r.rate), payCur(r.cur))}`; }).join('；')}</div>` : ''}
     <div class="muted xs">已经发出去的按结算时的算。要按现在的重新算，点「撤销结算」再结算一次；或者差额放到下个月补。</div></div>`;
 }
+// 2026-11-28：「结算完成」按钮上记下画出来那一刻的金额和节数。点的时候先读最新数据，和这个对一下：
+//   变了就不结算，刷新给他看（以前悄悄按新金额入账——看着 3,760 去转账，回来一点，存进去的是 4,080）
+const paySig = d => `${payAmtTxt(d.amt)}（${d.rows.length} 节 ${hTxt(d.h)} 小时）`;
 function payButtons(tid, ym){
   if (isOwner() && S.book === 'all') return '<span class="muted xs">右上角切到「Project K」或「Panda」再审核、结算</span>';
   const p = payOf(tid, ym);
   if (p.settled_at) return `<span class="muted xs">${esc(p.settled_by || '')} ${bjAt(p.settled_at).slice(5,10).replace('-','/')} 结算</span><button class="btn sm" data-act="pay" data-v="${tid}|${ym}|settled|0">撤销结算</button>`;
-  if (p.reviewed_at) return `<span class="muted xs">${esc(p.reviewed_by || '')} 已审核</span><button class="btn gold sm" data-act="pay" data-v="${tid}|${ym}|settled|1">结算完成</button><button class="btn sm" data-act="pay" data-v="${tid}|${ym}|reviewed|0">撤销审核</button>`;
+  if (p.reviewed_at) return `<span class="muted xs">${esc(p.reviewed_by || '')} 已审核</span><button class="btn gold sm" data-act="pay" data-v="${tid}|${ym}|settled|1" data-sig="${esc(paySig(payDetail(tid, ym)))}">结算完成</button><button class="btn sm" data-act="pay" data-v="${tid}|${ym}|reviewed|0">撤销审核</button>`;
   return `<button class="btn pri sm" data-act="pay" data-v="${tid}|${ym}|reviewed|1">审核通过</button>`;
 }
 
@@ -134,7 +162,10 @@ document.addEventListener('click', async e => {
   try {
     if (a.dataset.act === 'file-del') { e.preventDefault(); await act('file_delete', {fid: v}, '已删除'); reopenModal(); }
     if (a.dataset.act === 'pay') { e.stopPropagation(); const [tid, ym, what, on] = v.split('|');
-      if (what === 'settled' && on === '1') { try { await load(); } catch(err) { toast('网络不稳，没读到最新的课，请稍后再点', true); return; } }   // 2026-11-23：页面开久了，别拿旧数据算结算明细
+      if (what === 'settled' && on === '1') { try { await load(); } catch(err) { toast('网络不稳，没读到最新的课，请稍后再点', true); return; }   // 2026-11-23：页面开久了，别拿旧数据算结算明细
+        const was = a.dataset.sig || '', now = paySig(payDetail(tid, ym));
+        if (was && was !== now) { render(); toast(`这位老师这个月的课刚刚有变动：页面上是 ${was}，现在是 ${now}。已经刷新了明细，请核对后再点「结算完成」`, true, 12000); return; }
+        if (!confirm(`给 ${tea(tid).name} 标记 ${ymLabel(ym)} 结算完成？\n\n${now}\n\n存下来的就是这个数。`)) { render(); return; } }
       await act('pay_mark', {tid, month: ym, what, on_: on === '1', ...(isOwner() ? {ledger: curBook()} : {}), ...(what === 'settled' && on === '1' ? {detail: payDetail(tid, ym)} : {})}, what === 'settled' ? (on === '1' ? '已标记结算完成' : '已撤销结算') : (on === '1' ? '已审核' : '已撤销审核')); }
     if (a.dataset.act === 'makeup') { const [lid, on] = v.split('|'); await act('admin_update_lesson', {lid, d: {makeup: on === '1'}}, ME().role==='teacher' ? '已提交申请，教务批准后生效' : on === '1' ? '已标为补课' : '已取消补课标记'); lessonModal(lid); }
   } catch(err) { /* act() 已经提示过 */ }

@@ -120,8 +120,18 @@ async function exSave(v){
   if (S.page==='calendar') { let moved = false;
     if (!d.date.startsWith(S.month)) { S.month = d.date.slice(0,7); moved = true; }
     if (S.calView==='week' && typeof wkMon==='function' && S.week !== wkMon(d.date)) { S.week = wkMon(d.date); moved = true; }
+    // 2026-11-28：新版「老师 × 一周」也跟着跳到考试那一周（以前加了别的周的考试，课表还停在原地，看着像没存上）
+    if (exV2()) { if (S.v2wk !== v2WkMon(d.date)) { S.v2wk = v2WkMon(d.date); moved = true; } if (S.v2day !== d.date) { S.v2day = d.date; moved = true; } }
     if (moved) render(); }
   examModal(tid, d.date);
+}
+// 现在是不是在新版的「老师 × 一周」课表上
+const exV2 = () => typeof V2 !== 'undefined' && V2.ver === 'new' && document.body.classList.contains('v2') && S.page === 'calendar' && (S.v2cal || 'grid') === 'grid' && typeof v2WkMon === 'function';
+// 新版周课表上点「＋ 加考试」：正在看的那一周不是本周，日期就先填那一周（手机上填正在看的那一天）
+function exV2Date(){
+  const mon = S.v2wk || v2WkMon(TODAY), sun = addDay(mon, 6);
+  if (TODAY >= mon && TODAY <= sun && !(v2Phone() && S.v2day && S.v2day >= mon && S.v2day <= sun)) return TODAY;
+  return v2Phone() && S.v2day && S.v2day >= mon && S.v2day <= sun ? S.v2day : mon;
 }
 
 document.addEventListener('click', async e => {
@@ -132,7 +142,7 @@ document.addEventListener('click', async e => {
     if (k==='ex-new') {
       if (v==='al') examForm({date: val('al-d') || TODAY, sid: val('al-stu')});          // 排课弹窗顶上切过来：带上日期和学生
       else if (v) { const [d, sid, tid] = v.split('|'); examForm({date: d, sid, tid}); }  // 详情里「这所学校再加一场」，周视图考试栏点空白（只有日期）
-      else examForm({date: S.page==='calendar' && !TODAY.startsWith(S.month) ? `${S.month}-01` : TODAY});
+      else examForm({date: exV2() ? exV2Date() : S.page==='calendar' && !TODAY.startsWith(S.month) ? `${S.month}-01` : TODAY});
     }
     if (k==='ex-to-lesson') { S.alPre = {d: val('ex-d') || TODAY, s: '18:00', e: '20:00'}; addLessonModal(); }
     if (k==='ex-kind') {

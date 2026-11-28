@@ -579,3 +579,37 @@ body.v2[data-theme="night"] .tag.vz-late{background:#4a1f1f!important;color:#ffb
 .v2-schools .pg-gt{font-weight:800;font-size:13px;margin-bottom:4px}
 @media (max-width:760px){.v2-scsel select{min-width:0;flex:1 1 45%}}
 @media print{.v2-side,.v2-tabbar,.v2-banner,.v2-top{display:none!important}.v2-app{display:block}}
+
+/* ───────── 2026-11-28：Neon＋Carbon 第二次检查后的界面小改 ───────── */
+/* 名单里的金额：放最前面、加粗，不被右边的小标签挤掉 */
+.v2-row .tx>span .v2-amt{display:inline;font-size:12.5px;font-weight:800;color:var(--ink)}
+/* 工资明细：每一行能点开那节课 */
+.v2-paytbl tbody tr.click{cursor:pointer}
+.v2-paytbl tbody tr.click:hover>td{background:var(--sunk)}
+/* 总览：「可以集中办理」摊在「要你决定」下面 */
+.v2-sep.v2-ovb{margin-top:10px;border-top:1px solid var(--line-2);padding-top:12px}
+/* 写反馈：「这节没留作业」 */
+.w-nohw{margin-top:-4px;gap:8px;align-items:center}
+/* 学生首页：刚下课 30 分钟内还能回到课堂 */
+.v2-ended{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--sunk);border-radius:12px;padding:8px 12px;margin-bottom:8px;font-size:13px}
+.v2-ended small{display:block;color:var(--muted);font-size:11.5px;font-weight:500}
+.v2-next .row .meet-wrap{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+/* 家长首页：月度综合反馈 */
+.v2-prv details>summary{list-style:none;cursor:pointer;display:flex;gap:10px;align-items:flex-end;justify-content:space-between}
+.v2-prv details>summary::-webkit-details-marker{display:none}
+.v2-prv .v2-prv-s{font-size:14px;line-height:1.7;min-width:0}
+.v2-prv details[open]>summary .v2-prv-s{display:none}
+.v2-prv details[open]>summary .v2-link{visibility:hidden}
+.v2-prv details>.card{margin-top:8px;box-shadow:none;border:0;padding:0;background:none}
+.v2-pnote{padding:2px 4px}
+/* 手机上：小按钮、筛选钮、翻周箭头加大到手指点得准（以前高 27 像素，微信里容易点偏） */
+@media (max-width:760px){
+  body.v2 .btn.sm{min-height:36px;padding:6px 13px;display:inline-flex;align-items:center;justify-content:center}
+  body.v2 .btn.sm[hidden]{display:none}
+  body.v2 label.btn.sm{line-height:22px}   /* 「上传…」那种用 label 做的按钮：字也居中 */
+  .v2-chip{min-height:36px;padding:6px 13px}
+  .v2-wknav .btn.sm{min-width:36px}
+  .v2-link{padding:8px 0}
+  .v2-foot .v2-link{padding:8px 10px}
+  .v2-strip .v2-link{padding:0}
+}

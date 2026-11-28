@@ -53,6 +53,8 @@ function kSnap(s, all){
   rows.forEach(r => { const c = r.cur === 'JPY' ? 'JPY' : 'CNY'; amt[c] = (amt[c] || 0) + curRound(n(r.h) * n(r.rate), c); });
   return {...s, rows, h: +rows.reduce((a, r) => a + n(r.h), 0).toFixed(2), amt};
 }
+// 2026-11-28：反过来（Panda 账结算过、学生后来转进 Project K）的那几行不藏：看 Panda 账时照样拿它们和这些课现在的样子比，
+//   转账本本身不算改动，之后改了时长、单价或者删了课才报（见 extras.js 的 payDetail）
 function bookSwitch(){
   ownerSync();
   return `<div class="seg book-seg" role="group" aria-label="账本">${[['all','全部'],['K','Project K'],['mine','Panda']].map(([k, t]) =>

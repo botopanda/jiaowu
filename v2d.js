@@ -95,7 +95,7 @@ function v2Log(){
   if (LOGX.sid && !DB.students.some(s => s.id === LOGX.sid)) { LOGX.sid = ''; LOGX.rows = []; LOGX.more = false; LOGX.at = 0; setTimeout(() => logFetch(false)); }
   else if (!LOGX.busy && !LOGX.at) setTimeout(() => logFetch(false));
   const cat = LOG_CATS.find(c => c[0] === LOGX.cat) || LOG_CATS[0];
-  const inView = r => !isOwner() || S.book === 'all' || (S.book === 'K' ? !r.priv : r.priv);
+  const inView = logInView;   // 2026-11-28：新旧两版共用一个判断（log.js）
   const seen = LOGX.rows.filter(inView);
   const whoKey = r => r.who + (r.who_id && r.who_id === ME().id ? '（我）' : '');
   const whos = [...new Set(seen.map(whoKey))]; if (LOGX.who && !whos.includes(LOGX.who)) whos.push(LOGX.who);

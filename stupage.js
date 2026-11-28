@@ -60,7 +60,7 @@ function spHome(s){
   const pe = lsOfS(id).filter(isPend).length;
   const v2on = document.body.classList.contains('v2');   // 2026-11-25：新版里这两项要去「课表」「作业」才看得到（以前跳到上课记录卡片，那里只有写好的反馈）
   if (pe) todo.push(['warn', `${pe} 节课上完了，老师还没写反馈`, `data-act="stu-tab" data-v="${id}|${v2on ? 'cal' : 'tl'}"`]);
-  const un = latestHw(id).filter(f => !f.hw_sub && (f.hw || '').trim()).length;
+  const un = hwUnsub(id).length;
   if (un) todo.push(['seal', `${un} 份作业还没交`, `data-act="stu-tab" data-v="${id}|${v2on ? 'hw' : 'tl'}"`]);
   const mu = (typeof MSGS !== 'undefined' ? MSGS : []).filter(m => m.student_id === id && !m.read_at).length;
   if (mu) todo.push(['seal', `${mu} 条学生 / 家长留言没读`, 'data-act="page" data-v="msgs"']);

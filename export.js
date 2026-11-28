@@ -124,7 +124,7 @@ function sxWrap(g, txt, w, max){
 const mrBtn = sid => `<button class="btn sm" data-act="mr" data-v="${sid}">月报图片</button>`;
 
 async function mrCanvas(sid, ym){
-  const s = stu(sid), [y, m] = ym.split('-').map(Number), st = monthStats(sid, ym);
+  const s = stu(sid), [y, m] = ym.split('-').map(Number), st = monthStats(sid, ym, true);   // 2026-11-28：只算审批过的反馈——教务导出的图和家长自己看到的是一个数
   const done = lsOfS(sid).filter(l => l.date.startsWith(ym) && isDone(l)), hrs = +done.reduce((a, l) => a + realH(l), 0).toFixed(2);
   const fbs = fbOfS(sid).filter(f => f.status === 'approved' && L(f.lesson_id).date.startsWith(ym));
   const W = 750, P = 32, F = getComputedStyle(document.body).fontFamily || 'sans-serif', font = (px, b) => `${b ? 600 : 400} ${px}px ${F}`;

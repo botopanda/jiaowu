@@ -71,7 +71,7 @@ document.addEventListener('click', e => {
     const h0 = +(a.parentElement.querySelector('.wk-times span')?.textContent.split(':')[0] || 9);
     let m = h0 * 60 + Math.floor((e.clientY - a.getBoundingClientRect().top) / WK_HH * 2) * 30;
     m = Math.max(0, Math.min(m, 22 * 60));
-    S.alPre = {d: v, s: wkHM(m), e: wkHM(Math.min(m + 120, 23 * 60 + 30))};
+    S.alPre = {d: v, s: wkHM(m), e: wkHM(Math.min(m + 120, 23 * 60 + 30)), one: true};
     addLessonModal();
   }
 });

@@ -81,10 +81,16 @@ const rvAiBox = (sid, ym) => PLAN_AI && isAdmin() ? `<div class="rv-ai"><button 
   <span class="muted xs">AI 会读这个月老师写的反馈、作业完成情况、成绩、学生上传的作业 / 作品图片和上面只给 AI 看的材料，写一份草稿填进下面五个框；看过改过再保存</span></div>` : '';
 async function reviewAI(sid, ym){
   if (typeof PEEK !== 'undefined' && PEEK) throw new Error('现在是「打开看看」，只能看，不能用 AI 生成');   // 第 61 步
-  let r;
+  let r, raw, traw;
+  if (document.getElementById('rv-raw')) { raw = val('rv-raw'); traw = val('rv-traw'); }
+  else {   // 2026-11-28：弹窗打开时「只给 AI 看的材料」没读出来（两个框没画出来）。以前会当成「没有纪要」发给 AI——现在先现读一次，读不出来就不生成
+    if (typeof rvxLoad === 'function') await rvxLoad();
+    if (typeof RVX === 'undefined' || !RVX.ok) throw new Error('只给 AI 看的材料（面谈纪要、任课老师说的）这次没读出来。请刷新页面，重新打开这份反馈再点「AI 生成」');
+    const x = rawRow(sid, ym); raw = x.text || ''; traw = x.teacher || '';
+  }
   try {
     r = await fetch(`${SB_URL}/functions/v1/plan-draft`, {method: 'POST', headers: {'Content-Type': 'application/json', apikey: SB_KEY},
-      body: JSON.stringify({k: KEY, kind: 'review', sid, ym, talk_raw: val('rv-raw'), teacher_raw: val('rv-traw'), talk: val('rv-talk')})});   // 面谈、任课老师说的：表里现在填的，还没保存也算
+      body: JSON.stringify({k: KEY, kind: 'review', sid, ym, talk_raw: raw, teacher_raw: traw, talk: val('rv-talk')})});   // 面谈、任课老师说的：表里现在填的，还没保存也算
   } catch(e) { throw new Error('网络不太稳定，没连上，请稍后再试'); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.review) throw new Error((j.error || '请稍后再试').replace('AI 代写', 'AI 生成'));

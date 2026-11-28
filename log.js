@@ -102,7 +102,8 @@ const logLong = v => typeof v === 'string' ? v.length > 40 || v.includes('\n') :
 const logBJ = iso => new Date(iso).toLocaleString('sv-SE', {timeZone: 'Asia/Shanghai'}).slice(0, 16);
 const logTime = iso => { const t = logBJ(iso); return `${+t.slice(5,7)}/${+t.slice(8,10)} ${t.slice(11)}`; };
 const logD = d => (d.slice(0, 4) === String(TODAY).slice(0, 4) ? '' : d.slice(0, 4) + '/') + `${+d.slice(5,7)}/${+d.slice(8,10)}`;
-const logAll = () => (typeof DB_ALL !== 'undefined' && DB_ALL) || DB;
+// 2026-11-28：总管理切到「Project K」时，名字只从 K 这本账里找（和潘、金看到的一样；以前从全部数据里找，已经转进 Panda 的学生名字会露出来）
+const logAll = () => (typeof isOwner === 'function' && isOwner() && S.book === 'K') ? DB : ((typeof DB_ALL !== 'undefined' && DB_ALL) || DB);
 const logStu = id => (logAll().students.find(s => s.id === id) || {name:'（已删除的学生）'}).name;
 const logTea = id => (logAll().teachers.find(t => t.id === id) || {name:'（已删除的老师）'}).name;
 // 里面套着的内容（考试时间备注、履历这些）摊成一行字
@@ -116,7 +117,8 @@ function logVal(t, c, v, full){
   if (typeof v === 'boolean') return v ? '是' : '否';
   if (c === 'student_id') return esc(logStu(v));
   if (c === 'teacher_id') return esc(logTea(v));
-  if (c === 'scope' && Array.isArray(v)) return esc(v.map(logStu).join('、'));
+  if (c === 'scope' && Array.isArray(v)) { const kv = typeof isOwner === 'function' && isOwner() && S.book === 'K';   // 2026-11-28：K 视图里「负责范围」不列已经转进 Panda 的学生（潘、金那边数据库本来就不给）
+    const ids = kv ? v.filter(id => DB.students.some(s => s.id === id)) : v; return ids.length ? esc(ids.map(logStu).join('、')) : '<span class="muted">空</span>'; }
   let s;
   if (Array.isArray(v)) s = v.map(logFlat).filter(Boolean).join('、');
   else if (typeof v === 'object') s = Object.entries(v).map(([k, x]) => [logCol(t, k), logFlat(x)]).filter(x => x[1]).map(([k, x]) => `${k}：${x}`).join('；');
@@ -175,13 +177,24 @@ function logGroup(g){
   return `<div class="lg-g"><div class="lg-h"><span class="num lg-tm">${logBJ(r0.at).slice(11)}</span><b>${esc(names)}</b>${me ? ' <span class="tag gold">我</span>' : ''}${r0.who === '系统' ? '' : `<span class="muted xs">${esc(LOG_ROLE[r0.role] ?? '')}</span>`}${isOwner() && S.book === 'all' && g.some(r => r.priv) ? '<span class="tag seal">Panda</span>' : ''}</div>${items.join('')}</div>`;
 }
 
+// 总管理切到「Project K」：和潘、金看到的一样；切到「Panda」：只显示 Panda 的。
+// 2026-11-28：K 视图除了看「只给总管理看」的记号，还照数据库给潘、金用的那两条筛（第 69 步 change_log_load）——
+//   记录的学生现在是 Panda 的不显示；只带老师的记录（工资、老师资料），那位老师现在潘、金看不到的也不显示（已经删掉的学生、老师的旧记录照旧显示）
+function logInView(r){
+  if (!isOwner() || S.book === 'all') return true;
+  if (S.book !== 'K') return !!r.priv;
+  if (r.priv) return false;
+  const A = (typeof DB_ALL !== 'undefined' && DB_ALL) || DB;
+  if (r.student_id && A.students.some(s => s.id === r.student_id && s.private)) return false;
+  if (!r.student_id && r.teacher_id && A.teachers.some(t => t.id === r.teacher_id) && !DB.teachers.some(t => t.id === r.teacher_id)) return false;
+  return true;
+}
 function pgLog(){
   // 切了视图，选中的学生已经不在这个视图里：回到「所有学生」重新读
   if (LOGX.sid && !DB.students.some(s => s.id === LOGX.sid)) { LOGX.sid = ''; LOGX.rows = []; LOGX.more = false; LOGX.at = 0; setTimeout(() => logFetch(false)); }
   else if (!LOGX.busy && !LOGX.at) setTimeout(() => logFetch(false));
   const cat = LOG_CATS.find(c => c[0] === LOGX.cat) || LOG_CATS[0];
-  // 总管理切到「Project K」：和潘、金看到的一样，Panda 的记录不显示；切到「Panda」：只显示 Panda 的
-  const inView = r => !isOwner() || S.book === 'all' || (S.book === 'K' ? !r.priv : r.priv);
+  const inView = logInView;
   const seen = LOGX.rows.filter(inView);
   const whoKey = r => r.who + (r.who_id && r.who_id === ME().id ? '（我）' : '');
   const whos = [...new Set(seen.map(whoKey))];
