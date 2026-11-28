@@ -593,17 +593,62 @@ function reqChBody(){
     ${cd.length ? `<details style="margin-top:6px"><summary class="muted small">最近处理过的 ${cd.length} 条</summary><div class="list">${cd.map(x => chCard(x, true)).join('')}</div></details>` : ''}</section>`;
 }
 // 一条改期 / 请假申请（旧版「待处理 → 改期·请假」和新版待处理右边详情共用，2026-11-22）
-function reqCard(q){ const l=L(q.lesson_id), c=course(l.course_id), at = bjAt(q.created_at), same = at.slice(0,10)===l.date;   // 2026-11-19：按北京时间的日期算当天
+function reqCard(q){ if (!L(q.lesson_id) || !course(L(q.lesson_id).course_id)) return `<section class="card"><div class="muted small">这条申请对应的课已经不在了，请刷新页面。</div></section>`;   // 2026-11-28：原课查不到时不让整页报错
+    const l=L(q.lesson_id), c=course(l.course_id), at = bjAt(q.created_at), same = at.slice(0,10)===l.date;   // 2026-11-19：按北京时间的日期算当天
     return `<section class="card" style="display:flex;flex-direction:column;gap:8px">
       <div class="row"><span class="tag ${q.type==='请假'?'seal':'warn'}">${q.type}</span><b>${esc(stu(c.student_id).name)}</b>${subjTag(c.subject)}<span class="muted small">${esc(tea(c.teacher_id).name)} · ${q.status==='pending'?'原定':'课程'} ${fmtMD(l.date)} ${l.start}–${l.end} · ${+at.slice(5,7)}/${+at.slice(8,10)} ${at.slice(11)} 申请</span></div>
       <dl class="kv small"><dt>原因</dt><dd>${esc(q.reason)}</dd>${q.wish?`<dt>希望时间</dt><dd>${esc(q.wish)}</dd>`:''}</dl>
-      ${q.status==='pending' ? `${q.type==='改期'
+      ${q.status==='pending' ? `${rqGone(l) ? `<div class="rq-v bad" id="rq-gone-${q.id}">✕ ${rqGone(l)}，不能再同意${q.type}了。在下面写一句回复，点「不同意」把这条申请关掉。</div>` : q.type==='改期'
         ? `<div class="fields"><label class="field"><span>新日期</span><input type="date" id="rq-d-${q.id}" value="${l.date}"></label><label class="field"><span>开始（北京时间）</span><input type="time" id="rq-s-${q.id}" value="${l.start}"></label><label class="field"><span>结束</span><input type="time" id="rq-e-${q.id}" value="${l.end}"></label></div>
+           <div class="rq-free" id="rq-free-${q.id}">${rqFreeHtml(q, l.date, l.start, l.end, true)}</div>
            <div class="row"><button class="btn pri sm" data-act="req-ok" data-v="${q.id}">同意，改到这个时间</button></div>`
         : `<div class="row" style="align-items:flex-end"><label class="field"><span>扣学生课时${same?'（当天请假）':'（提前请假）'}</span><select id="rq-dd-${q.id}"><option value="0" ${same?'':'selected'}>不扣</option><option value="${h4(dur(l)/2)}" ${same?'selected':''}>扣 ${hTxt(dur(l)/2)} 小时（一半）</option><option value="${h4(dur(l))}">扣全部 ${hTxt(dur(l))} 小时</option></select></label><button class="btn seal sm" data-act="req-ok" data-v="${q.id}">同意请假</button></div>`}
         <div class="row"><input type="text" id="rq-r-${q.id}" placeholder="不同意的话，写一句原因回复学生" style="flex:1;min-width:180px"><button class="btn sm" data-act="req-no" data-v="${q.id}">不同意</button></div>`
       : `<div class="small" style="color:${q.status==='accepted'?'var(--ok)':'var(--seal)'}">${q.status==='accepted'?'已同意':'未同意'}（${esc(q.handled_by)}）：${esc(q.reply)}</div>`}
     </section>`; }
+// 2026-11-28：改期卡片里当场看「选的这个时间，老师和学生有没有空」，不用跳去课表查了再回来填。
+//   撞不撞的查法和数据库批准时一样：这位老师、这位学生在这段时间有没有别的正常的课（这节要改的课自己不算）。
+//   下面列老师那一周已经排的课。潘、金这边只看得到 Project K 的课，所以只按 K 的课来说（和批准时一样）
+// 原来那节课已经不能再改期 / 请假了（和数据库批准时的规矩一样：已经请假或取消、已经上过——老师写了反馈、教务确认过、或者教务老师自己的课到点下课）。
+//   这时卡片上不给「同意」，免得点了才被数据库挡回来
+const rqGone = l => !l ? '这节课已经不在了' : l.status !== 'scheduled' ? '这节课已经请假或取消了' : isDone(l) ? '这节课已经上过了（老师写了反馈、教务确认过，或者是已经下课的面谈 / 升学指导）' : '';
+function rqFreeHtml(q, d, st, et, open){
+  const l = L(q.lesson_id), c = course(l.course_id), t = tea(c.teacher_id), s = stu(c.student_id);
+  const noDate = !/^\d{4}-\d{2}-\d{2}$/.test(d || ''); if (noDate) d = l.date;   // 日期被清空了：下面的表先按原来那一周列，结论那一行只提示先选日期
+  const wdN = x => '周' + WD[pd(x).getDay()], mdN = x => `${+x.slice(5, 7)}/${+x.slice(8, 10)}`;
+  const other = x => x.status === 'scheduled' && x.id !== l.id, by = (a, b) => a.start.localeCompare(b.start);
+  const tDay = lsOfT(t.id).filter(x => other(x) && x.date === d).sort(by), sDay = lsOfS(s.id).filter(x => other(x) && x.date === d).sort(by);
+  const sName = x => esc(stu(course(x.course_id).student_id).name);
+  // 总管理停在 Panda 视图时，页面上只有 Panda 的课，但数据库批准时这位老师两本账的课都查——这里也到全部数据里看老师那边有没有占着（只说时间，不列是谁的课）
+  const xBook = typeof isOwner === 'function' && isOwner() && S.book === 'mine' && typeof DB_ALL !== 'undefined' && DB_ALL
+    ? (() => { const cs = new Map(DB_ALL.courses.map(y => [y.id, y])), mine = new Set(DB.lessons.map(y => y.id)); return DB_ALL.lessons.filter(x => other(x) && x.date === d && !mine.has(x.id) && (cs.get(x.course_id) || {}).teacher_id === t.id).sort(by); })() : [];
+  let v;
+  if (noDate) v = '<div class="rq-v bad">✕ 请先选新的日期</div>';
+  else if (d === l.date && st === l.start && et === l.end) v = '<div class="rq-v">先选新的日期和时间，这里会告诉你排不排得进去。</div>';
+  else if (!st || !et || mins(et) <= mins(st)) v = '<div class="rq-v bad">✕ 结束时间要晚于开始时间</div>';
+  else { const hit = x => x.start < et && st < x.end, seen = new Set(), hs = [];
+    tDay.filter(hit).forEach(x => { seen.add(x.id); hs.push(`${esc(t.name)}老师 ${x.start}–${x.end} ${sName(x)}的课`); });
+    sDay.filter(x => hit(x) && !seen.has(x.id)).forEach(x => hs.push(`${esc(s.name)} ${x.start}–${x.end} 的${esc(course(x.course_id).subject)}课`));
+    xBook.filter(hit).forEach(x => hs.push(`${esc(t.name)}老师 ${x.start}–${x.end} 在 Project K 那边的课`));
+    v = hs.length ? `<div class="rq-v bad">✕ ${mdN(d)} ${wdN(d)} ${st}–${et} 排不进去：和 ${hs.join('、')} 撞了</div>` : `<div class="rq-v ok">✓ ${mdN(d)} ${wdN(d)} ${st}–${et}：${esc(t.name)}老师和${esc(s.name)}都有空</div>`; }
+  const day = (who, xs, f) => `<span><b>${who}</b> 这天：${xs.length ? xs.map(f).join('、') : '没有别的课'}</span>`;
+  const mon = (() => { const x = pd(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return ds(x); })();
+  const wk = Array.from({length: 7}, (_, i) => { const x = pd(mon); x.setDate(x.getDate() + i); return ds(x); }).map(x => { const xs = lsOfT(t.id).filter(y => y.status === 'scheduled' && y.date === x).sort(by);
+    return `<tr class="${x === d ? 'on' : ''}"><td>${mdN(x)} ${wdN(x)}</td><td>${xs.length ? xs.map(y => `<span class="${y.id === l.id ? 'me' : ''}">${y.start}–${y.end} ${sName(y)}${y.id === l.id ? '（要改的就是这节）' : ''}</span>`).join('、') : '<span class="muted">没有课</span>'}</td></tr>`; }).join('');
+  return `<div class="muted xs">改「开始」时间，「结束」会自动跟着走（按原来的 ${hTxt(dur(l))} 小时）。</div>${v}
+    <div class="rq-day">${day(esc(t.name) + '老师', tDay, x => `${x.start}–${x.end} ${sName(x)}`)}${day(esc(s.name), sDay, x => `${x.start}–${x.end} ${esc(course(x.course_id).subject)}`)}${xBook.length ? `<span><b>${esc(t.name)}老师</b> 这天在 Project K 那边还有：${xBook.map(x => `${x.start}–${x.end}`).join('、')}</span>` : ''}</div>
+    <details class="rq-week" ${open ? 'open' : ''}><summary>${esc(t.name)}老师这一周已经排的课</summary><table>${wk}</table></details>`;
+}
+function rqFree(qid){
+  const box = document.getElementById('rq-free-' + qid), q = DB.requests.find(x => x.id === qid); if (!box || !q || !L(q.lesson_id)) return;
+  const dt = box.querySelector('details');
+  box.innerHTML = rqFreeHtml(q, val('rq-d-' + qid), val('rq-s-' + qid), val('rq-e-' + qid), dt ? dt.open : true);
+}
+const rqFreeAll = () => document.querySelectorAll('.rq-free[id]').forEach(b => rqFree(b.id.slice(8)));
+document.addEventListener('change', e => { const m = /^rq-([dse])-(.+)$/.exec(e.target?.id || ''); if (!m) return;
+  if (m[1] === 's') { const q = DB.requests.find(x => x.id === m[2]), l = q && L(q.lesson_id), en = document.getElementById('rq-e-' + m[2]);   // 开始时间改了：结束时间按原来的时长跟着走（过了半夜就不动）
+    if (l && en && e.target.value) { const to = mins(e.target.value) + (mins(l.end) - mins(l.start)); if (to < 1440) en.value = tstr(to); } }
+  rqFree(m[2]); });
 function reqStuBody(){
   const pend = DB.requests.filter(q=>q.status==='pending'), done = DB.requests.filter(q=>q.status!=='pending').slice().reverse().slice(0,20), card = reqCard;
   return `<div class="ph"><h2>改期 · 请假</h2></div>
@@ -1298,6 +1343,8 @@ document.addEventListener('click', async e => {
           finally { document.body.classList.remove('busy'); } } }
       await act('admin_add_lessons', {course:c.id, kind:alKind(), ...(val('al-topic').trim()?{topic:val('al-topic').trim()}:{}), dates:lessonDates(d, val('al-rep')), st:s, et:en, ...(val('al-mk')==='1'?{makeup:true}:{}), ...mt}, r=>r.pending?'已提交排课申请，教务批准后会出现在课表上':`已排 ${r.added} 节课`+(r.skipped?`，${r.skipped} 节和老师或学生已有的课撞了，已跳过`:'')); S.month=d.slice(0,7); closeModal(); render(); break; }
     case 'req-ok': { const q=DB.requests.find(x=>x.id===v);
+      // 2026-11-28：卡片开了很久、原来那节课其实已经上过了（比如面谈课到点下课）：不发给数据库，当场把卡片换成「不能再同意」的样子，写了一半的回复留着
+      if (q && rqGone(L(q.lesson_id))) { const r = val('rq-r-'+v); render(); const el = document.getElementById('rq-r-'+v); if (el && r) el.value = r; toast(rqGone(L(q.lesson_id)) + '，不能再同意了；可以点「不同意」回复学生', true, 7000); break; }
       const args = q.type==='改期' ? {rid:v, accept:true, reply:'', nd:val('rq-d-'+v), ns:val('rq-s-'+v), ne:val('rq-e-'+v), deduct:0} : {rid:v, accept:true, reply:'', deduct:Number(val('rq-dd-'+v))};
       await act('admin_handle_request', args, '已处理，学生和老师都能看到结果'); break; }
     case 'req-no': await act('admin_handle_request', {rid:v, accept:false, reply:val('rq-r-'+v)}, '已回复学生'); break;

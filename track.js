@@ -257,6 +257,20 @@ function tsForm(sid){
   <div class="row"><button class="btn pri" data-act="ts-save" data-v="${sid}">记下来</button></div>
   ${had ? `<details><summary class="muted small">这个月已经记的</summary><div class="small" style="white-space:pre-wrap;margin-top:4px">${esc(had)}</div></details>` : ''}`, true);
 }
+// 2026-11-28：写月度家长反馈时，弹窗里直接附上这个月各科老师写的课后反馈（以前要关掉弹窗去翻上课记录）。
+//   只给教务看，不会跟着这份反馈发给家长；还没审批的也列出来
+function rvFbBox(sid, ym){
+  const fs = fbOfS(sid).filter(f => L(f.lesson_id) && L(f.lesson_id).date.startsWith(ym)).sort((a, b) => (L(b.lesson_id).date + L(b.lesson_id).start).localeCompare(L(a.lesson_id).date + L(a.lesson_id).start));
+  const by = new Map(); fs.forEach(f => { const c = cOfF(f); if (!c) return; if (!by.has(c.id)) by.set(c.id, {c, fs: []}); by.get(c.id).fs.push(f); });
+  const clip = (x, n) => { x = String(x || '').trim(); return esc(x.slice(0, n)) + (x.length > n ? '…' : ''); };
+  const one = (f, c) => { const l = L(f.lesson_id);
+    return `<div class="rv-fb" style="--hc:${hue(c.subject)}"><b>${+l.date.slice(5, 7)}/${+l.date.slice(8)} 周${WD[pd(l.date).getDay()]}</b>${f.status === 'pending' ? ' <span class="tag warn">还没审批</span>' : ''}${(f.tags || []).slice(0, 3).map(t => ` <span class="tag ${TAGS_WARN.includes(t) ? 'warn' : 'ok'}">${esc(t)}</span>`).join('')}
+      <p title="${esc(f.content || '')}">${clip(f.content, 80)}</p><p class="m" title="${esc(f.perf || '')}">表现：${clip(f.perf, 80)}</p>
+      <p class="m">作业：${hasHw(f) ? `${clip(f.hw, 40)} · ${f.hw_fb ? '已批改' : f.hw_sub ? '已交' : '<b class="no">没交</b>'}` : '没留'}</p></div>`; };
+  const body = [...by.values()].map(({c, fs}) => `<div class="rv-fbh">${subjTag(c.subject)}<span>${esc(tea(c.teacher_id).name)}老师 · ${fs.length} 节</span></div>${fs.map(f => one(f, c)).join('')}`).join('');
+  return `<details class="rv-fbs" ${fs.length ? 'open' : ''}><summary><b>这个月各科老师写的课后反馈</b> <span class="muted xs">${fs.length} 条 · 写的时候、核对 AI 草稿的时候对照着看；这一栏不会发给家长</span></summary>
+    <div class="rv-fbl">${body || '<div class="muted small">这个月老师还没写过反馈</div>'}</div></details>`;
+}
 function reviewForm(sid, ym){
   const r = reviewOf(sid, ym) || {}, st = monthStats(sid, ym);
   const sN = lsOfS(sid).filter(l => l.date.startsWith(ym) && isDone(l) && isStaffT(course(l.course_id)?.teacher_id)).length;   // 面谈、升学指导不算上课
@@ -266,6 +280,7 @@ function reviewForm(sid, ym){
   <div class="note"><b>学生自我评价：</b>${r.self_eval ? esc(r.self_eval) : '<span class="muted">学生还没写（学生在自己的链接「月度」里填）</span>'}</div>
   ${rvRawBox(sid, ym)}
   ${typeof rvAiBox==='function' ? rvAiBox(sid, ym) : ''}
+  ${rvFbBox(sid, ym)}
   ${ta('rv-content','本月课程内容',r.content || auto,'例：日语：N2长文、复合助词；数学：函数与数列')}
   ${ta('rv-teacher','老师评价',r.teacher_eval,'')}
   ${ta('rv-talk','本月面谈记录（家长、任课老师能看到）',r.talk,'例：学生说这个月……；我建议……；说好下个月……')}

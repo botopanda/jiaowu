@@ -1088,3 +1088,27 @@ a.btn.meet-go{gap:0}
 /* 「打开看看」顶上的提示条（2026-11-19） */
 .peek-bar{position:sticky;top:0;z-index:65;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;background:var(--gold-soft);border-bottom:2px solid var(--gold);padding:8px 16px;font-size:13.5px}
 .peek-bar span{flex:1;min-width:200px}
+
+/* ───────── 2026-11-28：改期卡片里「有没有空」、月度反馈弹窗里附老师写的反馈（新旧两版共用） ───────── */
+.rq-free{display:flex;flex-direction:column;gap:6px}
+.rq-v{border-radius:10px;padding:7px 11px;font-size:13px;font-weight:700;background:var(--sunk);color:var(--muted)}
+.rq-v.ok{background:var(--oks,rgba(18,134,91,.12));color:var(--ok)}
+.rq-v.bad{background:var(--seals,rgba(207,58,58,.12));color:var(--seal)}
+.rq-day{display:flex;gap:4px 18px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.rq-day b{color:var(--ink)}
+.rq-week{font-size:12.5px;border:1px dashed var(--line);border-radius:10px;padding:7px 10px;background:var(--sunk)}
+.rq-week summary{cursor:pointer;font-weight:700;color:var(--gold-text)}
+.rq-week table{border-collapse:collapse;margin-top:6px;width:100%}
+.rq-week td{padding:3px 8px 3px 0;vertical-align:top;border:0;background:none}
+.rq-week td:first-child{white-space:nowrap;color:var(--muted);width:78px}
+.rq-week tr.on td:first-child{color:var(--ink);font-weight:800}
+.rq-week .me{font-weight:800;color:var(--warn)}
+.rv-fbs{border:1px solid var(--line);border-radius:12px;padding:9px 11px}
+.rv-fbs>summary{cursor:pointer}
+.rv-fbl{max-height:250px;overflow:auto;margin-top:8px;display:flex;flex-direction:column;gap:8px;padding-right:4px}
+.rv-fbh{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:800;padding:2px 0}
+.rv-fb{border-left:3px solid var(--hc,var(--line));padding:2px 0 2px 9px;font-size:13px;line-height:1.6}
+.rv-fb b{font-size:12.5px}
+.rv-fb p{margin:0}
+.rv-fb .m{color:var(--muted);font-size:12.5px}
+.rv-fb .no{color:var(--warn)}

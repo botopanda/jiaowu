@@ -451,7 +451,7 @@ const v2TCand = () => v2TCanWrite().filter(l => !l.done_manual);   // 老师要�
 const v2TExtra = () => v2TCanWrite().filter(l => l.done_manual).reverse();   // 教务确认上过、老师没写的：可以补写，新的在上
 const v2TLesson = l => { const c = course(l.course_id), f = fbOf(l), fl = v2Flag(l);
   return `<button type="button" class="v2-tl ${l.status !== 'scheduled' ? 'off' : ''}" style="--hc:${hue(c.subject)}" data-act="${f ? 't-fb' : 'lesson'}" data-v="${f ? f.id : l.id}"><b>${l.start}–${l.end}</b><span class="n">${esc(stu(c.student_id).name)} · ${esc(c.subject)}${l.kind ? ` · ${esc(l.kind)}` : ''}</span>
-    <span class="tags">${l.makeup ? '<span class="tag blue">补课</span>' : ''}${l.status === 'leave' ? '<span class="tag seal">请假</span>' : ''}${l.status === 'cancelled' ? '<span class="tag mute">已取消</span>' : ''}${isPend(l) ? '<span class="tag warn">待写反馈</span>' : f ? '<span class="tag ok">已反馈</span>' : ''}${fl ? `<span class="tag warn">${fl}</span>` : ''}</span>${l.topic ? `<span class="tp">本节：${esc(l.topic)}</span>` : ''}</button>`; };
+    <span class="tags">${l.makeup ? '<span class="tag blue">补课</span>' : ''}${l.status === 'leave' ? '<span class="tag seal">请假</span>' : ''}${l.status === 'cancelled' ? '<span class="tag mute">已取消</span>' : ''}${isPend(l) ? '<span class="tag warn">待写反馈</span>' : f ? '<span class="tag ok">已反馈</span>' : ''}${fl ? `<span class="tag warn">${fl}</span>` : ''}</span>${l.topic ? `<span class="tp">本节：${esc(l.topic)}</span>` : ''}${isPend(l) ? `<span class="btn pri sm v2-wfb" data-act="v2-go-wl" data-v="${l.id}">写反馈 ›</span>` : ''}</button>`; };   // 2026-11-28：待写反馈的课，卡片上直接带「写反馈」（点卡片别处还是打开这节课）
 function v2TSched(t){
   const mode = S.v2tcal || 'week';
   const seg = `<div class="seg" role="group" aria-label="看法"><button class="${mode === 'week' ? 'on' : ''}" data-act="v2-tcal" data-v="week">这一周</button><button class="${mode === 'month' ? 'on' : ''}" data-act="v2-tcal" data-v="month">月历</button></div>`;
@@ -471,6 +471,51 @@ function v2TSched(t){
     + (typeof meetTodoNote === 'function' ? meetTodoNote(t) : '') + tChBox() + nav
     + (shown.length ? `<div class="v2-week">${cols}</div>` : '<div class="v2-empty big">这周没有课</div>');
 }
+// 2026-11-28：老师一进来最上面先看「今天的课」。每节课右边的按钮跟着状态走：
+//   下课了没写反馈 →「写反馈」；有上课链接 →「进入课堂」；还没填链接 →「＋ 填链接」；写过了 →「看反馈」。
+//   下面接着列以前没写完的反馈（最多 3 节）和等批改的作业。老师写反馈多半在手机上、刚下课的时候——以前要先从学生名单绕过去
+function v2TToday(t){
+  const n = nowBJ(), mine = lsOfT(t.id), cand = v2TCand(), gN = DB.feedbacks.filter(f => f.hw_sub && !f.hw_fb).length;
+  const tl = mine.filter(l => l.date === TODAY && l.status !== 'cancelled').sort((a, b) => a.start.localeCompare(b.start));
+  const wBtn = (l, t2, pri) => `<button type="button" class="btn ${pri ? 'pri ' : ''}sm" data-act="v2-go-wl" data-v="${l.id}">${t2}</button>`;
+  const row = l => { const c = course(l.course_id), f = fbOf(l), today = l.date === TODAY, started = !today || l.start <= n, ended = lesEnded(l), link = typeof meetOk === 'function' && meetOk(l);
+    const note = link && l.meet_note ? ` · ${esc(l.meet_note)}` : '', go = link ? meetBtn(l, {label: '进入课堂', withNote: false}) : '';
+    let sub, btn = '', cls = '';
+    if (l.status === 'leave') sub = '<small>学生请假了</small>';
+    else if (f || l.has_fb){ sub = '<small class="ok">已经写了反馈</small>'; btn = f ? `<button type="button" class="btn sm" data-act="t-fb" data-v="${f.id}">看反馈</button>` : ''; }
+    else if (ended && l.done_manual){ sub = '<small>已下课 · 教务已经确认上过，不写也可以</small>'; btn = wBtn(l, '补写反馈'); }
+    else if (ended){ const d = dBetween(l.date, TODAY); sub = `<small class="warn">${today ? '已下课' : `下课 ${d} 天`} · 还没写反馈</small>`; btn = wBtn(l, '写反馈', true); }
+    else if (started){ cls = 'now'; sub = `<small>上课中 · 到 ${l.end}${note}</small>`; btn = go || wBtn(l, '先写反馈'); }
+    else { const m = mins(l.start) - mins(n), when = m <= 60 ? `${m} 分钟后开始` : `${l.start} 开始`; if (m <= 30) cls = 'now';
+      if (link){ sub = `<small>${when}${note}</small>`; btn = go; }
+      else { sub = `<small class="warn">${when} · 还没填上课链接</small>`; btn = `<button type="button" class="btn sm" data-act="mt-open" data-v="${l.id}">＋ 填链接</button>`; } }
+    return `<div class="v2-tdr ${cls}" style="--hc:${hue(c.subject)}"><button type="button" class="tx" data-act="${f ? 't-fb' : 'lesson'}" data-v="${f ? f.id : l.id}"><b>${today ? `${l.start}–${l.end}` : `${md(l.date)} 周${WD[pd(l.date).getDay()]}`}</b><span>${esc(stu(c.student_id).name)} · ${esc(c.subject)}${l.kind ? ` · ${esc(l.kind)}` : ''}</span>${sub}</button>${btn}</div>`; };
+  const old = cand.filter(l => l.date < TODAY).sort((a, b) => (b.date + b.start).localeCompare(a.date + a.start));   // 以前没写完的：新的在上
+  const nx = tl.length ? null : v2Next(mine)[0];
+  const body = tl.length ? tl.map(row).join('') : `<div class="v2-empty">今天没有课${nx ? ` · 下一节：${v2Day(nx.date)} ${nx.start} ${esc(stu(course(nx.course_id).student_id).name)} · ${esc(course(nx.course_id).subject)}` : ''}</div>`;
+  return `<section class="v2-box v2-tdy v2-today" data-n="${cand.length}" data-g="${gN}"><div class="v2-bh"><h3>今天的课 <span class="v2-sub2">${md(TODAY)} 周${WD[pd(TODAY).getDay()]}${tl.length ? ` · ${tl.length} 节` : ''}</span></h3></div>
+    <div class="v2-tyl">${body}</div>
+    ${old.length ? `<div class="v2-sep">之前还没写反馈的 · ${old.length} 节</div><div class="v2-tyl">${old.slice(0, 3).map(row).join('')}</div>${old.length > 3 ? `<button type="button" class="v2-tdm" data-act="tab" data-v="c" data-todo="1">还有 ${old.length - 3} 节没写反馈<span>全部 ›</span></button>` : ''}` : ''}
+    ${gN ? `<button type="button" class="v2-tdm" data-act="v2-go-grade">${gN} 份作业等批改<span>去批改 ›</span></button>` : ''}</section>`;
+}
+// 留言那一行点开 / 收起：记下来，页面重画以后保持原样（点的那一下就记，不等浏览器的展开事件）
+document.addEventListener('click', e => { const s = e.target.closest && e.target.closest('.v2-fold > summary'); if (s) S.v2fold = !s.parentElement.open; }, true);
+// 老师把首页一直开着：到点了按钮要跟着换（没上 → 上课中 → 下课了写反馈）。每 20 秒看一眼，北京时间的「分钟」变了才只重画这张卡片，
+//   别的（搜索框、留言开合、正在看的学生）都不动；开着弹窗、正在打字时不动
+let v2TdyAt = '';
+setInterval(() => {
+  if (typeof DB === 'undefined' || !DB || !DB.me || DB.me.role !== 'teacher' || typeof V2 === 'undefined' || V2.ver !== 'new') return;
+  const now = bjHM(); if (now === v2TdyAt) return;
+  const card = document.querySelector('.v2-tdy'); if (!card || document.hidden || document.querySelector('.modal')) return;
+  if (card.querySelector(':active')) return;   // 手指正按着卡片里的按钮：这一轮先不换，20 秒后再看
+  v2TdyAt = now;   // 真的能换的时候才记下这一分钟（页面在后台、开着弹窗时不记，回来以后马上补上）
+  const t = DB.teachers.find(x => x.id === DB.me.teacher_id); if (!t) return;
+  const html = v2TToday(t), box = document.createElement('div'); box.innerHTML = html;
+  const neu = box.firstElementChild; if (!neu || neu.innerHTML === card.innerHTML) return;
+  const fa = card.contains(document.activeElement) ? document.activeElement : null, key = fa && fa.dataset ? [fa.dataset.act || '', fa.dataset.v || ''] : null;   // 键盘焦点正停在卡片里的某个按钮上：换完放回同一个按钮
+  card.replaceWith(neu);
+  if (key) { const again = [...neu.querySelectorAll('[data-act]')].find(b => (b.dataset.act || '') === key[0] && (b.dataset.v || '') === key[1]); if (again) again.focus({preventScroll: true}); }
+}, 20000);
 function v2TStudents(t){
   const cand = v2TCand();
   // 2026-11-28：课程标了「停了」、但还有课没写反馈或作业没批改的，学生照样列出来（不然顶上催着「有 1 节课待写反馈」，名单里却找不到这个学生）
@@ -504,9 +549,10 @@ function v2TStudents(t){
         ${v2Box('最近的反馈', fs.length ? `<div class="v2-lines">${fs.map(f => { const l = L(f.lesson_id); return `<button type="button" class="v2-line" data-act="t-fb" data-v="${f.id}"><b>${md(l.date)}</b><span>${esc(String(f.content || '').slice(0, 30))}${String(f.content || '').length > 30 ? '…' : ''}</span></button>`; }).join('')}</div>` : '<div class="v2-empty">还没有写过</div>')}
       </div></div>`;
   }
-  const todoN = cand.length, gN = DB.feedbacks.filter(f => f.hw_sub && !f.hw_fb).length;
-  const today = todoN + gN ? `<button type="button" class="v2-strip warn v2-today" data-act="tab" data-v="c" data-todo="1"><span><b>今天要处理的</b> · ${[todoN ? `${todoN} 节课待写反馈` : '', gN ? `${gN} 份作业待批改` : ''].filter(Boolean).join(' · ')}</span><span class="v2-link">去处理 ›</span></button>` : '';
-  return v2Head('我的学生', fmtMD(TODAY)) + today + (typeof msgTeacherBox === 'function' ? `<div class="v2-msgs">${msgTeacherBox()}</div>` : '')
+  // 2026-11-28：最上面先是「今天的课」（v2TToday，原来那条黄色的「今天要处理的」并进去了）；学生留言收成一行，点开再看
+  const msgN = typeof msgShown === 'function' ? msgShown().slice(0, 20).length : 0;
+  const msgs = msgN && typeof msgTeacherBox === 'function' ? `<details class="v2-msgs v2-fold" ${S.v2fold ? 'open' : ''}><summary><b>学生想和老师说的话 · ${msgN} 条</b><span class="v2-link"></span></summary>${msgTeacherBox()}</details>` : '';
+  return v2Head('我的学生', fmtMD(TODAY)) + v2TToday(t) + msgs
     + v2Tri({id: 'ts', label: '我的学生', items, sel: cur && cur.k, search: '查学生…', chips: [['all', '全部', all.length], ['todo', '有要处理的', all.filter(x => x.i.pl + x.i.g > 0).length]], chip,
       count: `${items.length} 个学生`, empty: sids.length ? '没有要处理的学生' : '还没有分配学生', detail});
 }
@@ -683,7 +729,7 @@ document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]'); if (!a || V2.ver !== 'new' || !document.body.classList.contains('v2')) return;
   const k = a.dataset.act, v = a.dataset.v || '';
   if (a.closest('#modal-root')) return;
-  const LEAVE = ['page', 'tab', 'v2-sel', 'v2-chip', 'v2-back', 'v2-subj', 'v2-go-write', 'student', 'v2-cal', 'v2-tcal', 'v2-wk', 'v2-twk', 'book', 'stu-tab', 'student-tab', 'v2-ssub', 'v2-ov', 'v2-go-todo', 'v2-ap', 'v2-apym', 'v2-ap-open', 'v2-go-ts'];
+  const LEAVE = ['page', 'tab', 'v2-sel', 'v2-chip', 'v2-back', 'v2-subj', 'v2-go-write', 'v2-go-wl', 'v2-go-grade', 'student', 'v2-cal', 'v2-tcal', 'v2-wk', 'v2-twk', 'book', 'stu-tab', 'student-tab', 'v2-ssub', 'v2-ov', 'v2-go-todo', 'v2-ap', 'v2-apym', 'v2-ap-open', 'v2-go-ts'];
   // 2026-11-28：「待处理」摊开以后，卡片里写了一半的（不同意原因、改期时间、改措辞）也算——以前只在换分类时问，点左边菜单、切账本直接就丢了
   const td = typeof v2TdDraft === 'function' && S.page === 'todo' && !(k === 'v2-chip' && v.startsWith('todo|')) && v2TdDraft().length > 0;   // 换分类那里自己会问
   if (LEAVE.includes(k) && (td || (v2Dirty() && !(k === 'v2-sel' && a.classList.contains('on') && !v2Phone())))
@@ -757,6 +803,22 @@ document.addEventListener('click', async e => {
       const f = !l && DB.feedbacks.find(x => x.hw_sub && !x.hw_fb && cOfF(x)?.student_id === v);
       S.v2sel.tw = l ? 'w:' + l.id : f ? 'g:' + f.id : null; wTags.clear();
       if (v2Phone() && S.v2sel.tw) S.v2open = 'tw';
+      render(); window.scrollTo(0, 0); break; }
+    case 'v2-go-wl': {   // 「今天的课」、课表卡片上的「写反馈」：直接打开这一节的反馈表
+      // 先确认这节课现在真的还等着写（页面开久了，可能刚写过、请假了、删掉了）——不在名单里就不打开表，免得写到别的课上
+      const l = L(v), inTodo = v2TCand().some(x => x.id === v), inExtra = v2TExtra().some(x => x.id === v);
+      if (!inTodo && !inExtra){ const f = l && fbOf(l); render();
+        if (f) { toast('这节课已经写过反馈了'); tFbModal(f.id); } else toast(l ? '这节课的状态刚刚变了（请假、取消或者已经处理过），请看一下最新的' : '这节课已经不在了', true);
+        break; }
+      S.tab = 'c'; S.v2q.tw = ''; S.v2idx.tw = 0; wTags.clear();
+      S.v2chip.tw = inTodo ? 'todo' : 'extra'; S.v2sel.tw = 'w:' + v;
+      if (v2Phone()) S.v2open = 'tw';
+      render(); window.scrollTo(0, 0); break; }
+    case 'v2-go-grade': {   // 「N 份作业等批改 · 去批改」：直接打开第一份等批改的作业（以前只切到名单，排在最前面的是待写反馈的课）
+      const f = DB.feedbacks.find(x => x.hw_sub && !x.hw_fb && L(x.lesson_id));
+      if (!f){ render(); toast('现在没有等批改的作业了'); break; }
+      S.tab = 'c'; S.v2q.tw = ''; S.v2idx.tw = 0; wTags.clear(); S.v2chip.tw = 'todo'; S.v2sel.tw = 'g:' + f.id;
+      if (v2Phone()) S.v2open = 'tw';
       render(); window.scrollTo(0, 0); break; }
     case 'v2-subj': S.v2subj = v; render(); break;
     case 'v2-fb-all': {

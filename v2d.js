@@ -250,6 +250,7 @@ function v2TdRestore(){
     if (x.ver && v2TdVer(el) !== x.ver) { stale++; return; }
     if (el.value !== x.v) el.value = x.v; put++; });
   if (put) S.dirtyMain = true;
+  if (put && typeof rqFreeAll === 'function') rqFreeAll();   // 2026-11-28：改期卡片里「有没有空」那一栏按放回来的日期时间重算
   if (stale) toast('老师刚刚又改了这条反馈。你改到一半的措辞没有放回去，请照现在的内容重新改', true, 8000);
 }
 function v2TdFocus(){
