@@ -287,3 +287,61 @@ document.addEventListener('click', e => {
   const p = (DB.people || []).find(x => x.id === a.dataset.v); if (!p) return;
   if (!confirm(`给「${p.name}」换一条新链接？\n旧链接马上打不开，要把新链接重新发给${p.id === ME().id ? '自己（这台设备会自动换成新链接）' : '他'}。`)) { e.stopImmediatePropagation(); e.preventDefault(); }
 }, true);
+
+/* ═════════════ 学生速览（2026-11-28）═════════════
+   教务在「待处理」「课时与工资」里点学生名字：右边滑出一栏，看这位学生的近况（下节课、这个月、在上的课、最近的反馈、出愿），
+   后面那一页原样不动（筛选、滚动位置、填了一半的内容都在）。按 Esc、点外面、点 ✕ 收起；要细看点「打开完整档案」。
+   只是多一个看的地方：里面的数字和学生档案页是同一套算法，不存任何东西 */
+const v2PeekOn = () => typeof DB !== 'undefined' && !!DB && typeof isAdmin === 'function' && isAdmin() && V2.ver === 'new' && document.body.classList.contains('v2');
+let v2PeekFrom = null;
+function v2PeekHtml(sid){
+  const s = DB.students.find(x => x.id === sid); if (!s) return '';
+  const ym = TODAY.slice(0, 7), st = monthStats(s.id, ym), up0 = v2Next(lsOfS(s.id)).filter(l => !isDone(l)), nx = up0.find(l => !lesStarted(l)), live = up0.find(l => l.status === 'scheduled' && lesStarted(l)), un = hwUnsub(s.id).length;   // 下节课＝还没开始的第一节；正在上的单独一行
+  const lv = lsOfS(s.id).filter(l => l.date.startsWith(ym) && l.status === 'leave' && l.date <= TODAY).length;   // 请假：到今天为止（今天请的也算），和家长首页的月报一个数
+  const cs = DB.courses.filter(c => c.student_id === s.id && c.active !== false), fs = fbOfS(s.id).filter(f => L(f.lesson_id)).slice(-3).reverse();
+  // 出愿：这位学生所有志望校、所有还没到的日子放在一起，取最近两个（以前每所学校只取一个，同一所学校更近的第二个日子会被漏掉）
+  const tg = (typeof targetsOf === 'function' ? targetsOf(s.id) : []).flatMap(t => DATE_KEYS.filter(([k]) => t[k] && t[k] >= TODAY).map(([k, l]) => ({t, e: {date: t[k], label: l, days: dBetween(TODAY, t[k])}})))
+    .sort((a, b) => a.e.date.localeCompare(b.e.date)).slice(0, 2);
+  const rq = isTop() ? DB.requests.filter(q => q.status === 'pending' && L(q.lesson_id) && course(L(q.lesson_id).course_id)?.student_id === s.id).length : 0;
+  const pe = lsOfS(s.id).filter(isPend).length;
+  const row = (a, b, c = '') => `<div class="v2-pkr">${a ? `<b>${a}</b>` : ''}<div class="g">${b}</div>${c}</div>`;
+  const meta = [s.code, s.direction || s.track, s.loc, s.staff ? `负责教务 ${s.staff}` : ''].filter(Boolean).map(esc).join(' · ');
+  const notes = [rq ? `<span class="tag warn">${rq} 个改期 / 请假申请等处理</span>` : '', pe ? `<span class="tag warn">${pe} 节过了下课时间、老师还没写反馈</span>` : ''].filter(Boolean).join(' ');
+  return `<div class="v2-pkdim" data-act="v2-peek-x"></div><aside class="v2-pk" role="dialog" aria-label="${esc(s.name)} 的近况">
+    <div class="v2-pkh">${v2Ava(s.name, true)}<div><h2>${esc(s.name)}${isMine(s) && ownerUI() ? ' <span class="tag gold">Panda</span>' : ''}${s.active === false ? ' <span class="tag mute">停课</span>' : ''}</h2><p>${meta || '&nbsp;'}</p></div><button type="button" class="x" data-act="v2-peek-x" aria-label="收起">✕</button></div>
+    <div class="row"><button class="btn pri sm" data-act="student" data-v="${s.id}">打开完整档案 ›</button><button class="btn sm" data-act="v2-stu-add" data-v="${s.id}">给他排课</button><button class="btn sm" data-act="rv-open" data-v="${s.id}|${ym}">写${+ym.slice(5)}月家长反馈</button></div>
+    <div class="v2-pkb">
+    ${v2Box('下节课', (live ? row('正在上', `${esc(course(live.course_id).subject)} · ${esc(tea(course(live.course_id).teacher_id).name)}<small>${live.start}–${live.end}</small>`) : '') + (nx ? row(`${v2Day(nx.date)} ${nx.start}`, `${esc(course(nx.course_id).subject)} · ${esc(tea(course(nx.course_id).teacher_id).name)}`, v2FlagTag(nx)) : '<div class="v2-empty">还没有排接下来的课</div>'))}
+    ${v2Box(`${+ym.slice(5)} 月`, `<div class="v2-nums"><div><b>${st.actual}</b><small>节已上</small></div><div class="${lv ? 'warn' : ''}"><b>${lv}</b><small>次请假</small></div><div class="${un ? 'warn' : ''}"><b>${un}</b><small>份作业没交</small></div></div>${notes ? `<div class="v2-pkn">${notes}</div>` : ''}`)}
+    ${v2Box('在上的课', cs.length ? cs.map(c => row('', `${subjTag(c.subject)} ${esc(tea(c.teacher_id).name)}`)).join('') : '<div class="v2-empty">还没有课程</div>')}
+    ${v2Box('最近的老师反馈', fs.length ? fs.map(f => { const l = L(f.lesson_id), t = String(f.content || ''); return row(md(l.date), `${esc(t.slice(0, 28))}${t.length > 28 ? '…' : ''}<small>${esc(tea(cOfF(f).teacher_id).name)}${isTop() && f.status === 'pending' ? ' · 待审批' : ''}${f.confirm === '不满意' ? ' · 学生说不满意' : ''}</small>`); }).join('') : '<div class="v2-empty">还没有反馈</div>')}
+    ${tg.length ? v2Box('出愿', tg.map(x => row('', `${esc(x.t.school)}<small>${esc(x.e.label)} · ${md(x.e.date)}${x.t.doc_status === '已放弃' ? ' · 资料已放弃' : ''}</small>`, `<span class="tag ${x.e.days <= 14 ? 'seal' : 'mute'}">${x.e.days === 0 ? '今天' : x.e.days + ' 天'}</span>`)).join('')) : ''}
+    </div>
+    <div class="v2-pkf">按 Esc 或点外面收起 · 后面那一页原样不动</div></aside>`;
+}
+// 画出来 / 收起来。页面重画（刚处理完一条、后台刷新）以后也会被叫一次，数字跟着更新；学生不在了（比如切了账本）就收起
+function v2PeekDraw(){
+  let root = document.getElementById('v2-peek');
+  const html = S.v2peek && v2PeekOn() ? v2PeekHtml(S.v2peek) : '';
+  if (!html){ S.v2peek = null; if (root) root.remove(); return; }
+  if (!root){ root = document.createElement('div'); root.id = 'v2-peek'; document.body.appendChild(root); }
+  const sc = root.querySelector('.v2-pkb'), top = sc ? sc.scrollTop : 0, had = root.contains(document.activeElement);
+  root.innerHTML = html;
+  const sc2 = root.querySelector('.v2-pkb'); if (sc2) sc2.scrollTop = top;
+  if (had) root.querySelector('.x')?.focus({preventScroll: true});
+}
+function v2PeekOpen(sid, from){ S.v2peek = sid; v2PeekFrom = from || null; v2PeekDraw(); document.querySelector('#v2-peek .x')?.focus({preventScroll: true}); }
+function v2PeekClose(back){ if (!S.v2peek) return; S.v2peek = null; v2PeekDraw(); if (back && v2PeekFrom && document.contains(v2PeekFrom)) v2PeekFrom.focus({preventScroll: true}); v2PeekFrom = null; }
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  const k = a.dataset.act;
+  if (k === 'v2-peek'){ if (v2PeekOn()) { e.preventDefault(); e.stopPropagation(); v2PeekOpen(a.dataset.v, a); } return; }
+  if (k === 'v2-peek-x'){ v2PeekClose(true); return; }
+});
+// 「打开完整档案」：去学生档案页，速览收起（排课、写家长反馈是弹窗，开在速览上面，关掉弹窗速览还在）。
+//   要赶在跳转之前记下「收起」——跳转时页面会重画、速览也跟着重画，等跳完再找被点的那个按钮就找不到了。
+//   前面如果因为「有没保存的内容」被拦下（v2.js 的那个监听先跑、会掐掉这次点击），这里不会执行，速览留着
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('#v2-peek [data-act="student"]')) { S.v2peek = null; v2PeekFrom = null; setTimeout(v2PeekDraw, 0); } }, true);
+// Esc 一次只关一层：上面开着弹窗时这次只关弹窗（app.js 那个监听去关），速览留着；没有弹窗才收速览。
+//   放在捕获阶段——比 app.js 的监听先跑，这时弹窗还在，看得出「上面有没有弹窗」；要是等它关完再看，一次 Esc 就把两样都关了
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !e.isComposing && S.v2peek && !(document.getElementById('modal-root') || {}).innerHTML) { e.preventDefault(); v2PeekClose(true); } }, true);

@@ -1098,7 +1098,7 @@ a.btn.meet-go{gap:0}
 .rq-day b{color:var(--ink)}
 .rq-week{font-size:12.5px;border:1px dashed var(--line);border-radius:10px;padding:7px 10px;background:var(--sunk)}
 .rq-week summary{cursor:pointer;font-weight:700;color:var(--gold-text)}
-.rq-week table{border-collapse:collapse;margin-top:6px;width:100%}
+.rq-week table{border-collapse:collapse;margin-top:6px;width:100%;min-width:0}   /* min-width:0：全站表格默认最窄 640，这张小表在手机上会把整页撑出屏幕（2026-11-28 晚修） */
 .rq-week td{padding:3px 8px 3px 0;vertical-align:top;border:0;background:none}
 .rq-week td:first-child{white-space:nowrap;color:var(--muted);width:78px}
 .rq-week tr.on td:first-child{color:var(--ink);font-weight:800}

@@ -641,3 +641,71 @@ body.v2[data-theme="night"] .tag.vz-late{background:#4a1f1f!important;color:#ffb
   .v2-main:has(.v2-tri.open) .v2-tdy{display:none}
   .v2-tyl{grid-template-columns:1fr}
 }
+
+/* ───────── 2026-11-28：学生速览（教务在待处理、工资页点学生名字，右边滑出） ───────── */
+.stu-n{border:0;background:none;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;text-decoration:underline dotted;text-decoration-color:var(--line-3,var(--muted));text-underline-offset:3px}
+.stu-n:hover{color:var(--gold-text);text-decoration-color:currentColor}
+.v2-pkdim{position:fixed;inset:0;background:rgba(15,22,40,.2);z-index:44}
+.v2-pk{position:fixed;top:0;right:0;bottom:0;width:min(430px,100%);background:var(--bg);z-index:45;box-shadow:-8px 0 30px rgba(15,22,40,.18);padding:16px 16px 12px;display:flex;flex-direction:column;gap:12px}
+.v2-pkh{display:flex;align-items:center;gap:12px}
+.v2-pkh h2{font-size:20px;margin:0}
+.v2-pkh p{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
+.v2-pkh .x{margin-left:auto;flex:none;border:0;background:var(--sunk);border-radius:999px;width:34px;height:34px;font-size:15px;color:var(--muted);cursor:pointer}
+.v2-pkb{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:2px}
+.v2-pk .v2-box{background:var(--card);padding:11px 13px;border-radius:16px}
+.v2-pk .v2-bh h3{font-size:13.5px}
+.v2-pkr{display:flex;align-items:center;gap:10px;padding:7px 2px;border-top:1px solid var(--line-2);font-size:13px}
+.v2-pkr:first-child{border-top:0}
+.v2-pkr>b{font-weight:800;white-space:nowrap}
+.v2-pkr .g{flex:1;min-width:0}
+.v2-pkr small{display:block;color:var(--muted);font-size:11.5px}
+.v2-pkn{display:flex;gap:6px;flex-wrap:wrap}
+.v2-pkf{font-size:11.5px;color:var(--muted);text-align:center}
+
+/* ───────── 2026-11-28：学生首页重排、家长首页月报 ───────── */
+.v2-sh{display:flex;flex-direction:column;gap:10px}
+.v2-lab{font-size:12px;font-weight:800;color:var(--muted);padding:4px 4px 0;letter-spacing:.03em}
+.v2-nx{background:var(--card);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px;border-left:5px solid var(--hc,var(--gold))}
+.v2-nx.none{border-left:0}
+.v2-nx.live{box-shadow:inset 0 0 0 2px var(--gold)}
+.v2-nx .t{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.v2-nx .t b{font-size:30px;font-weight:800;line-height:1}
+.v2-nx .t span{font-size:14px;font-weight:700}
+.v2-nx .s{font-size:12.5px;color:var(--muted)}
+.v2-nx .meet-wrap{display:flex}
+.v2-nx .meet-go{flex:1;justify-content:center;padding:13px;font-size:16px;font-weight:800;border-radius:14px}
+.v2-nxn .v2-link{padding:0 2px}
+.v2-hwc{background:var(--card);border-radius:18px;padding:13px 14px;display:flex;flex-direction:column;gap:8px;border-left:4px solid var(--hc,var(--gold))}
+.v2-hwc .h{font-size:14px;font-weight:700;line-height:1.5}
+.v2-hwc .m{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.v2-hwc .r{display:flex;gap:8px}
+.v2-hwc .r>.btn{flex:1;justify-content:center;text-align:center;min-height:40px;display:inline-flex !important;align-items:center}
+.v2-allok{background:var(--card);border-radius:16px;padding:12px 14px;font-size:13.5px;font-weight:700;color:var(--ok)}
+.v2-rowb{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;border:0;background:var(--card);border-radius:16px;padding:12px 14px;font-size:13.5px;font-weight:700;color:var(--ink);text-align:left;cursor:pointer}
+.v2-rowb>span{color:var(--gold-text);font-size:12.5px;white-space:nowrap}
+.v2-shm .v2-shb{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:0 12px 12px}
+.v2-shm .v2-shb>.v2-box{background:var(--paper)}
+.v2-rep{background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.v2-rep h3{font-size:18px;margin:0}
+.v2-rep h3 small{font-size:12px;color:var(--muted);font-weight:600;margin-left:6px}
+.v2-rep .v2-lab{padding:0 0 6px}
+.v2-bar{display:flex;flex-direction:column;gap:5px}
+.v2-bar .l{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13.5px}
+.v2-bar .l > span:first-child{flex:none;white-space:nowrap}   /* 「上课」两个字不折成两行 */
+.v2-bar .l > span:last-child{text-align:right}
+.v2-bar .l b{font-size:17px;font-weight:800}
+.v2-bar .l small{color:var(--muted);font-size:12px}
+.v2-bar .tr{height:12px;border-radius:999px;background:var(--sunk);overflow:hidden}
+.v2-bar .tr i{display:block;height:100%;border-radius:999px;background:var(--gold)}
+.v2-bar .tr i.ok{background:var(--ok)}
+.v2-bar .tr i.warn{background:var(--warn)}
+.v2-rps{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;border:0;background:none;padding:0;margin-top:-6px;font-size:12.5px;color:var(--muted);text-align:left;cursor:pointer}
+.v2-rps b{color:var(--ink)}
+.v2-rps b.warn{color:var(--warn)}
+.v2-rep .v2-prv details>summary,.v2-say2{background:var(--sunk);border-radius:14px;padding:11px 13px}
+.v2-say2{font-size:14px;line-height:1.75}
+.v2-say2 small{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+.v2-say2 .v2-link{padding:0}
+@media (max-width:760px){
+  .v2-shm .v2-shb{grid-template-columns:1fr}
+}

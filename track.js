@@ -373,7 +373,7 @@ document.addEventListener('click', async e => {
     case 'rv-pick': reviewForm(v, val('rv-ym')); break;
     case 'rv-save': { const [sid,ym]=v.split('|'); const d={content:val('rv-content'), teacher_eval:val('rv-teacher'), talk:val('rv-talk'), talk_raw:val('rv-raw'), teacher_raw:val('rv-traw'), conclusion:val('rv-concl'), next_focus:val('rv-next'), status:val('rv-status'), note:val('rv-note')};
       if (!RVX.ok || !document.getElementById('rv-raw')) { delete d.talk_raw; delete d.teacher_raw; }   // 原始纪要没读出来：不发这两栏，数据库就不动它们
-      await act('review_save', {sid, month:ym, d}, d.status==='已完成'?'已保存，家长和任课老师现在能看到':'已保存'); if (S.page==='reviews') closeModal(); else studentModal(sid, S.page==='student' ? S.stuTab : 'review'); break; }
+      await act('review_save', {sid, month:ym, d}, d.status==='已完成'?'已保存，家长和任课老师现在能看到':'已保存'); if (S.page==='reviews' || S.v2peek === sid) closeModal(); else studentModal(sid, S.page==='student' ? S.stuTab : 'review'); break; }   // 2026-11-28 晚：从学生速览里打开的，保存后只关弹窗，后面那一页原样不动
     case 'ts-open': tsForm(v); break;
     case 'ts-save': { const d=val('ts-date'), txt=val('ts-text').trim(), tid=val('ts-t');
       if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){toast('请填写日期',true);break;} if(!txt){toast('先写老师说了什么',true);break;}

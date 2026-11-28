@@ -127,7 +127,7 @@ function sHomework2(s){
       ${f.hw_note?`<div class="muted xs">${who}说：${esc(f.hw_note)}</div>`:''}${f.hw_fb?`<div class="note"><b>老师批改：</b>${esc(f.hw_fb)}</div>`:''}</div></div>`; };
   return `${todo.length ? `<div class="dg">还没交 · ${todo.length} 份</div>${todo.map(f => item(f, true)).join('')}` : olderUn ? `<div class="card todo-ok"><b>这次的作业交了</b><span class="muted small">下面还有 ${olderUn} 份以前没交的</span></div>` : '<div class="card todo-ok"><b>作业都交了</b><span class="muted small">新作业会出现在这里</span></div>'}
   ${done.length ? `<div class="dg">这次的作业 · 已交</div>${done.map(f => item(f, true)).join('')}` : ''}
-  ${older.length ? `<details class="sh-more" ${olderUn && !ro ? 'open' : ''}><summary>以前的作业（${older.length}）${olderUn ? `· ${olderUn} 份没交，可以补交` : ''}</summary>${older.map(f => item(f, !f.hw_sub)).join('')}</details>` : ''}`;
+  ${older.length ? `<details class="sh-more" ${olderUn && !ro ? 'open' : ''}><summary>以前的作业（${older.length}）${olderUn ? `· ${olderUn} 份没交，可以补交` : ''}</summary>${older.map(f => item(f, !f.hw_sub || !f.hw_fb)).join('')}</details>` : ''}`;
 }
 
 /* ───────── 上课记录：一行一节，点开看全文；没确认的放最上面 ───────── */
