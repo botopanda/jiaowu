@@ -656,7 +656,7 @@ function v2SHome(s){
       <div class="v2-hside">${soon}${sCountdown(s)}${sCkCard(s)}${typeof sWordCard === 'function' ? sWordCard(s) : ''}${typeof sMsgEntry === 'function' ? sMsgEntry() : ''}</div></div>`;
 }
 const v2HwGroups = s => hwGroups(s.id);   // 2026-11-28：搬到 app.js，首页的数字也用它（以前首页只数「这次的」，和作业页对不上）
-// 2026-11-28：家长首页做成一张「这个月到今天」的月报：上课、作业、请假各一条进度条，下面是教务写的月度总评和最近一节课老师说的话。
+// 2026-11-28：家长首页做成一张「这个月到今天」的月报：上课、作业、请假各一个圆环（一开始是三条长条，用户说不直观，当晚改成圆环），下面是教务写的月度总评和最近一节课老师说的话。
 //   以前是几个数字格子。数字和原来是同一套算法（monthStats / hwGroups），只是换了摆法
 // 月度总评那一块：最近一期「已完成」的月度家长反馈，先看一句，点「看全文」当场展开
 function v2PReview(s){
@@ -677,14 +677,18 @@ function v2PHome(s){
   const lesTail = [pendN ? `${pendN} 节过了下课时间、等老师确认` : '', liveN ? `${liveN} 节正在上` : '', comeN ? `还有 ${comeN} 节没上` : ''].filter(Boolean).join('，') || (doneN && doneN === total - lvN - lvLater ? (lvN + lvLater ? '其余的都上完了' : '都上完了') : '');
   const full = !lvN && !lvLater && !pendN && doneN > 0;   // 到今天全勤
   const fsM = fbOfS(s.id).filter(f => L(f.lesson_id).date.startsWith(ym) && hasHw(f) && hwDue(f)), hwOkN = fsM.filter(f => f.hw_sub).length;   // 和「作业完成 %」同一批作业
-  const bar = (label, big, small, pct, cls = '') => `<div class="v2-bar"><div class="l"><span>${label}</span><span><b>${big}</b>${small ? ` <small>${small}</small>` : ''}</span></div><div class="tr"><i class="${cls}" style="width:${Math.max(0, Math.min(100, Math.round(pct)))}%"></i></div></div>`;
+  // 2026-11-28 晚：三条长条改成三个并排的圆环（用户说长条不直观）。圆环中间是数字，下面是名字和一句说明
+  const ring = (label, big, unit, note, pct, cls = '') => { const C = 263.9, p = Math.max(0, Math.min(100, Math.round(pct)));
+    return `<div class="v2-ring" data-p="${p}"><div class="g"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="tk" cx="50" cy="50" r="42"/>${p ? `<circle class="ar ${cls}" cx="50" cy="50" r="42" stroke-dasharray="${(p / 100 * C).toFixed(1)} ${C}" transform="rotate(-90 50 50)"/>` : ''}</svg><div class="c"><b>${big}</b>${unit ? `<small>${unit}</small>` : ''}</div></div><div class="n">${label}</div>${note ? `<div class="s">${note}</div>` : ''}</div>`; };
   const fs = fbOfS(s.id), lastF = fs[fs.length - 1];
   const mrYm = +TODAY.slice(8) <= 7 ? ymShift(ym, -1) : ym;   // 「月报图片」默认打开哪个月（每月 1–7 号是上个月，和 export.js 一样），按钮上写明白
   const rep = `<section class="v2-rep"><h3>${+ym.slice(5)} 月到今天<small>每天自动更新</small></h3>
-    ${total ? bar('上课', `已上 ${doneN} 节`, `本月排了 ${total} 节${lesTail ? `，${lesTail}` : ''}`, doneN / total * 100) : `<div class="v2-empty">${lsOfS(s.id).some(l => l.date.startsWith(ym)) ? '这个月排的课都取消了' : '这个月还没有排课'}</div>`}
-    ${bar('作业', fsM.length ? `已交 ${hwOkN} / ${fsM.length} 份` : '—', fsM.length ? `提交率 ${st.hwOk}%` : '这个月还没有到期的作业', fsM.length ? st.hwOk : 0, st.hwOk >= 80 ? 'ok' : 'warn')}
+    <div class="v2-rings">
+    ${total ? ring('已上课', doneN, `/ ${total} 节`, lesTail, doneN / total * 100) : ring('已上课', '—', '', lsOfS(s.id).some(l => l.date.startsWith(ym)) ? '这个月排的课都取消了' : '这个月还没有排课', 0)}
+    ${ring('已交作业', fsM.length ? hwOkN : '—', fsM.length ? `/ ${fsM.length} 份` : '', fsM.length ? `提交率 ${st.hwOk}%` : '这个月还没有到期的作业', fsM.length ? st.hwOk : 0, st.hwOk >= 80 ? 'ok' : 'warn')}
+    ${ring('请假', lvN, '次', lvLater ? `后面还请了 ${lvLater} 次` : (full ? '到今天全勤' : ''), !total ? 0 : lvN ? lvN / total * 100 : (full ? 100 : 0), lvN ? 'warn' : 'ok')}
+    </div>
     <button type="button" class="v2-rps" data-act="tab" data-v="c"><span>现在：要交 <b class="${nTodo ? 'warn' : ''}">${nTodo}</b> 份 · 等批改 <b>${nWait}</b> 份 · 批改好了 <b>${nOk}</b> 份</span><span class="v2-link">看作业 ›</span></button>
-    ${total ? bar('请假', `${lvN} 次`, lvLater ? `后面还请了 ${lvLater} 次` : (full ? '到今天全勤' : ''), lvN ? lvN / total * 100 : (full ? 100 : 0), lvN ? 'warn' : 'ok') : ''}
     ${v2PReview(s)}
     ${lastF ? `<div><div class="v2-lab">最近一节课老师说</div><div class="v2-say2">${esc(String(lastF.content || '').slice(0, 90))}${String(lastF.content || '').length > 90 ? '…' : ''}<small>${md(L(lastF.lesson_id).date)} · ${esc(cOfF(lastF).subject)} · ${esc(tName(cOfF(lastF).teacher_id))} · <button type="button" class="v2-link" data-act="tab" data-v="d">看全部 ›</button></small></div></div>`
             : '<div class="v2-empty">上完第一节课后，老师写的反馈会出现在这里</div>'}</section>`;

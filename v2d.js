@@ -299,8 +299,8 @@ function v2PeekHtml(sid){
   const ym = TODAY.slice(0, 7), st = monthStats(s.id, ym), up0 = v2Next(lsOfS(s.id)).filter(l => !isDone(l)), nx = up0.find(l => !lesStarted(l)), live = up0.find(l => l.status === 'scheduled' && lesStarted(l)), un = hwUnsub(s.id).length;   // 下节课＝还没开始的第一节；正在上的单独一行
   const lv = lsOfS(s.id).filter(l => l.date.startsWith(ym) && l.status === 'leave' && l.date <= TODAY).length;   // 请假：到今天为止（今天请的也算），和家长首页的月报一个数
   const cs = DB.courses.filter(c => c.student_id === s.id && c.active !== false), fs = fbOfS(s.id).filter(f => L(f.lesson_id)).slice(-3).reverse();
-  // 出愿：这位学生所有志望校、所有还没到的日子放在一起，取最近两个（以前每所学校只取一个，同一所学校更近的第二个日子会被漏掉）
-  const tg = (typeof targetsOf === 'function' ? targetsOf(s.id) : []).flatMap(t => DATE_KEYS.filter(([k]) => t[k] && t[k] >= TODAY).map(([k, l]) => ({t, e: {date: t[k], label: l, days: dBetween(TODAY, t[k])}})))
+  // 出愿：这位学生所有志望校、所有还没到的日子放在一起，取最近两个（以前每所学校只取一个，同一所学校更近的第二个日子会被漏掉）。资料状态是「已放弃」的学校不列（学生档案、出愿看板里照旧看得到）
+  const tg = (typeof targetsOf === 'function' ? targetsOf(s.id) : []).filter(t => t.doc_status !== '已放弃').flatMap(t => DATE_KEYS.filter(([k]) => t[k] && t[k] >= TODAY).map(([k, l]) => ({t, e: {date: t[k], label: l, days: dBetween(TODAY, t[k])}})))
     .sort((a, b) => a.e.date.localeCompare(b.e.date)).slice(0, 2);
   const rq = isTop() ? DB.requests.filter(q => q.status === 'pending' && L(q.lesson_id) && course(L(q.lesson_id).course_id)?.student_id === s.id).length : 0;
   const pe = lsOfS(s.id).filter(isPend).length;
@@ -315,7 +315,7 @@ function v2PeekHtml(sid){
     ${v2Box(`${+ym.slice(5)} 月`, `<div class="v2-nums"><div><b>${st.actual}</b><small>节已上</small></div><div class="${lv ? 'warn' : ''}"><b>${lv}</b><small>次请假</small></div><div class="${un ? 'warn' : ''}"><b>${un}</b><small>份作业没交</small></div></div>${notes ? `<div class="v2-pkn">${notes}</div>` : ''}`)}
     ${v2Box('在上的课', cs.length ? cs.map(c => row('', `${subjTag(c.subject)} ${esc(tea(c.teacher_id).name)}`)).join('') : '<div class="v2-empty">还没有课程</div>')}
     ${v2Box('最近的老师反馈', fs.length ? fs.map(f => { const l = L(f.lesson_id), t = String(f.content || ''); return row(md(l.date), `${esc(t.slice(0, 28))}${t.length > 28 ? '…' : ''}<small>${esc(tea(cOfF(f).teacher_id).name)}${isTop() && f.status === 'pending' ? ' · 待审批' : ''}${f.confirm === '不满意' ? ' · 学生说不满意' : ''}</small>`); }).join('') : '<div class="v2-empty">还没有反馈</div>')}
-    ${tg.length ? v2Box('出愿', tg.map(x => row('', `${esc(x.t.school)}<small>${esc(x.e.label)} · ${md(x.e.date)}${x.t.doc_status === '已放弃' ? ' · 资料已放弃' : ''}</small>`, `<span class="tag ${x.e.days <= 14 ? 'seal' : 'mute'}">${x.e.days === 0 ? '今天' : x.e.days + ' 天'}</span>`)).join('')) : ''}
+    ${tg.length ? v2Box('出愿', tg.map(x => row('', `${esc(x.t.school)}<small>${esc(x.e.label)} · ${md(x.e.date)}</small>`, `<span class="tag ${x.e.days <= 14 ? 'seal' : 'mute'}">${x.e.days === 0 ? '今天' : x.e.days + ' 天'}</span>`)).join('')) : ''}
     </div>
     <div class="v2-pkf">按 Esc 或点外面收起 · 后面那一页原样不动</div></aside>`;
 }
